@@ -1,5 +1,5 @@
 {
-  "name": "my-turborepo",
+  "name": "Code2Cloud",
   "private": true,
   "scripts": {
     "build": "turbo run build",
