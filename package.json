@@ -1,5 +1,5 @@
 {
-  "name": "Code2Cloud",
+  "name": "code2cloud",
   "private": true,
   "scripts": {
     "build": "turbo run build",
