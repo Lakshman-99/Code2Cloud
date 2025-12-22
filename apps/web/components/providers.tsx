@@ -11,8 +11,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     return (
         <QueryClientProvider client={queryClient}>
             <TooltipProvider>
-                {children}
-                <Sonner />
+                <div className="dark">
+                    {children}
+                    <Sonner />
+                </div>
             </TooltipProvider>
         </QueryClientProvider>
     );
