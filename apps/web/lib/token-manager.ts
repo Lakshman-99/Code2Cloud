@@ -51,10 +51,12 @@ class TokenManager extends EventTarget { // Extend EventTarget for easy events
 
     try {
       const payload = decodeJwt(currentToken);
+      console.log("Decoded JWT payload:", payload);
       this.cachedUser = {
         id: String(payload.sub),
         email: String(payload.email),
         name: String(payload.name || ""),
+        avatar: String(payload.avatar || ""),
       };
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {

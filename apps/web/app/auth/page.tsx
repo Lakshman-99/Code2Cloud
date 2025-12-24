@@ -21,7 +21,6 @@ const AuthPage = () => {
 
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
   const {
@@ -130,13 +129,10 @@ const AuthPage = () => {
               type="button"
               variant="outline"
               className="w-full h-12 bg-background/50 border-border/50 hover:bg-accent/10 hover:border-accent/50 transition-all duration-300"
-              disabled={!!oauthLoading || loading}
+              disabled={loading}
+              onClick={() => window.location.href = "http://localhost:3001/auth/google"}
             >
-              {oauthLoading === "google" ? (
-                <Loader2 className="w-5 h-5 mr-3 animate-spin" />
-              ) : (
-                <Globe className="w-5 h-5 mr-3" />
-              )}
+              <Globe className="w-5 h-5 mr-3" />
               Continue with Google
             </Button>
 
@@ -144,13 +140,10 @@ const AuthPage = () => {
               type="button"
               variant="outline"
               className="w-full h-12 bg-background/50 border-border/50 hover:bg-accent/10 hover:border-accent/50 transition-all duration-300"
-              disabled={!!oauthLoading || loading}
+              disabled={loading}
+              onClick={() => window.location.href = "http://localhost:3001/auth/github"}
             >
-              {oauthLoading === "github" ? (
-                <Loader2 className="w-5 h-5 mr-3 animate-spin" />
-              ) : (
-                <Github className="w-5 h-5 mr-3" />
-              )}
+              <Github className="w-5 h-5 mr-3" />
               Continue with GitHub
             </Button>
           </div>
@@ -254,7 +247,7 @@ const AuthPage = () => {
             <Button
               type="submit"
               className="w-full h-12 bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity text-primary-foreground font-medium"
-              disabled={loading || !!oauthLoading}
+              disabled={loading}
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />

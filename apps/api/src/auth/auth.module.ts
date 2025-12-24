@@ -6,6 +6,8 @@ import { PrismaModule } from "prisma/prisma.module";
 import { JwtModule } from "@nestjs/jwt";
 import { AtStrategy } from "./strategies/at.strategy";
 import { RtStrategy } from "./strategies/rt.strategy";
+import { GoogleStrategy } from "./strategies/google.strategy";
+import { GithubStrategy } from "./strategies/github.strategy";
 
 @Module({
   imports: [
@@ -16,6 +18,6 @@ import { RtStrategy } from "./strategies/rt.strategy";
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, AtStrategy, RtStrategy],
+  providers: [AuthService, AtStrategy, RtStrategy, GoogleStrategy, GithubStrategy],
 })
 export class AuthModule {}

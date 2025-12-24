@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import {
   ForbiddenException,
   Injectable,
@@ -8,6 +9,7 @@ import * as bcrypt from "bcrypt";
 import { JwtService } from "@nestjs/jwt";
 import { SignUpDto } from "./dto/sign-up.dto";
 import { SignInDto } from "./dto/sign-in.dto";
+import { OAuthUser } from "./common/type";
 
 @Injectable()
 export class AuthService {
@@ -38,7 +40,7 @@ async signUp(dto: SignUpDto) {
     });
 
     // Automatically log them in on signup
-    const tokens = await this.getTokens(user.id, user.email, user.name);
+    const tokens = await this.getTokens(user.id, user.email, user.name, user.avatar);
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
     return tokens;
   }
@@ -50,10 +52,10 @@ async signUp(dto: SignUpDto) {
 
     if (!user) throw new UnauthorizedException("Invalid credentials");
 
-    const valid = await bcrypt.compare(dto.password, user.password);
+    const valid = await bcrypt.compare(dto.password, user.password || "");
     if (!valid) throw new UnauthorizedException("Invalid credentials");
 
-    const tokens = await this.getTokens(user.id, user.email, user.name);
+    const tokens = await this.getTokens(user.id, user.email, user.name, user.avatar);
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
 
     return tokens;
@@ -79,9 +81,44 @@ async signUp(dto: SignUpDto) {
     const rtMatches = await bcrypt.compare(rt, user.hashedRefreshToken as string);
     if (!rtMatches) throw new ForbiddenException("Access Denied");
 
-    const tokens = await this.getTokens(user.id, user.email, user.name);
+    const tokens = await this.getTokens(user.id, user.email, user.name, user.avatar);
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
 
+    return tokens;
+  }
+
+  async validateOAuthLogin(profile: OAuthUser) {
+    // 1. Check if user exists
+    let user = await this.prisma.user.findUnique({
+      where: { email: profile.email },
+    });
+
+    // 2. If not, create them (No password needed!)
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          email: profile.email,
+          name: profile.name,
+          avatar: profile.picture, // Store the image!
+          provider: profile.provider,
+          password: null, // Explicitly null
+        },
+      });
+    } else {
+      // Optional: Update avatar if they changed it on Google/GitHub
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { 
+          avatar: profile.picture,
+          provider: profile.provider 
+        }
+      });
+    }
+
+    // 3. Generate Tokens (using your existing logic)
+    const tokens = await this.getTokens(user.id, user.email, user.name, user.avatar);
+    await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
+    
     return tokens;
   }
 
@@ -95,27 +132,19 @@ async signUp(dto: SignUpDto) {
     });
   }
 
-  async getTokens(userId: string, email: string, name: string | null) {
+  async getTokens(userId: string, email: string, name: string | null, avatar: string | null = null) {
     const payload = {
       sub: userId,
       email,
       name: name || "",
-    }
+      avatar,
+    };
 
     const [at, rt] = await Promise.all([
-      this.jwt.signAsync(payload, {
-        secret: process.env.JWT_SECRET,
-        expiresIn: '15m',
-      }),
-      this.jwt.signAsync(payload, {
-        secret: process.env.JWT_REFRESH_SECRET,
-        expiresIn: '7d',
-      }),
+      this.jwt.signAsync(payload, { secret: process.env.JWT_SECRET, expiresIn: '15m' }),
+      this.jwt.signAsync(payload, { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '7d' }),
     ]);
 
-    return {
-      accessToken: at,
-      refreshToken: rt,
-    };
+    return { accessToken: at, refreshToken: rt };
   }
 }

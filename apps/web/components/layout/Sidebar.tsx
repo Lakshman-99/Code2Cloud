@@ -47,6 +47,8 @@ export const Sidebar = () => {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar, toggleCommandPalette } = useMockStore();
 
+  console.log("Sidebar render - user:", user);
+
   const handleLogout = async () => {
     // 1. Optimistic UI: Immediately show feedback
     const toastId = toast.loading("Logging out...");
@@ -174,7 +176,7 @@ export const Sidebar = () => {
             )}>
               <Avatar className="h-8 w-8 rounded-lg border border-white/10">
                 {/* Use name initials or fallback icon */}
-                <AvatarImage src={`https://avatar.vercel.sh/${user?.email}`} alt={user?.name} />
+                <AvatarImage src={user?.avatar || `https://avatar.vercel.sh/${user?.email}`} alt={user?.name} />
                 <AvatarFallback className="rounded-lg bg-muted text-muted-foreground">
                   <UserIcon className="w-4 h-4" />
                 </AvatarFallback>

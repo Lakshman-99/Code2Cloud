@@ -2,6 +2,7 @@ import type { Config } from "tailwindcss";
 import tailwindcssAnimate from 'tailwindcss-animate';  // Correct import syntax
 
 export default {
+  reactStrictMode: false,
   darkMode: ["class", "dark"],
   content: [
     "./app/**/*.{ts,tsx}",
@@ -104,4 +105,12 @@ export default {
     },
   },
   plugins: [tailwindcssAnimate],
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
+    ],
+  },
 } satisfies Config;
