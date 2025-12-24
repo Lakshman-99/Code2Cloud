@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { useUser } from "@/hooks/use-user";
 
 const settingsSections = [
   {
@@ -39,6 +40,8 @@ const settingsSections = [
 ];
 
 const Settings = () => {
+  const { user } = useUser();
+
   return (
     <div className="p-8">
       {/* Header */}
@@ -102,8 +105,8 @@ const Settings = () => {
                 JD
               </div>
               <div>
-                <p className="text-foreground font-medium">John Doe</p>
-                <p className="text-sm text-muted-foreground">john@acme.dev</p>
+                <p className="text-foreground font-medium">{user?.name || "Guest"}</p>
+                <p className="text-sm text-muted-foreground">{user?.email || "guest@example.com"}</p>
                 <Button variant="outline" size="sm" className="mt-2">
                   Change Avatar
                 </Button>
@@ -116,7 +119,7 @@ const Settings = () => {
                   Full Name
                 </label>
                 <Input
-                  defaultValue="John Doe"
+                  defaultValue={user?.name || "Guest"}
                   className="bg-card/50 border-white/5"
                 />
               </div>
@@ -125,7 +128,7 @@ const Settings = () => {
                   Email
                 </label>
                 <Input
-                  defaultValue="john@acme.dev"
+                  defaultValue={user?.email || "guest@example.com"}
                   className="bg-card/50 border-white/5"
                 />
               </div>

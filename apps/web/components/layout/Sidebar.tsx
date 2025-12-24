@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion } from 'framer-motion';
 import {
   LayoutGrid,
@@ -12,12 +12,26 @@ import {
   Settings,
   Command,
   ChevronRight,
-  User,
-  ChevronDown,
+  User as UserIcon,
   Search,
+  LogOut,
+  MoreVertical,
 } from 'lucide-react';
 import { useMockStore } from '@/stores/useMockStore';
 import { cn } from '@/lib/utils';
+import { useUser } from '@/hooks/use-user';
+import { tokenManager } from '@/lib/token-manager';
+import { api } from '@/lib/api-client';
+import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const menuItems = [
   { icon: LayoutGrid, label: 'Overview', path: '/dashboard' },
@@ -28,8 +42,29 @@ const menuItems = [
 ];
 
 export const Sidebar = () => {
+  const { user } = useUser();
+  const router = useRouter();
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar, toggleCommandPalette } = useMockStore();
+
+  const handleLogout = async () => {
+    // 1. Optimistic UI: Immediately show feedback
+    const toastId = toast.loading("Logging out...");
+
+    try {
+      // 2. Tell Backend to revoke refresh token (Secure!)
+      // We pass skipAuth: false to ensure we send the token so the backend knows WHO to logout
+      await api.post('/auth/logout'); 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error) {
+      console.warn("Backend logout failed (token might be expired), clearing local state anyway.");
+    } finally {
+      // 3. Always clear local state and redirect
+      tokenManager.clearTokens();
+      toast.success("Logged out successfully", { id: toastId });
+      router.push('/auth');
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -50,7 +85,7 @@ export const Sidebar = () => {
       transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
       className="fixed left-0 top-0 h-screen bg-sidebar border-r border-white/5 flex flex-col z-50"
     >
-      {/* Header - Single unified logo section */}
+      {/* Header */}
       <div className="h-16 flex items-center px-4 border-b border-white/5">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center flex-shrink-0">
@@ -129,51 +164,85 @@ export const Sidebar = () => {
         })}
       </nav>
 
-      {/* Footer */}
+      {/* Footer - NOW WITH DROPDOWN */}
       <div className="border-t border-white/5 p-3">
-        {/* Team Switcher */}
-        <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors mb-2">
-          <div className="w-6 h-6 rounded bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-            A
-          </div>
-          <motion.div
-            initial={false}
-            animate={{ 
-              opacity: sidebarCollapsed ? 0 : 1,
-              width: sidebarCollapsed ? 0 : 'auto',
-            }}
-            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-            className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden"
-          >
-            <span className="text-sm flex-1 text-left whitespace-nowrap">Acme Corp</span>
-            <ChevronDown className="w-4 h-4 flex-shrink-0" />
-          </motion.div>
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className={cn(
+              "flex items-center gap-3 px-2 py-2 w-full rounded-lg hover:bg-white/5 transition-colors text-left group outline-none",
+              sidebarCollapsed && "justify-center px-0"
+            )}>
+              <Avatar className="h-8 w-8 rounded-lg border border-white/10">
+                {/* Use name initials or fallback icon */}
+                <AvatarImage src={`https://avatar.vercel.sh/${user?.email}`} alt={user?.name} />
+                <AvatarFallback className="rounded-lg bg-muted text-muted-foreground">
+                  <UserIcon className="w-4 h-4" />
+                </AvatarFallback>
+              </Avatar>
 
-        {/* User */}
-        <div className="flex items-center gap-3 px-3 py-2.5">
-          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-            <User className="w-4 h-4 text-muted-foreground" />
-          </div>
-          <motion.div
-            initial={false}
-            animate={{ 
-              opacity: sidebarCollapsed ? 0 : 1,
-              width: sidebarCollapsed ? 0 : 'auto',
-            }}
-            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-            className="flex-1 min-w-0 overflow-hidden"
+              <motion.div
+                initial={false}
+                animate={{ 
+                  opacity: sidebarCollapsed ? 0 : 1,
+                  width: sidebarCollapsed ? 0 : 'auto',
+                }}
+                transition={{ duration: 0.2 }}
+                className="flex-1 min-w-0 overflow-hidden"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="truncate">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {user?.name || "Guest"}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {user?.email || "guest@example.com"}
+                    </p>
+                  </div>
+                  <MoreVertical className="w-4 h-4 text-muted-foreground opacity-50 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </motion.div>
+            </button>
+          </DropdownMenuTrigger>
+          
+          <DropdownMenuContent 
+            align="end" 
+            side="right" 
+            className="w-56 bg-card/95 backdrop-blur-xl border-white/10"
+            sideOffset={10}
           >
-            <p className="text-sm font-medium text-foreground truncate whitespace-nowrap">John Doe</p>
-            <p className="text-xs text-muted-foreground truncate whitespace-nowrap">john@acme.dev</p>
-          </motion.div>
-        </div>
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none">{user?.name}</p>
+                <p className="text-xs leading-none text-muted-foreground">
+                  {user?.email}
+                </p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-white/10" />
+            <DropdownMenuItem className="cursor-pointer select-none outline-none focus:bg-transparent focus:text-foreground focus:ring-0 data-[highlighted]:bg-white/5 data-[highlighted]:text-foreground">
+              <UserIcon className="mr-2 h-4 w-4" />
+              <span>Profile</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem className="cursor-pointer select-none outline-none focus:bg-transparent focus:text-foreground focus:ring-0 data-[highlighted]:bg-white/5 data-[highlighted]:text-foreground">
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Settings</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-white/10" />
+            <DropdownMenuItem 
+              onClick={handleLogout}
+              className="cursor-pointer select-none outline-none focus:bg-transparent focus:text-destructive focus:ring-0 data-[highlighted]:bg-white/5 data-[highlighted]:text-foreground text-destructive"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Log out</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Collapse Toggle */}
       <button
         onClick={toggleSidebar}
-        className="absolute z-10 -right-3 top-30 w-6 h-6 rounded-full bg-card border border-white/10 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+        className="absolute z-10 -right-3 top-24 w-6 h-6 rounded-full bg-card border border-white/10 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shadow-lg"
       >
         <motion.div
           initial={false}

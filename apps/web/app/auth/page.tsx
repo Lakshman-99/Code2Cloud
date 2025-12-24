@@ -9,10 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { api } from "@/lib/api-client";
+import { useRouter } from "next/navigation";
+import { AuthResponse } from "@/types/auth";
 import { Rocket, Mail, Lock, User, Github, Loader2, Globe, Eye, EyeOff } from "lucide-react";
 import { signInSchema, signUpSchema } from "@/lib/validation/auth";
+import { tokenManager } from "@/lib/token-manager";
 
 const AuthPage = () => {
+  const router = useRouter();
+
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
@@ -24,18 +30,40 @@ const AuthPage = () => {
     formState: { errors },
   } = useForm<any>({
     resolver: zodResolver(isLogin ? signInSchema : signUpSchema),
-    defaultValues: { email: "", password: "", name: "" },
+    defaultValues: { email: "siva.l@northeastern.edu", password: "Code@2024", name: "" },
   });
 
-  const onSubmit = (data: any) => {
-    const id = toast.loading("Signing you in...")
+  const onSubmit = async (data: any) => {
+    const toastId = toast.loading(isLogin ? "Signing you in..." : "Creating account...");
     setLoading(true);
-    // For now we just log & show toast; real auth to be implemented later
-    console.log("Auth form submitted:", data, { isLogin });
-    setTimeout(() => {
+
+    try {
+      if (isLogin) {
+        // Login Flow
+        const res = await api.post<AuthResponse>("/auth/signin", data, { skipAuth: true });
+        
+        // Let TokenManager handle storage (Memory + LocalStorage)
+        tokenManager.setTokens(res);
+        
+        toast.success("Welcome back!", { id: toastId });
+      } else {
+        // Signup Flow
+        const res = await api.post<AuthResponse>("/auth/signup", data, { skipAuth: true });
+        
+        // Auto-login on signup (since your backend returns tokens now!)
+        tokenManager.setTokens(res);
+        
+        toast.success("Account created!", { id: toastId });
+      }
+
+      router.push("/dashboard"); 
+      router.refresh();
+    } catch (error: any) {
+      console.error("Auth error:", error);
+      toast.error(error.message || "Something went wrong", { id: toastId });
+    } finally {
       setLoading(false);
-      toast.success("Welcome back!", { id })
-    }, 1600);
+    }
   };
 
   return (

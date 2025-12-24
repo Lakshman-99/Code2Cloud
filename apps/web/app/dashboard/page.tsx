@@ -8,8 +8,10 @@ import { ProjectCard } from "@/components/dashboard/ProjectCard";
 import { QuickStats } from "@/components/dashboard/QuickStats";
 import { CardSkeleton, ChartSkeleton } from "@/components/ui/skeleton-shimmer";
 import { useMockStore } from "@/stores/useMockStore";
+import { useUser } from "@/hooks/use-user";
 
 const Index = () => {
+  const { user } = useUser();
   const { projects, loading, setLoading } = useMockStore();
 
   useEffect(() => {
@@ -26,7 +28,7 @@ const Index = () => {
         className="mb-8"
       >
         <h1 className="text-3xl font-bold text-foreground mb-2">
-          Welcome back, <span className="gradient-text">John</span>
+          Welcome back, <span className="gradient-text">{user?.name || "Guest"}</span>
         </h1>
         <p className="text-muted-foreground">
           Here&apos;s what&apos;s happening with your projects today.
