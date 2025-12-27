@@ -1,12 +1,13 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { User, Bell, Shield, Globe, Palette, Code } from "lucide-react";
+import { User, Bell, Shield, Globe, Palette, Code, UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/use-user";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const settingsSections = [
   {
@@ -101,9 +102,12 @@ const Settings = () => {
             </h3>
 
             <div className="flex items-center gap-6 mb-8">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-2xl font-bold text-primary-foreground">
-                JD
-              </div>
+              <Avatar className="w-20 h-20 rounded-full border border-white/10 shadow-sm">
+                <AvatarImage src={user?.avatar || `https://avatar.vercel.sh/${user?.email}`} alt={user?.name} />
+                <AvatarFallback className="rounded-lg bg-primary/10 text-primary font-medium">
+                  <UserIcon className="w-10 h-10" />
+                </AvatarFallback>
+              </Avatar>
               <div>
                 <p className="text-foreground font-medium">{user?.name || "Guest"}</p>
                 <p className="text-sm text-muted-foreground">{user?.email || "guest@example.com"}</p>

@@ -1,11 +1,9 @@
 "use client";
 
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { ProjectHeader } from "@/components/project/ProjectHeader";
-import { PipelineVisualizer } from "@/components/project/PipelineVisualizer";
 import { DeploymentsTable } from "@/components/project/DeploymentsTable";
 import { TerminalLogs } from "@/components/project/TerminalLogs";
 import { EnvVarsPanel } from "@/components/project/EnvVarsPanel";
@@ -13,22 +11,32 @@ import { StoragePanel } from "@/components/project/StoragePanel";
 import { useMockStore } from "@/stores/useMockStore";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ProjectOverview } from "@/components/project/ProjectOverview";
 
 const tabs = ["Overview", "Deployments", "Logs", "Storage", "Settings"];
 
 const ProjectDetail = () => {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
 
   const projectId = params.id as string;
 
-  const { getProjectById, getDeploymentsByProject, getLogsByProject } =
-    useMockStore();
-  const [activeTab, setActiveTab] = useState("Overview");
+  const { getProjectById, getDeploymentsByProject, getLogsByProject } = useMockStore();
+
+  const tabParam = searchParams.get("tab");
+  const activeTab = tabs.find((t) => t.toLowerCase() === tabParam?.toLowerCase()) || "Overview";
 
   const project = getProjectById(projectId);
   const deployments = getDeploymentsByProject(projectId);
   const logs = getLogsByProject(projectId);
+
+  const handleTabChange = (tab: string) => {
+    const newParams = new URLSearchParams(searchParams.toString());
+    newParams.set("tab", tab.toLowerCase());
+    router.push(`${pathname}?${newParams.toString()}`);
+  };
 
   if (!project) {
     return (
@@ -63,7 +71,7 @@ const ProjectDetail = () => {
           {tabs.map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => handleTabChange(tab)}
               className={cn(
                 "px-4 py-3 text-sm font-medium transition-colors relative",
                 activeTab === tab
@@ -93,17 +101,7 @@ const ProjectDetail = () => {
             exit={{ opacity: 0, y: -10 }}
             className="space-y-6"
           >
-            <PipelineVisualizer />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <DeploymentsTable
-                deployments={deployments.slice(0, 3)}
-                project={project}
-              />
-              <TerminalLogs
-                logs={logs.slice(0, 6)}
-                projectName={project.name}
-              />
-            </div>
+            <ProjectOverview project={project} />
           </motion.div>
         )}
 

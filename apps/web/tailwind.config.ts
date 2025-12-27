@@ -29,6 +29,9 @@ export default {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         glass: "hsl(var(--glass))",
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
+        info: "hsl(var(--info))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -114,6 +117,8 @@ export default {
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         shimmer: "linear-gradient(90deg, transparent, hsl(var(--muted) / 0.3), transparent)",
+        "gradient-primary": "linear-gradient(135deg, hsl(238, 83%, 67%), hsl(270, 70%, 60%))",
+        "gradient-glow": "radial-gradient(ellipse at center, hsl(238, 83%, 67%, 0.15), transparent 70%)",
       },
       spacing: {
         30: "7.5rem",

@@ -1,5 +1,8 @@
+"use client";
+
 import { motion } from 'framer-motion';
-import { ExternalLink, GitBranch, Clock } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { GitBranch, Clock, CheckCircle2, XCircle, Loader2, PlayCircle, ArrowRight } from 'lucide-react';
 import { Deployment, Project } from '@/stores/useMockStore';
 import { cn } from '@/lib/utils';
 
@@ -8,43 +11,47 @@ interface DeploymentsTableProps {
   project: Project;
 }
 
-export const DeploymentsTable = ({ deployments, project }: DeploymentsTableProps) => {
+const statusIcons = {
+  ready: <CheckCircle2 className="w-4 h-4 text-emerald-500" />,
+  building: <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />,
+  error: <XCircle className="w-4 h-4 text-red-500" />,
+  queued: <PlayCircle className="w-4 h-4 text-yellow-500" />,
+};
+
+export const DeploymentsTable = ({ deployments }: DeploymentsTableProps) => {
+  const router = useRouter();
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="glass-card overflow-hidden"
+      className="glass-card overflow-hidden rounded-xl border border-white/10"
     >
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-white/5">
-              <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">Status</th>
-              <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">Commit</th>
-              <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">Branch</th>
-              <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">Runtime</th>
-              <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">Duration</th>
-              <th className="text-left px-6 py-4 text-sm font-medium text-muted-foreground">Time</th>
+            <tr className="border-b border-white/5 bg-white/5">
+              <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase">Status</th>
+              <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase">Commit</th>
+              <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase">Branch</th>
+              <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase">Duration</th>
+              <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase">Created</th>
               <th className="px-6 py-4"></th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-white/5">
             {deployments.map((deployment, index) => (
               <motion.tr
                 key={deployment.id}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="border-b border-white/5 hover:bg-white/5 transition-colors group"
+                onClick={() => router.push(`/dashboard/deployments/${deployment.id}`)} // Navigate to details
+                className="hover:bg-white/5 transition-colors group cursor-pointer"
               >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
-                    <div className={cn(
-                      "status-dot",
-                      deployment.status === 'ready' && "status-dot-ready",
-                      deployment.status === 'building' && "status-dot-building",
-                      deployment.status === 'error' && "status-dot-error"
-                    )} />
+                    {statusIcons[deployment.status as keyof typeof statusIcons]}
                     <span className={cn(
                       "text-sm font-medium capitalize",
                       deployment.status === 'ready' && "text-emerald-400",
@@ -56,42 +63,28 @@ export const DeploymentsTable = ({ deployments, project }: DeploymentsTableProps
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <div>
-                    <code className="text-sm text-foreground font-mono">{deployment.commit}</code>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-[200px]">
-                      {deployment.commitMessage}
-                    </p>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-mono text-foreground font-medium">{deployment.commit.substring(0, 7)}</span>
+                    <span className="text-xs text-muted-foreground truncate max-w-[250px]">{deployment.commitMessage}</span>
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <GitBranch className="w-3 h-3" />
-                    {deployment.branch}
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground bg-white/5 px-2 py-1 rounded-md w-fit">
+                    <GitBranch className="w-3.5 h-3.5" />
+                    <span className="text-xs font-medium">{deployment.branch}</span>
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <span className={cn(
-                    "px-2 py-1 rounded-md text-xs font-medium",
-                    project.type === 'python'
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : "bg-white/10 text-foreground"
-                  )}>
-                    {deployment.runtime}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <Clock className="w-3 h-3" />
-                    {deployment.duration > 0 ? `${deployment.duration}s` : '—'}
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>{deployment.duration}</span>
                   </div>
                 </td>
                 <td className="px-6 py-4 text-sm text-muted-foreground">
                   {deployment.timestamp}
                 </td>
-                <td className="px-6 py-4">
-                  <button className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground">
-                    <ExternalLink className="w-4 h-4" />
-                  </button>
+                <td className="px-6 py-4 text-right">
+                  <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </td>
               </motion.tr>
             ))}

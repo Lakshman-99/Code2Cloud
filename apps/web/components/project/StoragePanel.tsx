@@ -1,26 +1,22 @@
 "use client";
 
 import { motion } from 'framer-motion';
-import { Database, Copy, HardDrive, Activity } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Database, Copy, HardDrive, Server } from 'lucide-react';
 import { toast } from 'sonner';
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
+import { XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, Line, LineChart } from 'recharts';
 
-const usageData = [
-  { time: '1w', storage: 120 },
-  { time: '2w', storage: 145 },
-  { time: '3w', storage: 160 },
-  { time: '4w', storage: 178 },
-  { time: '5w', storage: 195 },
-  { time: '6w', storage: 220 },
-  { time: '7w', storage: 248 },
-];
 
 export const StoragePanel = () => {
-  const copyConnectionString = () => {
-    navigator.clipboard.writeText('postgresql://user:****@db.code2cloud.dev:5432/main');
-    toast.success('Connection string copied');
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard");
   };
+
+  const storageData = Array.from({ length: 7 }, (_, i) => ({
+    day: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i],
+    // eslint-disable-next-line react-hooks/purity
+    usage: Math.floor(Math.random() * 500) + 200,
+  }));
 
   return (
     <motion.div
@@ -46,87 +42,119 @@ export const StoragePanel = () => {
           </div>
         </div>
 
-        {/* Connection String */}
-        <div className="bg-zinc-950 rounded-lg p-4 mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground">Connection String</span>
-            <Button variant="ghost" size="sm" onClick={copyConnectionString} className="gap-2">
-              <Copy className="w-3 h-3" />
-              Copy
-            </Button>
+        <div className="space-y-4">
+          <div className="p-4 rounded-lg bg-secondary/30 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Connection String</span>
+              <button
+                onClick={() =>
+                  handleCopy('postgres://user:****@db.code2cloud.dev:5432/production')
+                }
+                className="p-1.5 rounded hover:bg-secondary transition-colors"
+              >
+                <Copy className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+            <code className="text-sm text-foreground font-mono block truncate">
+              postgres://user:****@db.code2cloud.dev:5432/production
+            </code>
           </div>
-          <code className="text-sm text-foreground font-mono break-all">
-            postgresql://user:****@db.code2cloud.dev:5432/main
-          </code>
+
+          <div className="p-4 rounded-lg bg-secondary/30 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Pooled Connection</span>
+              <button
+                onClick={() =>
+                  handleCopy('postgres://user:****@pooler.code2cloud.dev:6543/production')
+                }
+                className="p-1.5 rounded hover:bg-secondary transition-colors"
+              >
+                <Copy className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </div>
+            <code className="text-sm text-foreground font-mono block truncate">
+              postgres://user:****@pooler.code2cloud.dev:6543/production
+            </code>
+          </div>
+        </div>
+      </div>
+
+      {/* Storage Usage */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="glass-card rounded-xl p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <HardDrive className="w-5 h-5 text-primary" />
+            <span className="text-sm text-muted-foreground">Database Size</span>
+          </div>
+          <p className="text-2xl font-bold text-foreground">2.4 GB</p>
+          <p className="text-xs text-muted-foreground mt-1">of 10 GB limit</p>
+          <div className="mt-3 h-1.5 bg-secondary rounded-full overflow-hidden">
+            <div className="h-full w-[24%] gradient-primary rounded-full" />
+          </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="p-4 rounded-xl bg-white/5">
-            <div className="flex items-center gap-2 text-muted-foreground mb-2">
-              <HardDrive className="w-4 h-4" />
-              <span className="text-sm">Storage Used</span>
-            </div>
-            <p className="text-2xl font-bold text-foreground">248 MB</p>
-            <p className="text-xs text-muted-foreground mt-1">of 1 GB limit</p>
+        <div className="glass-card rounded-xl p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <Server className="w-5 h-5 text-accent" />
+            <span className="text-sm text-muted-foreground">Blob Storage</span>
           </div>
-          <div className="p-4 rounded-xl bg-white/5">
-            <div className="flex items-center gap-2 text-muted-foreground mb-2">
-              <Database className="w-4 h-4" />
-              <span className="text-sm">Tables</span>
-            </div>
-            <p className="text-2xl font-bold text-foreground">12</p>
-            <p className="text-xs text-muted-foreground mt-1">Active tables</p>
+          <p className="text-2xl font-bold text-foreground">847 MB</p>
+          <p className="text-xs text-muted-foreground mt-1">1,234 files</p>
+          <div className="mt-3 h-1.5 bg-secondary rounded-full overflow-hidden">
+            <div className="h-full w-[8%] bg-accent rounded-full" />
           </div>
-          <div className="p-4 rounded-xl bg-white/5">
-            <div className="flex items-center gap-2 text-muted-foreground mb-2">
-              <Activity className="w-4 h-4" />
-              <span className="text-sm">Queries/min</span>
-            </div>
-            <p className="text-2xl font-bold text-foreground">1.2k</p>
-            <p className="text-xs text-muted-foreground mt-1">Avg last hour</p>
+        </div>
+
+        <div className="glass-card rounded-xl p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <Database className="w-5 h-5 text-success" />
+            <span className="text-sm text-muted-foreground">KV Storage</span>
+          </div>
+          <p className="text-2xl font-bold text-foreground">156 KB</p>
+          <p className="text-xs text-muted-foreground mt-1">89 keys</p>
+          <div className="mt-3 h-1.5 bg-secondary rounded-full overflow-hidden">
+            <div className="h-full w-[2%] bg-success rounded-full" />
           </div>
         </div>
       </div>
 
       {/* Usage Chart */}
-      <div className="glass-card p-6">
-        <h3 className="text-lg font-semibold text-foreground mb-6">Storage Growth</h3>
-        <div className="h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={usageData}>
-              <defs>
-                <linearGradient id="colorStorage" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="hsl(142, 71%, 45%)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis
-                dataKey="time"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'hsl(240, 5%, 55%)', fontSize: 12 }}
-              />
-              <YAxis hide />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'hsl(240, 10%, 8%)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '8px',
-                }}
-                labelStyle={{ color: 'hsl(0, 0%, 98%)' }}
-                formatter={(value: number) => [`${value} MB`, 'Storage']}
-              />
-              <Area
-                type="monotone"
-                dataKey="storage"
-                stroke="hsl(142, 71%, 45%)"
-                strokeWidth={2}
-                fill="url(#colorStorage)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+      <div className="glass-card rounded-xl p-6">
+        <h3 className="text-lg font-semibold text-foreground mb-6">Storage Usage (Last 7 Days)</h3>
+        <ResponsiveContainer width="100%" height={200}>
+          <LineChart data={storageData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(240, 4%, 16%)" />
+            <XAxis
+              dataKey="day"
+              stroke="hsl(240, 5%, 55%)"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
+            />
+            <YAxis
+              stroke="hsl(240, 5%, 55%)"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(value) => `${value}MB`}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: 'hsl(240, 6%, 8%)',
+                border: '1px solid hsl(240, 4%, 16%)',
+                borderRadius: '8px',
+              }}
+              labelStyle={{ color: 'hsl(240, 5%, 96%)' }}
+            />
+            <Line
+              type="monotone"
+              dataKey="usage"
+              stroke="hsl(270, 70%, 60%)"
+              strokeWidth={2}
+              dot={{ fill: 'hsl(270, 70%, 60%)', r: 4 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
     </motion.div>
   );

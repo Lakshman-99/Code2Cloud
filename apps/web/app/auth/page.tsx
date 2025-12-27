@@ -12,7 +12,8 @@ import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
 import { AuthResponse } from "@/types/auth";
-import { Rocket, Mail, Lock, User, Github, Loader2, Globe, Eye, EyeOff } from "lucide-react";
+import { FaGoogle, FaGithub } from "react-icons/fa";
+import { Rocket, Mail, Lock, User, Loader2, Eye, EyeOff } from "lucide-react";
 import { signInSchema, signUpSchema } from "@/lib/validation/auth";
 import { tokenManager } from "@/lib/token-manager";
 
@@ -132,7 +133,7 @@ const AuthPage = () => {
               disabled={loading}
               onClick={() => window.location.href = "http://localhost:3001/auth/google"}
             >
-              <Globe className="w-5 h-5 mr-3" />
+              <FaGoogle />
               Continue with Google
             </Button>
 
@@ -143,7 +144,7 @@ const AuthPage = () => {
               disabled={loading}
               onClick={() => window.location.href = "http://localhost:3001/auth/github"}
             >
-              <Github className="w-5 h-5 mr-3" />
+              <FaGithub />
               Continue with GitHub
             </Button>
           </div>
