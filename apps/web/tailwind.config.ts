@@ -126,4 +126,12 @@ export default {
     },
   },
   plugins: [tailwindcssAnimate],
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
+      },
+    ],
+  },
 } satisfies Config;

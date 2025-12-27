@@ -96,13 +96,15 @@ export default function DeploymentDetails() {
         className="flex flex-col xl:flex-row xl:items-center justify-between gap-6"
       >
         <div className="flex flex-col gap-4">
-          <button 
+          <motion.button
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-white transition-colors w-fit group"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors group"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            <span className="font-mono tracking-wide text-xs uppercase">Back to Fleet</span>
-          </button>
+            Back to Fleet
+          </motion.button>
 
           <div className="flex items-center gap-4">
             <div className={cn(

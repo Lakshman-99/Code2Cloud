@@ -182,7 +182,7 @@ export const Sidebar = () => {
           <DropdownMenuTrigger asChild>
             <button className={cn(
               "flex items-center gap-3 px-2 py-2 w-full rounded-xl hover:bg-white/5 transition-all duration-200 text-left group outline-none",
-              sidebarCollapsed && "justify-center px-0"
+              sidebarCollapsed && "p-0 hover:bg-transparent"
             )}>
               <Avatar className="h-9 w-9 rounded-lg border border-white/10 shadow-sm">
                 <AvatarImage src={user?.avatar || `https://avatar.vercel.sh/${user?.email}`} alt={user?.name} />

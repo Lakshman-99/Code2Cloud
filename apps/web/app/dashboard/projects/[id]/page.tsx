@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useParams, useSearchParams, usePathname } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { ProjectHeader } from "@/components/project/ProjectHeader";
@@ -12,6 +12,7 @@ import { useMockStore } from "@/stores/useMockStore";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ProjectOverview } from "@/components/project/ProjectOverview";
+import { useEffect, useState } from "react";
 
 const tabs = ["Overview", "Deployments", "Logs", "Storage", "Settings"];
 
@@ -19,24 +20,42 @@ const ProjectDetail = () => {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
-  const pathname = usePathname();
 
   const projectId = params.id as string;
-
   const { getProjectById, getDeploymentsByProject, getLogsByProject } = useMockStore();
 
-  const tabParam = searchParams.get("tab");
-  const activeTab = tabs.find((t) => t.toLowerCase() === tabParam?.toLowerCase()) || "Overview";
+  // Determine active tab
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabParam = searchParams.get("tab");
+    return tabs.find((t) => t.toLowerCase() === tabParam?.toLowerCase()) || "Overview";
+  });
 
   const project = getProjectById(projectId);
   const deployments = getDeploymentsByProject(projectId);
   const logs = getLogsByProject(projectId);
 
   const handleTabChange = (tab: string) => {
-    const newParams = new URLSearchParams(searchParams.toString());
-    newParams.set("tab", tab.toLowerCase());
-    router.push(`${pathname}?${newParams.toString()}`);
+    // A. Update UI immediately
+    setActiveTab(tab);
+
+    // B. Update URL silently (No Router Push = No Lag)
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.set("tab", tab.toLowerCase());
+    window.history.replaceState({}, "", newUrl.toString());
   };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (tab) {
+        const found = tabs.find((t) => t.toLowerCase() === tab.toLowerCase());
+        if (found) setActiveTab(found);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   if (!project) {
     return (
@@ -49,16 +68,34 @@ const ProjectDetail = () => {
     );
   }
 
+  // Helper to render content without repetition
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "Overview":
+        return <ProjectOverview project={project} />;
+      case "Deployments":
+        return <DeploymentsTable deployments={deployments} project={project} />;
+      case "Logs":
+        return <TerminalLogs logs={logs} projectName={project.name} />;
+      case "Storage":
+        return <StoragePanel />;
+      case "Settings":
+        return <EnvVarsPanel />;
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="p-8">
+    <div className="p-8 max-w-[1600px] mx-auto">
       {/* Back Button */}
       <motion.button
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         onClick={() => router.push("/dashboard/projects")}
-        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
+        className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6 group"
       >
-        <ArrowLeft className="w-4 h-4" />
+        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
         Back to Projects
       </motion.button>
 
@@ -69,86 +106,51 @@ const ProjectDetail = () => {
       <div className="border-b border-white/5 mb-8">
         <div className="flex gap-1">
           {tabs.map((tab) => (
-            <button
+            <motion.div 
               key={tab}
-              onClick={() => handleTabChange(tab)}
-              className={cn(
-                "px-4 py-3 text-sm font-medium transition-colors relative",
-                activeTab === tab
-                  ? "text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.15, ease: "easeOut" }} // Fast & snappy
             >
-              {tab}
-              {activeTab === tab && (
-                <motion.div
-                  layoutId="activeTab"
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary to-accent"
-                />
-              )}
-            </button>
+              <button
+                key={tab}
+                onClick={() => handleTabChange(tab)}
+                className={cn(
+                  "px-4 py-3 text-sm font-medium transition-colors relative",
+                  activeTab === tab
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {tab}
+                {activeTab === tab && (
+                  <motion.div
+                    layoutId="activeTab"
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary to-accent"
+                  />
+                )}
+              </button>
+            </motion.div>
           ))}
         </div>
       </div>
 
-      {/* Tab Content */}
-      <AnimatePresence mode="wait">
-        {activeTab === "Overview" && (
+      {/* Content Area - Optimized Animation */}
+      <div className="relative min-h-[400px]">
+        <AnimatePresence mode="popLayout">
           <motion.div
-            key="overview"
+            key={activeTab} // Unique key triggers the animation
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="space-y-6"
+            transition={{ duration: 0.15, ease: "easeOut" }} // Fast & snappy
           >
-            <ProjectOverview project={project} />
+            {renderTabContent()}
           </motion.div>
-        )}
-
-        {activeTab === "Deployments" && (
-          <motion.div
-            key="deployments"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-          >
-            <DeploymentsTable deployments={deployments} project={project} />
-          </motion.div>
-        )}
-
-        {activeTab === "Logs" && (
-          <motion.div
-            key="logs"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-          >
-            <TerminalLogs logs={logs} projectName={project.name} />
-          </motion.div>
-        )}
-
-        {activeTab === "Storage" && (
-          <motion.div
-            key="storage"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-          >
-            <StoragePanel />
-          </motion.div>
-        )}
-
-        {activeTab === "Settings" && (
-          <motion.div
-            key="settings"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-          >
-            <EnvVarsPanel />
-          </motion.div>
-        )}
-      </AnimatePresence>
+        </AnimatePresence>
+      </div>
     </div>
   );
 };

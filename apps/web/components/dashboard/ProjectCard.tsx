@@ -36,6 +36,7 @@ const ProjectCard = ({ project, layout = false }: ProjectCardProps) => {
     <motion.div
       layout={layout}
       variants={itemVariants}
+      onClick={() => router.push(`/dashboard/projects/${project.id}`)}
       className="group relative"
     >
       <div className={cn(
@@ -44,7 +45,6 @@ const ProjectCard = ({ project, layout = false }: ProjectCardProps) => {
       )} />
 
       <div 
-        onClick={() => router.push(`/dashboard/projects/${project.id}`)}
         className="relative h-full bg-[#0a0a0a]/90 backdrop-blur-xl border border-white/10 rounded-xl p-5 cursor-pointer hover:bg-white/5 transition-all duration-300 overflow-hidden"
       >
         {/* Header */}
