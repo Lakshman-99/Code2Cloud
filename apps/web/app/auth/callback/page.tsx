@@ -1,9 +1,10 @@
 import { Suspense } from "react";
 import CallbackClient from "./callback-client";
+import { LoaderSplash } from "@/components/feedback/LoaderSplash";
 
 export default function CallbackPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-muted-foreground">Finalizing login…</div>}>
+    <Suspense fallback={<LoaderSplash />}>
       <CallbackClient />
     </Suspense>
   );

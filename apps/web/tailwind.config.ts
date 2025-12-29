@@ -93,15 +93,15 @@ export default {
           "0%": { opacity: "0", transform: "translateX(-10px)" },
           "100%": { opacity: "1", transform: "translateX(0)" },
         },
-        shimmer: {
-          "0%": { backgroundPosition: "-200% 0" },
-          "100%": { backgroundPosition: "200% 0" },
+        "shimmer": {
+          "0%": { backgroundPosition: "200% 0" },
+          "100%": { backgroundPosition: "-200% 0" },
         },
-        pulse: {
+        "pulse": {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.5" },
         },
-        glow: {
+        "glow": {
           "0%, 100%": { boxShadow: "0 0 20px -5px hsl(239 84% 67% / 0.3)" },
           "50%": { boxShadow: "0 0 30px -5px hsl(239 84% 67% / 0.5)" },
         },
@@ -111,12 +111,12 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in": "fade-in 0.5s ease-out forwards",
         "slide-in-left": "slide-in-left 0.3s ease-out forwards",
-        shimmer: "shimmer 2s linear infinite",
-        glow: "glow 2s ease-in-out infinite",
+        "shimmer": "shimmer 2s linear infinite",
+        "glow": "glow 2s ease-in-out infinite",
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
-        shimmer: "linear-gradient(90deg, transparent, hsl(var(--muted) / 0.3), transparent)",
+        "shimmer": "linear-gradient(90deg, transparent, hsl(var(--muted) / 0.3), transparent)",
         "gradient-primary": "linear-gradient(135deg, hsl(238, 83%, 67%), hsl(270, 70%, 60%))",
         "gradient-glow": "radial-gradient(ellipse at center, hsl(238, 83%, 67%, 0.15), transparent 70%)",
       },
@@ -126,12 +126,4 @@ export default {
     },
   },
   plugins: [tailwindcssAnimate],
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "lh3.googleusercontent.com",
-      },
-    ],
-  },
 } satisfies Config;

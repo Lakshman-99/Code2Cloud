@@ -10,14 +10,20 @@ export const SkeletonShimmer = ({ className, style }: SkeletonShimmerProps) => {
   return (
     <div
       className={cn(
-        "rounded-lg bg-muted/50 bg-shimmer bg-[length:200%_100%] animate-shimmer",
+        // 1. Base Styles (Shape & Base Color)
+        "relative overflow-hidden rounded-md bg-white/5",
         className
       )}
       style={style}
-    />
+    >
+      {/* 2. The Shimmer Overlay (The Moving Light) */}
+      <div 
+        className="absolute inset-0 -translate-x-full animate-shimmer-slide bg-gradient-to-r from-transparent via-white/10 to-transparent"
+        style={{ content: '""' }}
+      />
+    </div>
   );
 };
-
 export const CardSkeleton = () => (
   <div className="glass-card p-6 space-y-4">
     <SkeletonShimmer className="h-4 w-1/3" />

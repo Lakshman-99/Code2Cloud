@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { TerminalLogs } from "@/components/project/TerminalLogs";
 import { Badge } from "@/components/ui/badge";
+import { DeploymentNotFoundState } from "@/components/feedback/DeploymentNotFoundState";
 
 // --- MOCK INFRASTRUCTURE DATA ---
 const mockSystemStats = {
@@ -68,11 +69,7 @@ export default function DeploymentDetails() {
   const logs = project ? getLogsByProject(project.id) : [];
 
   if (!deployment || !project) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[50vh] text-muted-foreground">
-        Deployment not found
-      </div>
-    );
+    return <DeploymentNotFoundState deploymentId={id as string} />;
   }
 
   const status = statusConfig[deployment.status as keyof typeof statusConfig] || statusConfig.ready;

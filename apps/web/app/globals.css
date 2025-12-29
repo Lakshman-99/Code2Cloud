@@ -210,3 +210,49 @@
   font-size: 0.875rem;
   color: hsl(var(--muted-foreground));
 }
+
+@keyframes dataStream {
+  0%   { transform: translateX(-140%); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: translateX(140%); opacity: 0; }
+}
+
+@keyframes logoGlow {
+  0%,100% { opacity: 0.35; }
+  50%     { opacity: 0.7; }
+}
+
+.animate-dataStream {
+  animation: dataStream 1.6s cubic-bezier(.4,0,.2,1) infinite;
+}
+
+.animate-logoGlow {
+  animation: logoGlow 4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s linear infinite;
+}
+
+.bg-shimmer {
+  background: linear-gradient(90deg, transparent, hsl(var(--muted) / 0.3), transparent);
+  background-size: 400% 100%;
+}
+
+@keyframes shimmer-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer-slide {
+  animation: shimmer-slide 2s infinite linear;
+}

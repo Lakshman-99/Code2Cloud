@@ -1,226 +1,339 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { User, Bell, Shield, Globe, Palette, Code, UserIcon } from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Bell, Cpu, AlertTriangle, 
+  Slack, Globe, Save, Check, Mail, Clock, Server, Database
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useUser } from "@/hooks/use-user";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const settingsSections = [
-  {
-    icon: User,
-    title: "Profile",
-    description: "Manage your account details",
-    gradient: "from-blue-500/20 to-indigo-500/20",
-    iconColor: "text-blue-400",
-  },
-  {
-    icon: Bell,
-    title: "Notifications",
-    description: "Configure notification preferences",
-    gradient: "from-amber-500/20 to-orange-500/20",
-    iconColor: "text-amber-400",
-  },
-  {
-    icon: Shield,
-    title: "Security",
-    description: "Security and authentication settings",
-    gradient: "from-emerald-500/20 to-teal-500/20",
-    iconColor: "text-emerald-400",
-  },
-  {
-    icon: Globe,
-    title: "Domains",
-    description: "Manage custom domains",
-    gradient: "from-purple-500/20 to-pink-500/20",
-    iconColor: "text-purple-400",
-  },
+// --- CONFIGURATION TABS ---
+const tabs = [
+  { id: "general", label: "Global Defaults", icon: Globe },
+  { id: "notifications", label: "Notifications", icon: Bell },
+  { id: "deployments", label: "Lifecycle & Cost", icon: Cpu },
 ];
 
-const Settings = () => {
-  const { user } = useUser();
+const ttlOptions = [
+  { value: 5, label: "5 Minutes", desc: "Maximum Savings" },
+  { value: 15, label: "15 Minutes", desc: "Standard Demo" },
+  { value: 30, label: "30 Minutes", desc: "Long Review" },
+  { value: 60, label: "1 Hour", desc: "Workshop Mode" },
+];
+
+const regions = [
+  { value: "us-east-1", label: "US East (N. Virginia)", flag: "🇺🇸" },
+  { value: "eu-west-1", label: "EU West (Ireland)", flag: "🇪🇺" },
+  { value: "ap-south-1", label: "Asia Pacific (Mumbai)", flag: "🇮🇳" },
+];
+
+export default function Settings() {
+  const [activeTab, setActiveTab] = useState("general");
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Mock State
+  const [settings, setSettings] = useState({
+    // General
+    defaultRegion: "us-east-1",
+    maxConcurrentBuilds: "1",
+    logRetention: "1", // Days
+    
+    // Deployments
+    turboMode: false,
+    globalTTL: 5, // Default 5 mins
+    autoDeploy: true,
+    
+    // Notifications
+    slackWebhook: "",
+    emailDeployFailed: true,
+    emailDeploySuccess: false,
+    emailBilling: true,
+  });
+
+  const handleToggle = (key: keyof typeof settings) => {
+    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+    setIsDirty(true);
+  };
+
+  const handleChange = (key: keyof typeof settings, value: unknown) => {
+    setSettings(prev => ({ ...prev, [key]: value }));
+    setIsDirty(true);
+  };
+
+  const saveSettings = () => {
+    setIsDirty(false);
+    toast.success("System Configuration Updated", {
+      description: "Resource limits and cost controls have been applied.",
+      icon: <Check className="w-4 h-4 text-emerald-500" />
+    });
+  };
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <h1 className="text-3xl font-bold text-foreground mb-2">Settings</h1>
-        <p className="text-muted-foreground">
-          Manage your account and preferences
-        </p>
-      </motion.div>
+    <div className="p-8 max-w-[1600px] mx-auto min-h-screen space-y-8">
+      
+      {/* --- HEADER --- */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold text-foreground tracking-tight">System Configuration</h1>
+          <p className="text-muted-foreground">Manage global resource limits, regions, and lifecycle policies.</p>
+        </div>
+        
+        {/* Contextual Save Button */}
+        <AnimatePresence>
+          {isDirty && (
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+              <Button onClick={saveSettings} className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+                <Save className="w-4 h-4" /> Save Changes
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Sidebar */}
-        <div className="space-y-2">
-          {settingsSections.map((section, index) => (
-            <motion.button
-              key={section.title}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className={cn(
-                "w-full flex items-center gap-3 p-4 rounded-xl transition-all text-left",
-                index === 0 ? "glass-card glow-border" : "hover:bg-white/5",
-              )}
-            >
-              <div
-                className={`w-10 h-10 rounded-lg bg-gradient-to-br ${section.gradient} flex items-center justify-center`}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        
+        {/* --- SIDEBAR NAVIGATION --- */}
+        <div className="lg:col-span-1 space-y-2">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-sm font-medium relative overflow-hidden group",
+                  isActive 
+                    ? "text-white bg-white/10 shadow-inner" 
+                    : "text-muted-foreground hover:text-white hover:bg-white/5"
+                )}
               >
-                <section.icon className={`w-5 h-5 ${section.iconColor}`} />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  {section.title}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {section.description}
-                </p>
-              </div>
-            </motion.button>
-          ))}
+                {isActive && (
+                  <motion.div 
+                    layoutId="active-setting-tab"
+                    className="absolute left-0 top-0 bottom-0 w-1 bg-primary"
+                  />
+                )}
+                <Icon className={cn("w-4 h-4 transition-colors", isActive ? "text-primary" : "text-muted-foreground group-hover:text-white")} />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Content */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="lg:col-span-2 space-y-6"
-        >
-          {/* Profile Section */}
-          <div className="glass-card p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-6">
-              Profile Information
-            </h3>
+        {/* --- MAIN CONTENT AREA --- */}
+        <div className="lg:col-span-3 space-y-6">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              
+              {/* 1. GENERAL (REGION & RESOURCES) */}
+              {activeTab === "general" && (
+                <div className="space-y-6">
+                  <section className="glass-card p-6 rounded-xl border border-white/10">
+                    <h3 className="text-lg font-semibold text-foreground mb-6 flex items-center gap-2">
+                      <Globe className="w-5 h-5 text-blue-400" /> Compute & Region
+                    </h3>
+                    
+                    <div className="grid gap-6">
+                      {/* Region Selector */}
+                      <div className="space-y-3">
+                        <label className="text-sm font-medium text-white">Default Deployment Region</label>
+                        <Select value={settings.defaultRegion} onValueChange={(val) => handleChange("defaultRegion", val)}>
+                          <SelectTrigger className="bg-black/40 border-white/10 h-12">
+                            <SelectValue placeholder="Select Region" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-[#0a0a0a] border-white/10">
+                            {regions.map((region) => (
+                              <SelectItem key={region.value} value={region.value}>
+                                <span className="mr-2">{region.flag}</span> {region.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">New projects will default to this region unless specified otherwise.</p>
+                      </div>
 
-            <div className="flex items-center gap-6 mb-8">
-              <Avatar className="w-20 h-20 rounded-full border border-white/10 shadow-sm">
-                <AvatarImage src={user?.avatar || `https://avatar.vercel.sh/${user?.email}`} alt={user?.name} />
-                <AvatarFallback className="rounded-lg bg-primary/10 text-primary font-medium">
-                  <UserIcon className="w-10 h-10" />
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="text-foreground font-medium">{user?.name || "Guest"}</p>
-                <p className="text-sm text-muted-foreground">{user?.email || "guest@example.com"}</p>
-                <Button variant="outline" size="sm" className="mt-2">
-                  Change Avatar
-                </Button>
-              </div>
-            </div>
+                      <div className="h-px bg-white/5" />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm text-muted-foreground mb-2 block">
-                  Full Name
-                </label>
-                <Input
-                  defaultValue={user?.name || "Guest"}
-                  className="bg-card/50 border-white/5"
-                />
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground mb-2 block">
-                  Email
-                </label>
-                <Input
-                  defaultValue={user?.email || "guest@example.com"}
-                  className="bg-card/50 border-white/5"
-                />
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground mb-2 block">
-                  Username
-                </label>
-                <Input
-                  defaultValue="johndoe"
-                  className="bg-card/50 border-white/5"
-                />
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground mb-2 block">
-                  Company
-                </label>
-                <Input
-                  defaultValue="Acme Corp"
-                  className="bg-card/50 border-white/5"
-                />
-              </div>
-            </div>
-          </div>
+                      {/* Resource Limits */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                          <label className="text-sm font-medium text-white flex items-center gap-2">
+                            <Server className="w-4 h-4 text-purple-400" /> Concurrent Builds
+                          </label>
+                          <Select value={settings.maxConcurrentBuilds} onValueChange={(val) => handleChange("maxConcurrentBuilds", val)}>
+                            <SelectTrigger className="bg-black/40 border-white/10">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-[#0a0a0a] border-white/10">
+                              <SelectItem value="1">1 Concurrent Build (Free)</SelectItem>
+                              <SelectItem value="2">2 Concurrent Builds</SelectItem>
+                              <SelectItem value="5">5 Concurrent Builds (Pro)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-          {/* Preferences */}
-          <div className="glass-card p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-6">
-              Preferences
-            </h3>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-lg bg-white/5">
-                <div className="flex items-center gap-3">
-                  <Bell className="w-5 h-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      Email Notifications
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Receive deployment updates via email
-                    </p>
-                  </div>
+                        <div className="space-y-3">
+                          <label className="text-sm font-medium text-white flex items-center gap-2">
+                            <Database className="w-4 h-4 text-amber-400" /> Log Retention
+                          </label>
+                          <Select value={settings.logRetention} onValueChange={(val) => handleChange("logRetention", val)}>
+                            <SelectTrigger className="bg-black/40 border-white/10">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-[#0a0a0a] border-white/10">
+                              <SelectItem value="1">1 Day (Cost Saving)</SelectItem>
+                              <SelectItem value="3">3 Days</SelectItem>
+                              <SelectItem value="7">7 Days</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
                 </div>
-                <Switch defaultChecked />
-              </div>
+              )}
 
-              <div className="flex items-center justify-between p-4 rounded-lg bg-white/5">
-                <div className="flex items-center gap-3">
-                  <Code className="w-5 h-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      Auto Deploy
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Deploy automatically on git push
-                    </p>
-                  </div>
+              {/* 2. NOTIFICATIONS */}
+              {activeTab === "notifications" && (
+                <div className="space-y-6">
+                  {/* Email Section */}
+                  <section className="glass-card p-6 rounded-xl border border-white/10">
+                    <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                      <Mail className="w-5 h-5 text-emerald-400" /> Email Alerts
+                    </h3>
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Deployment Failed</span>
+                          <Switch checked={settings.emailDeployFailed} onCheckedChange={() => handleToggle("emailDeployFailed")} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Successful Deployment</span>
+                          <Switch checked={settings.emailDeploySuccess} onCheckedChange={() => handleToggle("emailDeploySuccess")} />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Billing Threshold (80%)</span>
+                          <Switch checked={settings.emailBilling} onCheckedChange={() => handleToggle("emailBilling")} />
+                        </div>
+                    </div>
+                  </section>
+
+                  {/* Slack Section */}
+                  <section className="glass-card p-6 rounded-xl border border-white/10">
+                    <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                      <Slack className="w-5 h-5 text-purple-400" /> Slack Integration
+                    </h3>
+                    <div className="space-y-3">
+                        <label className="text-sm font-medium text-foreground">Webhook URL</label>
+                        <div className="flex gap-2">
+                          <Input 
+                            placeholder="https://hooks.slack.com/services/..." 
+                            className="bg-black/40 border-white/10 focus:border-purple-500/50"
+                            value={settings.slackWebhook}
+                            onChange={(e) => handleChange("slackWebhook", e.target.value)}
+                          />
+                          <Button variant="outline" className="border-white/10 bg-white/5">Test</Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">We&apos;ll send pipeline alerts to this channel.</p>
+                    </div>
+                  </section>
                 </div>
-                <Switch defaultChecked />
-              </div>
+              )}
 
-              <div className="flex items-center justify-between p-4 rounded-lg bg-white/5">
-                <div className="flex items-center gap-3">
-                  <Palette className="w-5 h-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      Compact Mode
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Reduce spacing in the interface
-                    </p>
-                  </div>
+              {/* 3. DEPLOYMENTS (LIFECYCLE) */}
+              {activeTab === "deployments" && (
+                <div className="space-y-6">
+                  <section className="glass-card p-6 rounded-xl border border-white/10">
+                    <h3 className="text-lg font-semibold text-foreground mb-6 flex items-center gap-2">
+                      <Cpu className="w-5 h-5 text-red-400" /> Lifecycle & Cost Control
+                    </h3>
+                    
+                    {/* GLOBAL TTL SECTION */}
+                    <div className="mb-8 p-5 rounded-xl bg-red-500/5 border border-red-500/20">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Clock className="w-5 h-5 text-red-400" />
+                        <span className="text-base font-bold text-white">Global Auto-Destruct (TTL)</span>
+                        <Badge variant="outline" className="text-[10px] text-red-400 border-red-400/20 bg-red-400/10">ACTIVE</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-6">
+                        To manage costs, <strong>ALL</strong> deployments (Production & Preview) will be permanently destroyed after this duration.
+                      </p>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {ttlOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => handleChange("globalTTL", option.value)}
+                            className={cn(
+                              "flex flex-col items-center justify-center p-4 rounded-xl border transition-all duration-200 relative overflow-hidden",
+                              settings.globalTTL === option.value
+                                ? "bg-red-500/20 border-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+                                : "bg-white/5 border-white/10 text-muted-foreground hover:bg-white/10 hover:border-white/20"
+                            )}
+                          >
+                            <span className="text-lg font-bold">{option.label}</span>
+                            <span className="text-[10px] opacity-70 mt-1">{option.desc}</span>
+                            {settings.globalTTL === option.value && (
+                                <motion.div layoutId="activeTTL" className="absolute inset-0 border-2 border-red-500 rounded-xl" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="h-px bg-white/5 my-6" />
+
+                    {/* Standard Settings */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/5">
+                        <div>
+                          <p className="text-sm font-medium text-white">Auto-Deploy &apos;main&apos;</p>
+                          <p className="text-xs text-muted-foreground">Trigger deployment when code is pushed.</p>
+                        </div>
+                        <Switch checked={settings.autoDeploy} onCheckedChange={() => handleToggle("autoDeploy")} />
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Danger Zone */}
+                  <section className="glass-card p-6 rounded-xl border border-red-500/20 bg-red-500/5">
+                    <h3 className="text-lg font-semibold text-red-400 mb-4 flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5" /> Danger Zone
+                    </h3>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-white">Purge All Resources</p>
+                        <p className="text-xs text-red-300/70">Immediately destroy all active containers and volumes.</p>
+                      </div>
+                      <Button variant="destructive" className="bg-red-600 hover:bg-red-700 text-white">Purge Now</Button>
+                    </div>
+                  </section>
                 </div>
-                <Switch />
-              </div>
-            </div>
-          </div>
+              )}
 
-          {/* Save Button */}
-          <div className="flex justify-end">
-            <Button className="bg-gradient-to-r from-primary to-accent hover:opacity-90">
-              Save Changes
-            </Button>
-          </div>
-        </motion.div>
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );
-};
-
-export default Settings;
+}

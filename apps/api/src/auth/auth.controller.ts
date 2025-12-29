@@ -10,6 +10,7 @@ import { OAuthUser } from "./common/type";
 import { GetCurrentUserId } from "./common/decorators/get-current-user-id.decorator";
 import { RtGuard } from "./common/guards/rt.guard";
 import { GetCurrentUser } from "./common/decorators/get-current-user.decorator";
+import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
 
 @Controller("auth")
 export class AuthController {
@@ -43,6 +44,12 @@ export class AuthController {
     // The Guard validated the token; the Strategy extracted it.
     // We just pass it to the service.
     return this.auth.refreshTokens(userId, refreshToken);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  getProfile(@Req() req: Request) {
+    return req.user;
   }
 
   @Get('google')

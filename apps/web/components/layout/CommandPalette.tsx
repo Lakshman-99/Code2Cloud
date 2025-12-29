@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, FolderKanban, Rocket, Settings, X } from 'lucide-react';
@@ -10,6 +10,9 @@ export const CommandPalette = () => {
   const { commandPaletteOpen, toggleCommandPalette, projects } = useMockStore();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const filteredProjects = projects.filter(p =>
     p.name.toLowerCase().includes(query.toLowerCase())
@@ -59,6 +62,32 @@ export const CommandPalette = () => {
     setSelectedIndex(0);
   }, [query]);
 
+  useEffect(() => {
+    const container = listRef.current;
+    const el = itemRefs.current[selectedIndex];
+    if (!container || !el) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+
+    const overBottom = elRect.bottom > containerRect.bottom;
+    const overTop = elRect.top < containerRect.top;
+
+    if (overBottom) {
+      container.scrollBy({
+        top: elRect.bottom - containerRect.bottom + 20,
+        behavior: "smooth",
+      });
+    }
+
+    if (overTop) {
+      container.scrollBy({
+        top: elRect.top - containerRect.top - 20,
+        behavior: "smooth",
+      });
+    }
+  }, [selectedIndex]);
+
   return (
     <AnimatePresence>
       {commandPaletteOpen && (
@@ -99,12 +128,13 @@ export const CommandPalette = () => {
                 </div>
 
                 {/* Results */}
-                <div className="max-h-80 overflow-y-auto p-2">
+                <div ref={listRef} className="max-h-80 overflow-y-auto p-2">
                   {filteredProjects.length > 0 && (
                     <div className="mb-2">
                       <p className="text-xs text-muted-foreground px-2 py-1">Projects</p>
                       {filteredProjects.map((project, index) => (
                         <button
+                          ref={(el) => {itemRefs.current[index] = el}}
                           key={project.id}
                           onClick={() => handleSelect(index)}
                           className={cn(
@@ -137,6 +167,7 @@ export const CommandPalette = () => {
                       const actualIndex = filteredProjects.length + index;
                       return (
                         <button
+                          ref={(el) => {itemRefs.current[filteredProjects.length + index] = el}}
                           key={action.label}
                           onClick={() => handleSelect(actualIndex)}
                           className={cn(

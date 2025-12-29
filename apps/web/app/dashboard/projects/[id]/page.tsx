@@ -9,10 +9,10 @@ import { TerminalLogs } from "@/components/project/TerminalLogs";
 import { EnvVarsPanel } from "@/components/project/EnvVarsPanel";
 import { StoragePanel } from "@/components/project/StoragePanel";
 import { useMockStore } from "@/stores/useMockStore";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ProjectOverview } from "@/components/project/ProjectOverview";
 import { useEffect, useState } from "react";
+import { ProjectNotFoundState } from "@/components/feedback/ProjectNotFoundState";
 
 const tabs = ["Overview", "Deployments", "Logs", "Storage", "Settings"];
 
@@ -58,14 +58,7 @@ const ProjectDetail = () => {
   }, []);
 
   if (!project) {
-    return (
-      <div className="p-8 text-center">
-        <p className="text-muted-foreground">Project not found</p>
-        <Button onClick={() => router.push("/dashboard/projects")} className="mt-4">
-          Back to Projects
-        </Button>
-      </div>
-    );
+    return <ProjectNotFoundState projectId={projectId} />;
   }
 
   // Helper to render content without repetition

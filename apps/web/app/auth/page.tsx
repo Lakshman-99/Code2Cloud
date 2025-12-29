@@ -16,6 +16,7 @@ import { FaGoogle, FaGithub } from "react-icons/fa";
 import { Rocket, Mail, Lock, User, Loader2, Eye, EyeOff } from "lucide-react";
 import { signInSchema, signUpSchema } from "@/lib/validation/auth";
 import { tokenManager } from "@/lib/token-manager";
+import { CosmicBackground } from "@/components/layout/CosmicBackground";
 
 const AuthPage = () => {
   const router = useRouter();
@@ -68,37 +69,7 @@ const AuthPage = () => {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Animated background gradient orbs */}
-      <div className="absolute inset-0 overflow-hidden">
-        <motion.div
-          className="absolute w-[600px] h-[600px] rounded-full bg-primary/10 blur-[100px]"
-          animate={{
-            x: [0, 100, 0],
-            y: [0, -50, 0],
-          }}
-          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          style={{ top: "-20%", left: "-10%" }}
-        />
-        <motion.div
-          className="absolute w-[500px] h-[500px] rounded-full bg-accent/10 blur-[100px]"
-          animate={{
-            x: [0, -80, 0],
-            y: [0, 80, 0],
-          }}
-          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-          style={{ bottom: "-10%", right: "-5%" }}
-        />
-      </div>
-
-      {/* Grid pattern overlay */}
-      <div
-        className="absolute inset-0 opacity-[0.02]"
-        style={{
-          backgroundImage: `linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)`,
-          backgroundSize: "50px 50px",
-        }}
-      />
-
+      <CosmicBackground />
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -123,7 +94,7 @@ const AuthPage = () => {
         </div>
 
         {/* Auth card */}
-        <div className="bg-card/50 backdrop-blur-xl border border-border/50 rounded-2xl p-8 shadow-2xl">
+        <div className="glass backdrop-blur-xl border border-border/50 rounded-2xl p-8 shadow-2xl">
           {/* OAuth buttons */}
           <div className="space-y-3 mb-6">
             <Button

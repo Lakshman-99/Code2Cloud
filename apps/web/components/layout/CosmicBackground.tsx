@@ -9,14 +9,14 @@ export function CosmicBackground() {
   return (
     <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
 
-      {/* Tech Grid */}
+      {/* Tech Grid (Dashed) */}
       <div
         className="absolute inset-0 opacity-20"
         style={{
-          backgroundImage: `
-            linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px)
-          `,
+          // We use a data-uri SVG here because creating dashed grid lines 
+          // with pure CSS gradients is extremely difficult and messy.
+          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 0h40M0 0v40' stroke='white' stroke-opacity='0.35' stroke-dasharray='4 4' fill='none'/%3E%3C/svg%3E")`,
+          
           backgroundSize: "40px 40px",
           maskImage: "linear-gradient(to bottom, black 40%, transparent 100%)",
           WebkitMaskImage: "linear-gradient(to bottom, black 40%, transparent 100%)",

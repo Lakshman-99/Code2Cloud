@@ -4,12 +4,23 @@ import { Project } from '@/stores/useMockStore';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { SiNextdotjs, SiPython } from 'react-icons/si';
 
 interface ProjectHeaderProps {
   project: Project;
 }
 
+const statusConfig = {
+  ready: { color: 'bg-emerald-500', glow: 'shadow-emerald-500/50', text: 'text-emerald-500' },
+  building: { color: 'bg-blue-500', glow: 'shadow-blue-500/50', text: 'text-blue-500' },
+  error: { color: 'bg-red-500', glow: 'shadow-red-500/50', text: 'text-red-500' },
+  queued: { color: 'bg-yellow-500', glow: 'shadow-yellow-500/50', text: 'text-yellow-500' },
+};
+
+
 export const ProjectHeader = ({ project }: ProjectHeaderProps) => {
+  const status = statusConfig[project.status as keyof typeof statusConfig] || statusConfig.ready;
+
   const handleRedeploy = () => {
     toast.success('Deployment queued', {
       description: `${project.name} is being redeployed from ${project.branch}`,
@@ -29,30 +40,24 @@ export const ProjectHeader = ({ project }: ProjectHeaderProps) => {
             ? "bg-white/10 text-foreground"
             : "bg-emerald-500/20 text-emerald-400"
         )}>
-          {project.type === 'nextjs' ? (
-            <svg viewBox="0 0 180 180" fill="none" className="w-8 h-8">
-              <mask id="mask1" maskUnits="userSpaceOnUse" x="0" y="0" width="180" height="180">
-                <circle cx="90" cy="90" r="90" fill="white"/>
-              </mask>
-              <g mask="url(#mask1)">
-                <circle cx="90" cy="90" r="90" fill="currentColor"/>
-                <path d="M149.508 157.52L69.142 54H54v72.272h12.114V69.3l73.885 95.673c3.497-2.286 6.815-4.818 9.927-7.571l-.418.118z" fill="black"/>
-                <path d="M115 54h12v72h-12V54z" fill="black"/>
-              </g>
-            </svg>
-          ) : (
-            <span>Py</span>
-          )}
+          {project.type === 'nextjs' ? <SiNextdotjs size={24} /> : <SiPython size={24} />}
         </div>
 
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-foreground">{project.name}</h1>
-            <div className={cn(
-              "status-dot",
-              project.status === 'ready' && "status-dot-ready",
-              project.status === 'building' && "status-dot-building"
-            )} />
+
+            <div className="flex flex-shrink-0 items-center gap-2 px-2.5 py-1 rounded-full bg-white/10 border border-white/5">
+              <span className={cn("relative flex h-2 w-2")}>
+                {project.status === 'building' && (
+                  <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", status.color)}></span>
+                )}
+                <span className={cn("relative inline-flex rounded-full h-2 w-2", status.color, status.glow)}></span>
+              </span>
+              <span className={cn("text-xs font-medium capitalize", status.text)}>
+                {project.status}
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
             <a
@@ -74,24 +79,20 @@ export const ProjectHeader = ({ project }: ProjectHeaderProps) => {
       </div>
 
       <div className="flex items-center gap-3">
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          onClick={handleRedeploy}
+        <Button 
+          className="gap-2 bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-bold hover:opacity-90 shadow-[0_0_20px_-5px_rgba(52,211,153,0.5)] transition-all border-0"
+          onClick={() => window.open(`https://${project.domain}`, '_blank')}
         >
-          <RefreshCw className="w-4 h-4" />
-          Redeploy
+          <ExternalLink className="w-4 h-4" />
+          Visit
         </Button>
         <Button
-          size="sm"
-          className="gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90"
-          asChild
+          variant="outline"
+          className="gap-2 border-white/10 bg-white/5 hover:bg-white/10 text-foreground group"
+          onClick={handleRedeploy}
         >
-          <a href={`https://${project.domain}`} target="_blank" rel="noopener noreferrer">
-            <ExternalLink className="w-4 h-4" />
-            Visit
-          </a>
+          <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+          Redeploy
         </Button>
         <Button variant="ghost" size="icon" className="w-8 h-8">
           <MoreHorizontal className="w-4 h-4" />

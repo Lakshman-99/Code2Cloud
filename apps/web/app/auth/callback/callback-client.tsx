@@ -2,6 +2,7 @@
 
 import { tokenManager } from "@/lib/token-manager";
 import { useSearchParams, useRouter } from "next/navigation";
+import { LoaderSplash } from "@/components/feedback/LoaderSplash";
 import { useEffect } from "react";
 
 export default function CallbackClient() {
@@ -17,12 +18,12 @@ export default function CallbackClient() {
       tokenManager.setTokens({ accessToken, refreshToken });
       
       // Redirect to dashboard
-      router.push("/dashboard");
+      router.replace("/dashboard");
     } else {
       // Error handling
-      router.push("/auth?error=oauth_failed");
+      router.replace("/auth?error=oauth_failed");
     }
   }, [router, searchParams]);
 
-  return null;
+  return <LoaderSplash />;
 }

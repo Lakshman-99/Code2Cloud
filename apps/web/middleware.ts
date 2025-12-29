@@ -40,7 +40,11 @@ export async function middleware(request: NextRequest) {
     try {
       // Create a fresh client instance for Middleware usage
       const middlewareApi = new FetchClient({
-        baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL,
+        baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001",
+        timeoutMs: 10_000,
+        defaultHeaders: {
+          Accept: 'application/json',
+        },
       });
 
       // Call the backend using our standardized client

@@ -5,14 +5,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import SystemHealthChart from '@/components/dashboard/SystemHealthChart';
 import ActiveDeployments from '@/components/dashboard/ActiveDeployments';
 import ProjectCard from '@/components/dashboard/ProjectCard';
-import { ChartSkeleton, ListSkeleton, CardSkeleton } from '@/components/dashboard/Skeleton';
+import { ChartSkeleton, ListSkeleton, CardSkeleton, NameSkeleton } from '@/components/ui/skeleton';
 import { useMockStore } from '@/stores/useMockStore';
 import { useUser } from '@/hooks/use-user';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 const Dashboard = () => {
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const router = useRouter();
   const { projects, loading, setLoading } = useMockStore();
 
@@ -40,8 +40,15 @@ const Dashboard = () => {
         animate={{ opacity: 1, y: 0 }}
         className="mb-8"
       >
-        <h1 className="text-3xl font-bold text-foreground mb-2">
-          Welcome back, <span className="gradient-text">{user?.name || "Guest"}</span>
+        <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-3">
+          Welcome back, 
+          {!isUserLoading && user ? (
+            <span className="gradient-text bg-clip-text text-transparent">
+              {user?.name}
+            </span>
+          ) : (
+            <NameSkeleton />
+          )}
         </h1>
         <p className="text-muted-foreground">
           Here&apos;s what&apos;s happening with your deployments and infrastructure today.
@@ -121,6 +128,7 @@ const Dashboard = () => {
             </button>
           </div>
           <motion.div
+            key={loading ? "loading" : "loaded"}
             variants={containerVariants} // Apply stagger logic here
             initial="hidden"
             animate="visible"

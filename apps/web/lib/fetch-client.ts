@@ -35,12 +35,16 @@ export class FetchClient {
     url: string,
     options: RequestOptions = {},
   ): Promise<T> {
-    const controller = new AbortController();
-    const timeout = options.timeoutMs ?? this.timeoutMs;
-
+    let signal = options.signal; // 1. Check for external signal
     let timeoutId: NodeJS.Timeout | undefined;
-    if (timeout) {
-      timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    if (!signal) {
+        const controller = new AbortController();
+        const timeout = options.timeoutMs ?? this.timeoutMs;
+        if (timeout) {
+            timeoutId = setTimeout(() => controller.abort(), timeout);
+        }
+        signal = controller.signal;
     }
 
     const fullUrl = this.buildUrl(url, options.params);
@@ -62,12 +66,12 @@ export class FetchClient {
 
     const fetchBody = body ? JSON.stringify(body) : undefined;
 
-    const doFetch = async () =>
+    const doFetch = async (newHeaders?: Record<string, string>) =>
       fetch(fullUrl, {
         ...rest,
         method,
-        signal: controller.signal,
-        headers,
+        signal,
+        headers: newHeaders ?? headers,
         body: fetchBody,
       });
 
@@ -77,19 +81,20 @@ export class FetchClient {
       // 2. Handle 401 -> Refresh Token Flow
       if (res.status === 401 && !skipAuth && tokenManager.getRefreshToken()) {
         try {
-          await this.refreshTokens();
+          const newToken = await this.refreshTokens();
+          if (!newToken) throw new Error("Refresh failed");
 
-          // Retry with new token
-          const newToken = tokenManager.getAccessToken();
-          if (newToken) {
-            headers["Authorization"] = `Bearer ${newToken}`;
-          }
-          res = await doFetch();
+          const newHeaders = {
+            ...headers,
+            Authorization: `Bearer ${newToken}`,
+          };
+          
+          res = await doFetch(newHeaders);
         } catch (error) {
           // If refresh fails, clear everything and redirect
           tokenManager.clearTokens();
           if (typeof window !== "undefined") {
-            window.location.href = "/auth";
+            window.dispatchEvent(new Event("auth:logout"));
           }
           throw error;
         }
@@ -114,30 +119,31 @@ export class FetchClient {
 
   // --- REFRESH LOGIC (Updated for RtGuard) ---
   private async refreshTokens() {
-    if (!this.refreshPromise) {
-      this.refreshPromise = (async () => {
-        const refreshToken = tokenManager.getRefreshToken();
-        if (!refreshToken) throw new Error("No refresh token");
+    if (this.refreshPromise) return this.refreshPromise;
 
-        // Use a fresh fetch call here to avoid circular logic
-        const response = await fetch(`${this.baseUrl}/auth/refresh`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${refreshToken}`, // Send in Header
-          },
-        });
+    this.refreshPromise = (async () => {
+      const refreshToken = tokenManager.getRefreshToken();
+      if (!refreshToken) throw new Error("No refresh token");
 
-        if (!response.ok) throw new Error("Refresh failed");
+      // Use a fresh fetch call here to avoid circular logic
+      const response = await fetch(`${this.baseUrl}/auth/refresh`, {
+        method: 'POST',
+        credentials: "include",
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${refreshToken}`, // Send in Header
+        },
+      });
 
-        const data: AuthResponse = await response.json();
-        tokenManager.setTokens(data); // Updates tokens
-        return data.accessToken;
-      })();
-    }
+      if (!response.ok) throw new Error("Refresh failed");
+
+      const data: AuthResponse = await response.json();
+      tokenManager.setTokens(data); // Updates tokens
+      return data.accessToken;
+    })();
 
     try {
-      await this.refreshPromise;
+      return await this.refreshPromise;
     } finally {
       this.refreshPromise = null;
     }
