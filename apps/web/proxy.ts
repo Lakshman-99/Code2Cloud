@@ -12,7 +12,7 @@ const getJwtSecretKey = () => {
   return new TextEncoder().encode(secret);
 };
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const accessToken = request.cookies.get("accessToken")?.value;
   const refreshToken = request.cookies.get("refreshToken")?.value;
 
