@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import { SkeletonShimmer } from './skeleton-shimmer';
+import { motion } from 'framer-motion';
 
 interface SkeletonProps {
   className?: string;
@@ -103,3 +104,41 @@ export const ListSkeleton = () => {
     </div>
   );
 };
+
+export const RepoListSkeleton = () => (
+  <motion.div 
+    key="list"
+    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    className="flex flex-col h-full w-full"
+  >
+    <div className="px-8 py-4 border-b border-white/10 flex items-center gap-4 shrink-0 z-10">
+      <div className="relative">
+        <Skeleton className="h-11 w-56 bg-white/10" />
+      </div>
+      <div className="flex-1 relative group">
+        <Skeleton className="h-11 w-full bg-white/10" />
+      </div>
+    </div>
+    <div className="p-4 space-y-2">
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <>
+        <motion.div 
+          key={i}
+          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+          className="group flex items-center justify-between p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/10 transition-all cursor-pointer"
+        >
+          <div className="flex items-center gap-4 min-w-0">
+            <Skeleton className="w-10 h-10 rounded-lg bg-white/10" />
+            <div className="min-w-0">
+              <Skeleton className="h-4 w-32 bg-white/10 mb-2" />
+              <Skeleton className="h-3 w-48 bg-white/10" />
+            </div>
+          </div>
+          <Skeleton className="h-8 w-20 rounded-lg bg-white/10" />
+
+        </motion.div>
+        </>
+      ))}
+    </div>
+  </motion.div>
+);

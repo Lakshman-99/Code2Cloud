@@ -1,0 +1,60 @@
+import { Controller, Get, UseGuards, BadRequestException, Query } from '@nestjs/common';
+import { GetCurrentUserId } from 'src/auth/common/decorators/get-current-user-id.decorator';
+import { JwtAuthGuard } from 'src/auth/common/guards/jwt-auth.guard';
+import { PrismaService } from '../../prisma/prisma.service';
+import { GithubAppService } from './git.service';
+
+@Controller('git')
+export class GitController {
+  constructor(
+    private prisma: PrismaService,
+    private githubApp: GithubAppService
+  ) {}
+
+  // Used by useGit() hook
+  @Get('status')
+  @UseGuards(JwtAuthGuard)
+  async getStatus(@GetCurrentUserId() userId: string) {
+    const accounts = await this.prisma.gitAccount.findMany({
+      where: { userId, provider: 'github' }
+    });
+
+    // Primary account is the first one, or the one with an installation
+    const primary = accounts.find(a => a.installationId) || accounts[0];
+
+    return {
+      connected: accounts.length > 0 && accounts.some(a => a.installationId),
+      username: primary?.username, // For display
+      avatarUrl: primary?.avatarUrl,
+      // Return the full list for your UI Dropdown
+      accounts: accounts.map(a => ({
+        id: a.id,
+        username: a.username,
+        avatarUrl: a.avatarUrl,
+        installationId: a.installationId as string | null,
+      }))
+    };
+  }
+
+  // Used by NewProjectDialog
+  @Get('repos')
+  @UseGuards(JwtAuthGuard)
+  async listRepos(@GetCurrentUserId() userId: string, @Query('installationId') installationId: string) {
+    if (!installationId) throw new BadRequestException("installationId is required");
+
+    // 1. Security: Verify this installation belongs to the User
+    const account = await this.prisma.gitAccount.findFirst({
+      where: { 
+        userId, 
+        provider: 'github',
+        installationId: installationId
+      }
+    });
+
+    if (!account) {
+      throw new BadRequestException("GitHub account not found or access denied");
+    }
+
+    return this.githubApp.listRepositories(installationId);
+  }
+}

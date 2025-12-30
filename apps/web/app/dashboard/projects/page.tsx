@@ -244,7 +244,7 @@ const Projects = () => {
         variants={containerVariants} // Apply stagger logic here
         initial="hidden"
         animate="visible"
-        key={searchQuery + viewMode + selectedStatus.join('') + selectedFrameworks.join('')} // Forces re-animation on filter change
+        key={searchQuery + viewMode + selectedStatus.join('') + selectedFrameworks.join('') + filteredProjects.length} // Forces re-animation on filter change
         className={cn(
           "grid gap-4",
           viewMode === "grid"

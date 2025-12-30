@@ -27,4 +27,26 @@ model User {
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  gitAccounts   GitAccount[]
+}
+
+model GitAccount {
+  id             String   @id @default(uuid())
+  provider       String   @default("github")
+  providerId     String
+  username       String
+  avatarUrl      String?
+  
+  installationId String?  @unique
+  accessToken    String
+  refreshToken   String?
+  
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([provider, providerId])
 }
