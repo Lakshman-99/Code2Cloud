@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { FetchClient } from "@/lib/fetch-client"; 
 import { AuthResponse } from "@/types/auth";
+import { urlConfig } from "./lib/url-config";
 
 // Helper to get secret
 const getJwtSecretKey = () => {
@@ -40,7 +41,7 @@ export async function proxy(request: NextRequest) {
     try {
       // Create a fresh client instance for Middleware usage
       const middlewareApi = new FetchClient({
-        baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001",
+        baseUrl: urlConfig.apiUrl,
         timeoutMs: 10_000,
         defaultHeaders: {
           Accept: 'application/json',

@@ -18,6 +18,7 @@ import { Mail, Lock, User, Loader2, Eye, EyeOff } from "lucide-react";
 import { signInSchema, signUpSchema } from "@/lib/validation/auth";
 import { tokenManager } from "@/lib/token-manager";
 import { CosmicBackground } from "@/components/layout/CosmicBackground";
+import { urlConfig } from "@/lib/url-config";
 import { cn } from "@/lib/utils"; // Import cn
 
 const AuthPage = () => {
@@ -117,7 +118,7 @@ const AuthPage = () => {
               variant="outline"
               className="w-full h-12 bg-background/50 border-border/50 hover:bg-accent/10 hover:border-accent/50 transition-all duration-300 gap-2"
               disabled={loading}
-              onClick={() => window.location.href = "http://localhost:3001/auth/google"}
+              onClick={() => window.location.href = `${urlConfig.apiUrl}/auth/google`}
             >
               <FaGoogle />
               Continue with Google
@@ -128,7 +129,7 @@ const AuthPage = () => {
               variant="outline"
               className="w-full h-12 bg-background/50 border-border/50 hover:bg-accent/10 hover:border-accent/50 transition-all duration-300 gap-2"
               disabled={loading}
-              onClick={() => window.location.href = "http://localhost:3001/auth/github"}
+              onClick={() => window.location.href = `${urlConfig.apiUrl}/auth/github`}
             >
               <FaGithub />
               Continue with GitHub

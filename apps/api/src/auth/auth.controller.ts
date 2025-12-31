@@ -15,6 +15,7 @@ import { GetCurrentUser } from "./common/decorators/get-current-user.decorator";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
 import { GithubAppService } from "src/git/git.service";
 import { ConfigService } from "@nestjs/config";
+import { urlConfig } from "lib/url-config";
 import { JwtService } from "@nestjs/jwt";
 
 @Controller("auth")
@@ -75,7 +76,7 @@ export class AuthController {
     @Res() res: Response
   ): Promise<void> {
     const tokens = await this.auth.validateOAuthLogin(req.user);
-    const frontendUrl = this.config.getOrThrow<string>('FRONTEND_URL');
+    const frontendUrl = urlConfig.appUrl;
 
     res.redirect(
       `${frontendUrl}/auth/callback?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}`
@@ -85,7 +86,7 @@ export class AuthController {
   @Get('github')
   githubLogin(@Res() res: Response) {
     const clientId = this.config.getOrThrow('GITHUB_CLIENT_ID');
-    const apiUrl = this.config.getOrThrow('API_URL');     
+    const apiUrl = urlConfig.apiUrl;   
     const redirectUri = `${apiUrl}/auth/github/callback`;
 
     const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=read:user,user:email`;
@@ -107,7 +108,7 @@ export class AuthController {
     @Req() req: Request,
     @Res() res: Response
   ) {
-    const frontendUrl = this.config.getOrThrow<string>('FRONTEND_URL');
+    const frontendUrl = urlConfig.appUrl;
 
     if (!code) return res.redirect(`${frontendUrl}/auth?error=no_code`);
 

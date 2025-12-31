@@ -1,5 +1,6 @@
 // lib/api.ts
 import { FetchClient } from "./fetch-client";
+import { urlConfig } from "./url-config";
 
 // Prevent duplicate instances in dev / HMR
 declare global {
@@ -8,7 +9,7 @@ declare global {
 
 function createClient() {
   return new FetchClient({
-    baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3001",
+    baseUrl: urlConfig.apiUrl,
     timeoutMs: 10_000,
     defaultHeaders: {
       Accept: 'application/json',
