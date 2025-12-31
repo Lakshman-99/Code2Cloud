@@ -142,3 +142,35 @@ export const RepoListSkeleton = () => (
     </div>
   </motion.div>
 );
+
+export const RootDirectorySkeleton = () => {
+  return (
+    <div className="space-y-1">
+      {/* Simulate Current Directory Row */}
+      <div className="flex items-center gap-3 p-2 rounded-md border border-white/5 bg-white/[0.02]">
+        <div className="w-4 h-4 rounded-full border border-white/10 flex items-center justify-center">
+          <Skeleton className="w-full h-full rounded-full bg-white/10" />
+        </div>
+        <Skeleton className="w-4 h-4 rounded bg-blue-400/20" /> {/* Icon */}
+        <Skeleton className="h-4 w-24 bg-white/10" /> {/* Name */}
+        <Skeleton className="h-4 w-12 ml-auto bg-white/5 rounded" /> {/* Badge */}
+      </div>
+
+      {/* Simulate File Rows */}
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="flex items-center justify-between p-2 rounded-md border border-transparent">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-4 h-4 rounded-full border border-white/10" /> {/* Radio Placeholder */}
+            
+            {/* Folder Icon (blue-ish tint) vs File Icon (white tint) */}
+            <Skeleton className={`w-4 h-4 rounded ${i >= 4 ? 'bg-white/10' : 'bg-blue-400/20'}`} />
+            
+            <Skeleton className="h-3.5 w-1/3 bg-white/10" />
+          </div>
+          {/* Arrow Placeholder */}
+          {i >= 4 && <Skeleton className="w-4 h-4 rounded bg-white/5" />}
+        </div>
+      ))}
+    </div>
+  );
+};

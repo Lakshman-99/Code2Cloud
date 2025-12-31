@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { GitBranch, Clock, CheckCircle2, XCircle, Loader2, PlayCircle, ArrowRight } from 'lucide-react';
+import { GitBranch, Clock, CheckCircle2, XCircle, Loader2, PlayCircle, ArrowRight, Rocket } from 'lucide-react';
 import { Deployment, Project } from '@/stores/useMockStore';
 import { cn } from '@/lib/utils';
 
@@ -90,6 +90,22 @@ export const DeploymentsTable = ({ deployments }: DeploymentsTableProps) => {
             ))}
           </tbody>
         </table>
+
+        {deployments.length === 0 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center justify-center py-24 border border-white/10 text-center"
+          >
+            <div className="w-16 h-16 bg-white/[0.03] rounded-full flex items-center justify-center mb-4 border border-white/10 shadow-lg">
+              <Rocket className="w-8 h-8 text-white/40" />
+            </div>
+            <h3 className="text-lg font-medium text-white mb-2">No deployments yet</h3>
+            <p className="text-muted-foreground text-sm max-w-xs mx-auto mb-6">
+              Push to your repository to trigger your first deployment.
+            </p>
+          </motion.div>
+        )}
       </div>
     </motion.div>
   );

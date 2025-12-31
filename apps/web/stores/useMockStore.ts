@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type FrameworkType = "nextjs" | "python";
+export type FrameworkType = "nextjs" | "nestjs" | "vite" | "create-react-app" | "vue" | "angular" | "express" | "node" | "django" | "flask" | "fastapi" | "streamlit" | "python" | "unknown";
 export type DeploymentStatus = "ready" | "building" | "error" | "queued";
 
 export interface Project {

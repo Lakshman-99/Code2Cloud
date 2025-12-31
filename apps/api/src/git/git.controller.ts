@@ -36,13 +36,42 @@ export class GitController {
     };
   }
 
-  // Used by NewProjectDialog
   @Get('repos')
   @UseGuards(JwtAuthGuard)
   async listRepos(@GetCurrentUserId() userId: string, @Query('installationId') installationId: string) {
+    await this.verifyInstallation(userId, installationId);
+    return this.githubApp.listRepositories(installationId);
+  }
+
+  @Get('tree')
+  @UseGuards(JwtAuthGuard)
+  async getRepoTree(
+    @GetCurrentUserId() userId: string,
+    @Query('installationId') installationId: string,
+    @Query('owner') owner: string,
+    @Query('repo') repo: string,
+    @Query('path') path: string = ''
+  ) {
+    await this.verifyInstallation(userId, installationId);
+    return this.githubApp.getRepoContents(installationId, owner, repo, path);
+  }
+
+  @Get('detect')
+  @UseGuards(JwtAuthGuard)
+  async detectFramework(
+    @GetCurrentUserId() userId: string,
+    @Query('installationId') installationId: string,
+    @Query('owner') owner: string,
+    @Query('repo') repo: string,
+    @Query('path') path: string = ''
+  ) {
+    await this.verifyInstallation(userId, installationId);
+    return this.githubApp.detectFrameworkConfig(installationId, owner, repo, path);
+  }
+
+  private async verifyInstallation(userId: string, installationId: string) {
     if (!installationId) throw new BadRequestException("installationId is required");
 
-    // 1. Security: Verify this installation belongs to the User
     const account = await this.prisma.gitAccount.findFirst({
       where: { 
         userId, 
@@ -54,7 +83,5 @@ export class GitController {
     if (!account) {
       throw new BadRequestException("GitHub account not found or access denied");
     }
-
-    return this.githubApp.listRepositories(installationId);
   }
 }

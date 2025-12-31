@@ -6,11 +6,7 @@ import {
   DialogTitle, 
 } from '@/components/ui/dialog';
 import { ArrowLeft, ArrowRight, Box, Check, ChevronDown, ChevronUp, GitBranch, Key, Loader2, Lock, Plus, RefreshCw, Rocket, Search, Settings2, Terminal, Trash2 } from 'lucide-react';
-import { 
-  SiReact, SiNextdotjs, SiPython, SiNodedotjs, SiTypescript, 
-  SiJavascript, SiGo, SiRust, SiDocker, SiVuedotjs, SiHtml5, 
-  SiGithub
-} from "react-icons/si";
+import { SiGithub, } from "react-icons/si";
 import { useGit } from '@/hooks/use-git';
 import { useMemo, useState } from 'react';
 import { Button } from '../ui/button';
@@ -18,52 +14,119 @@ import { RepoListSkeleton } from '../ui/skeleton';
 import { ScrollArea } from '../ui/scroll-area';
 import { Input } from '../ui/input';
 import { formatDistanceToNow } from 'date-fns';
-import { useMockStore } from '@/stores/useMockStore';
+import { FrameworkType, useMockStore } from '@/stores/useMockStore';
 import { toast } from 'sonner';
 import { Label } from '../ui/label';
-import { GitRepository } from '@/types/git';
+import { FRAMEWORK_ICONS, FRAMEWORK_PRESETS, GitRepository } from '@/types/git';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { cn } from '@/lib/utils';
+import { useFieldArray, useForm, useWatch } from 'react-hook-form';
+import { ProjectSchema, projectSchema } from '@/lib/validation/project';
+import { zodResolver } from '@hookform/resolvers/zod';
+import Image from 'next/image';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { RootDirectorySelector } from './root-directory-selector';
 
 interface NewProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-const getLanguageIcon = (lang: string | null) => {
-  const l = lang?.toLowerCase() || "";
-  const className = "w-5 h-5";
-  if (l.includes("react")) return <SiReact className={`${className} text-[#61DAFB]`} />;
-  if (l.includes("next")) return <SiNextdotjs className={`${className} text-white`} />;
-  if (l.includes("python")) return <SiPython className={`${className} text-[#3776AB]`} />;
-  if (l.includes("node")) return <SiNodedotjs className={`${className} text-[#339933]`} />;
-  if (l.includes("type")) return <SiTypescript className={`${className} text-[#3178C6]`} />;
-  if (l.includes("java")) return <SiJavascript className={`${className} text-[#F7DF1E]`} />;
-  if (l.includes("go")) return <SiGo className={`${className} text-[#00ADD8]`} />;
-  if (l.includes("rust")) return <SiRust className={`${className} text-[#DEA584]`} />;
-  if (l.includes("vue")) return <SiVuedotjs className={`${className} text-[#4FC08D]`} />;
-  if (l.includes("docker")) return <SiDocker className={`${className} text-[#2496ED]`} />;
-  return <SiHtml5 className={`${className} text-[#E34F26]`} />;
+export const getFrameworkIcon = (framework: string, language: string | null) => {
+  const fw = framework?.toLowerCase();
+  const lang = language?.toLowerCase() || "";
+  const size = 20;
+
+  // Framework-specific
+  if (fw && FRAMEWORK_ICONS[fw]) {
+    return <Image src={FRAMEWORK_ICONS[fw]} alt={fw} width={size} height={size} />;
+  }
+
+  // Fallback to language
+  if (fw && (fw.includes("unknown") || fw.includes("other"))) return <div className="w-5 h-5 border-2 border-gray-400 border-dotted rounded-full" />;
+  if (lang.includes("python")) return <Image src={FRAMEWORK_ICONS["python"]} alt="python" width={size} height={size} />;
+  if (lang.includes("node") || lang.includes("javascript")) return <Image src={FRAMEWORK_ICONS["node"]} alt="nodejs" width={size} height={size} />;
+  if (lang.includes("typescript")) return <Image src={FRAMEWORK_ICONS["typescript"]} alt="typescript" width={size} height={size} />;
+  if (lang.includes("go")) return <Image src={FRAMEWORK_ICONS["golang"]} alt="golang" width={size} height={size} />;
+
+  // Default fallback
+  return <div className="w-5 h-5 bg-white/50 rounded-sm" />;
 };
 
 export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) => {
-  const { isConnected, accounts, repos, isLoading, selectedAccount, setSelectedAccount, refreshStatus } = useGit();
+  const { isConnected, accounts, repos, isLoading, selectedAccount, setSelectedAccount, refreshStatus, detectFramework } = useGit();
   const { addProject } = useMockStore();
   
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [isAccountOpen, setIsAccountOpen] = useState<boolean>(false);
+  // Local UI State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<GitRepository | null>(null);
-
-  // Animation states
-  const [importingRepoId, setImportingRepoId] = useState<number | null>(null); // For button loader
+  const [importingRepoId, setImportingRepoId] = useState<number | null>(null);
   const [deploying, setDeploying] = useState(false);
-
-  // Configuration State
-  const [projectName, setProjectName] = useState("");
-  const [rootDirectory, setRootDirectory] = useState("./");
+  
+  // UI Toggles
   const [showBuildSettings, setShowBuildSettings] = useState(false);
+  const [isRootSelectorOpen, setIsRootSelectorOpen] = useState(false);
   const [showEnvVars, setShowEnvVars] = useState(false);
-  const [envVars, setEnvVars] = useState([{ key: "", value: "" }]);
+
+  // --- FORM SETUP ---
+  const form = useForm<ProjectSchema>({
+    resolver: zodResolver(projectSchema),
+    defaultValues: {
+      projectName: "",
+      rootDirectory: "./",
+      framework: "other",
+      buildCommand: "",
+      outputDirectory: "",
+      installCommand: "",
+      runCommand: "",
+      envVars: [],
+    },
+  });
+
+  const framework = useWatch({ control: form.control, name: "framework" });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "envVars"
+  });
+
+  const handleFrameworkChange = (value: string, showToast: boolean = true) => {
+    form.setValue("framework", value, { shouldDirty: true });
+    const preset = FRAMEWORK_PRESETS[value];
+    
+    if (preset) {
+      form.setValue("installCommand", preset.install, { shouldDirty: true });
+      form.setValue("buildCommand", preset.build, { shouldDirty: true });
+      form.setValue("runCommand", preset.run, { shouldDirty: true });
+      form.setValue("outputDirectory", preset.output, { shouldDirty: true });
+      
+      if (showToast) 
+        toast.info(`Applied build defaults for ${value}`, { 
+          icon: <div className="w-4 h-4">{getFrameworkIcon(value, null)}</div> 
+        });
+    }
+  };
+
+  const handleRootDirectoryChange = async (newPath: string) => {
+    form.setValue("rootDirectory", newPath);
+    
+    if (!selectedRepo || !selectedAccount) return;
+
+    const toastId = toast.loading("Detecting framework...");
+    try {
+      const detected = await detectFramework(
+        selectedAccount.installationId!, 
+        selectedRepo.fullName, 
+        newPath
+      );
+      
+      handleFrameworkChange(detected.framework, false);
+      toast.success(`Detected ${detected.framework}`, { id: toastId });
+    } catch {
+      toast.error("Failed to detect framework", { id: toastId });
+    }
+  };
 
   // Derived View Logic
   const view = useMemo(() => {
@@ -95,6 +158,7 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
         setSelectedRepo(null);
         setImportingRepoId(null);
         setDeploying(false);
+        form.reset();
       }, 300);
     }
   };
@@ -124,19 +188,37 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
 
   const handleImport = async (repo: GitRepository) => {
     setImportingRepoId(repo.id);
-    setProjectName(repo.name);
+    
+    // Simulate tiny network delay for UX
+    await new Promise(r => setTimeout(r, 500));
+
+    // Auto-fill form with backend data
+    form.reset({
+      projectName: repo.name.replace(/[^a-zA-Z0-9-]/g, '-'),
+      rootDirectory: "./",
+      framework: repo.framework || "unknown",
+      buildCommand: repo.buildCommand || "",
+      installCommand: repo.installCommand || "",
+      runCommand: repo.runCommand || "",
+      outputDirectory: repo.outputDirectory || "",
+      envVars: [{
+        key: "",
+        value: ""
+      }]
+    });
+
     setSelectedRepo(repo);
     setImportingRepoId(null);
   };
 
-  const handleDeploy = async () => {
+  const onSubmit = async (data: ProjectSchema) => {
     setDeploying(true);
     await new Promise(r => setTimeout(r, 2000));
     
     addProject({
-      name: projectName,
-      type: 'nextjs', // In real app, detect from repo
-      domain: `${projectName}.code2cloud.dev`,
+      name: data.projectName,
+      type: data.framework as FrameworkType,
+      domain: `${data.projectName}.code2cloud.dev`,
       branch: selectedRepo?.defaultBranch || 'main',
     });
     
@@ -144,30 +226,19 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
     handleClose(false);
   };
 
-  const updateEnv = (i: number, field: "key" | "value", val: string) => {
-    const next = [...envVars];
-    next[i][field] = val;
-    setEnvVars(next);
-  };
-
-  const removeEnv = (i: number) => {
-    setEnvVars(envVars.filter((_, idx) => idx !== i));
-  };
-
   const importEnvFile = async (file: File) => {
     const text = await file.text();
-
-    const parsed = text
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((l) => l && !l.startsWith("#") && l.includes("="))
-      .map((l) => {
-        const [key, ...rest] = l.split("=");
-        return { key, value: rest.join("=") };
-      });
-
-    setEnvVars(parsed.length ? parsed : envVars);
-    toast.success("Environment Variables Imported");
+    const parsed = text.split("\n").reduce((acc, line) => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
+        const [key, ...rest] = trimmed.split("=");
+        acc.push({ key, value: rest.join("=") });
+      }
+      return acc;
+    }, [] as { key: string; value: string }[]);
+    
+    parsed.forEach(v => append(v));
+    toast.success(`Imported ${parsed.length} variables`);
   };
 
   const filteredRepos = useMemo(() => 
@@ -210,7 +281,7 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
             )}
 
             {/* STATE 2: CONNECT */}
-            {view === 'connect' && (
+            {!isLoading && view === 'connect' && (
               <motion.div key="connect" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="flex-1 flex flex-col items-center justify-center p-12 text-center">
                 <div className="w-20 h-20 bg-white/[0.03] rounded-3xl flex items-center justify-center mb-8 border border-white/10 shadow-2xl">
                   <SiGithub className="w-10 h-10 text-white" />
@@ -329,7 +400,7 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
                         >
                           <div className="flex items-center gap-4 min-w-0">
                             <div className="w-10 h-10 rounded-lg bg-[#0F1117] border border-white/10 flex items-center justify-center shrink-0 group-hover:border-white/20 transition-colors">
-                              {getLanguageIcon(repo.language)}
+                              {getFrameworkIcon(repo.framework, repo.language)}
                             </div>
                             <div className="min-w-0">
                               <h3 className="text-sm font-semibold text-white truncate flex items-center gap-2 group-hover:text-emerald-400 transition-colors">
@@ -347,8 +418,12 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
                             size="sm" 
                             className="bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-bold h-9 px-6 rounded-lg transition-all translate-x-2 group-hover:translate-x-0"
                           >
-                            {importingRepoId === repo.id ? <Loader2 className="w-4 h-4 animate-spin" /> : "Import"}
-                            <ArrowRight className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                            {importingRepoId === repo.id ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                              <>
+                                Import
+                                <ArrowRight className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                              </>
+                            )}
                           </Button>
                         </motion.div>
                       ))
@@ -358,7 +433,7 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
               </motion.div>
             )}
 
-            {/* STATE 4: CONFIGURE (Based on Screenshot) */}
+            {/* STATE 4: CONFIGURE FORM */}
             {view === 'configure' && selectedRepo && (
               <motion.div key="configure" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col h-full">
                 <ScrollArea className="flex-1 overflow-y-auto">
@@ -382,29 +457,51 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
                     {/* Project Name */}
                     <div className="space-y-4">
                       <Label className="text-xs font-bold text-white/40 uppercase tracking-widest">Project Name</Label>
-                      <Input value={projectName} onChange={(e) => setProjectName(e.target.value)} className="bg-[#0A0A0A] border-white/10 h-11 focus-visible:ring-emerald-500/50" />
+                      <Input {...form.register("projectName")} className="bg-white/5 border-white/10 h-11 focus-visible:ring-emerald-500/50" />
+                      {form.formState.errors.projectName && <p className="text-red-400 text-xs">{form.formState.errors.projectName.message}</p>}
                     </div>
 
                     {/* Framework & Root */}
                     <div className="grid grid-cols-2 gap-6">
                         <div className="space-y-2">
                           <Label className="text-xs font-bold text-white/40 uppercase tracking-widest">Framework Preset</Label>
-                          <div className="flex items-center gap-2 h-11 px-3 rounded-md border border-white/10 bg-white/5 text-sm text-white/70">
-                            {getLanguageIcon(selectedRepo.language)} 
-                            {selectedRepo.language?.toLowerCase().includes('python') ? 'Python' : 'Next.js'}
-                          </div>
+                          <Select value={framework} onValueChange={handleFrameworkChange}> 
+                            <SelectTrigger style={{ height: '2.75rem' }} className="w-full px-3 rounded-md border border-white/10 bg-white/5 text-sm text-white/70">
+                              <SelectValue>
+                                <div className="flex items-center gap-3">
+                                  {getFrameworkIcon(framework, selectedRepo.language)}
+                                  <span className='capitalize'>{framework}</span>
+                                </div>
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent position="popper" side="bottom" sideOffset={4} avoidCollisions={false} className="max-h-60 overflow-y-auto">
+                              {Object.keys(FRAMEWORK_ICONS).map((fw) => (
+                                <SelectItem
+                                  key={fw}
+                                  value={fw}
+                                  className="px-3 text-sm"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    {getFrameworkIcon(fw, null)}
+                                    <span className='capitalize'>{fw}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div className="space-y-2">
                           <Label className="text-xs font-bold text-white/40 uppercase tracking-widest">Root Directory</Label>
                           <div className="flex gap-2">
-                            <Input value={rootDirectory} onChange={(e) => setRootDirectory(e.target.value)} className="bg-[#0A0A0A] border-white/10 h-11 font-mono text-sm" />
-                            <Button variant="outline" className="border-white/10 h-11 hover:bg-white/5">Edit</Button>
+                            <Input {...form.register("rootDirectory")} readOnly className="bg-white/5 border-white/10 h-11 font-mono text-sm cursor-default focus-visible:ring-0" />
+                            <Button type="button" variant="outline" className="border-white/10 h-11 hover:bg-white/5" onClick={() => setIsRootSelectorOpen(true)}>Edit</Button>
                           </div>
+                          {form.formState.errors.rootDirectory && <p className="text-red-400 text-xs">{form.formState.errors.rootDirectory.message}</p>}
                         </div>
                     </div>
 
                     {/* Build Settings Accordion */}
-                    <div className="rounded-xl border border-white/10 bg-[#0A0A0A] overflow-hidden">
+                    <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
                       <button onClick={() => setShowBuildSettings(!showBuildSettings)} className="w-full flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors">
                         <div className="flex items-center gap-2 text-sm font-medium text-white"><Settings2 className="w-4 h-4 text-white/50"/> Build and Output Settings</div>
                         {showBuildSettings ? <ChevronUp className="w-4 h-4 text-white/50"/> : <ChevronDown className="w-4 h-4 text-white/50"/>}
@@ -412,23 +509,27 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
                       {showBuildSettings && (
                         <div className="p-4 border-t border-white/10 space-y-4 bg-black/20">
                             <div className="grid gap-2">
+                              <Label className="text-xs text-white/50">Install Command</Label>
+                              <Input {...form.register("installCommand")} className="bg-black border-white/10 h-9 font-mono text-xs" />
+                            </div>
+                            <div className="grid gap-2">
                               <Label className="text-xs text-white/50">Build Command</Label>
-                              <Input placeholder="npm run build" className="bg-black border-white/10 h-9 font-mono text-xs" />
+                              <Input {...form.register("buildCommand")} className="bg-black border-white/10 h-9 font-mono text-xs" />
+                            </div>
+                            <div className="grid gap-2">
+                              <Label className="text-xs text-white/50">Run Command</Label>
+                              <Input {...form.register("runCommand")} className="bg-black border-white/10 h-9 font-mono text-xs" />
                             </div>
                             <div className="grid gap-2">
                               <Label className="text-xs text-white/50">Output Directory</Label>
-                              <Input placeholder=".next" className="bg-black border-white/10 h-9 font-mono text-xs" />
-                            </div>
-                            <div className="grid gap-2">
-                              <Label className="text-xs text-white/50">Install Command</Label>
-                              <Input placeholder="npm install" className="bg-black border-white/10 h-9 font-mono text-xs" />
+                              <Input {...form.register("outputDirectory")} className="bg-black border-white/10 h-9 font-mono text-xs" />
                             </div>
                         </div>
                       )}
                     </div>
 
                     {/* Env Vars Accordion */}
-                    <div className="rounded-xl border border-white/10 bg-[#0A0A0A] overflow-hidden">
+                    <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
                       <button onClick={() => setShowEnvVars(!showEnvVars)} className="w-full flex items-center justify-between p-4 hover:bg-white/[0.02] transition-colors">
                         <div className="flex items-center gap-2 text-sm font-medium text-white"><Key className="w-4 h-4 text-white/50"/> Environment Variables</div>
                         {showEnvVars ? <ChevronUp className="w-4 h-4 text-white/50"/> : <ChevronDown className="w-4 h-4 text-white/50"/>}
@@ -443,48 +544,19 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
                             </div>
 
                             {/* ROWS */}
-                            {envVars.map((env, i) => (
-                              <div
-                                key={i}
-                                className="grid grid-cols-[1fr_1fr_36px] gap-2 items-center"
-                              >
-                                <Input
-                                  value={env.key}
-                                  onChange={(e) => updateEnv(i, "key", e.target.value.toUpperCase())}
-                                  placeholder="ENV_VAR"
-                                  className="bg-black border-white/10 h-9 font-mono text-xs uppercase"
-                                />
-
-                                <Input
-                                  value={env.value}
-                                  onChange={(e) => updateEnv(i, "value", e.target.value)}
-                                  placeholder="I8JAS92JASD4#ML"
-                                  className="bg-black border-white/10 h-9 font-mono text-xs"
-                                />
-
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  onClick={() => removeEnv(i)}
-                                  className="h-9 w-9 text-red-400 hover:bg-red-400/10"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
+                            {fields.map((field, i) => (
+                                <div key={field.id} className="grid grid-cols-[1fr_1fr_36px] gap-2 items-center">
+                                  <Input {...form.register(`envVars.${i}.key`)} placeholder="ENV_VAR" className="bg-black border-white/10 h-9 font-mono text-xs uppercase" />
+                                  <Input {...form.register(`envVars.${i}.value`)} placeholder="I8JAS92JASD4#ML" className="bg-black border-white/10 h-9 font-mono text-xs flex-1" />
+                                  <Button size="icon" variant="ghost" onClick={() => remove(i)} className="h-9 w-9 text-red-400 hover:bg-red-400/10"><Trash2 className="w-4 h-4" /></Button>
                               </div>
                             ))}
 
                             {/* IMPORT BAR */}
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground pt-2">
                               <label className="cursor-pointer text-blue-400 hover:underline">
                                 Import from .env
-                                <input
-                                  type="file"
-                                  accept=".env,.env.*"
-                                  hidden
-                                  onChange={(e) =>
-                                    e.target.files && importEnvFile(e.target.files[0])
-                                  }
-                                />
+                                <input type="file" accept=".env,.env.*" hidden onChange={(e) => e.target.files && importEnvFile(e.target.files[0])} />
                               </label>
                             </div>
 
@@ -492,7 +564,7 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => setEnvVars([...envVars, { key: "", value: "" }])}
+                              onClick={() => append({ key: "", value: "" })}
                               className="w-full border-dashed border-white/20 h-8 text-xs hover:border-white/40 hover:bg-white/5 transition-colors"
                             >
                               <Plus className="w-3 h-3 mr-2" />
@@ -516,7 +588,7 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
                     <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                     Back
                   </motion.button>
-                  <Button onClick={handleDeploy} className="bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-bold px-5 h-10 rounded-lg hover:scale-[1.05] transition-transform">
+                  <Button onClick={form.handleSubmit(onSubmit)} className="bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-bold px-5 h-10 rounded-lg hover:scale-[1.05] transition-transform">
                     <Rocket className="w-4 h-4" />
                     Deploy
                   </Button>
@@ -539,6 +611,18 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
           </AnimatePresence>
         </div>
       </DialogContent>
+
+      {/* NESTED DIALOG: ROOT SELECTOR */}
+      {selectedRepo && selectedAccount && (
+        <RootDirectorySelector 
+          open={isRootSelectorOpen} 
+          onOpenChange={setIsRootSelectorOpen}
+          repo={selectedRepo}
+          activeInstallationId={selectedAccount.installationId!}
+          currentRoot={form.getValues("rootDirectory")}
+          onSelect={handleRootDirectoryChange}
+        />
+      )}
     </Dialog>
   );
 };
