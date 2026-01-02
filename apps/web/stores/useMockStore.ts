@@ -1,48 +1,10 @@
+import { Deployment, DeploymentStatus, EnvironmentType, EnvVar, Project } from "@/types/project";
 import { create } from "zustand";
-
-export type FrameworkType = "nextjs" | "nestjs" | "vite" | "create-react-app" | "vue" | "angular" | "express" | "node" | "django" | "flask" | "fastapi" | "streamlit" | "python" | "unknown";
-export type DeploymentStatus = "ready" | "building" | "error" | "queued";
-
-export interface Project {
-  id: string;
-  name: string;
-  type: FrameworkType;
-  status: DeploymentStatus;
-  domain: string;
-  lastDeployed: string;
-  branch: string;
-  commit: string;
-  commitMessage: string;
-  duration: number;
-  teamId: string;
-  repoUrl?: string;
-}
-
-export interface Deployment {
-  id: string;
-  projectId: string;
-  status: DeploymentStatus;
-  commit: string;
-  commitMessage: string;
-  branch: string;
-  duration: string;
-  timestamp?: string;
-  runtime: string;
-  createdAt: string;
-  author: string;
-}
 
 export interface AnalyticsData {
   time: string;
   requests: number;
   bandwidth: number;
-}
-
-export interface EnvVar {
-  id: string;
-  key: string;
-  value: string;
-  environments: ("production" | "preview" | "development")[];
 }
 
 export interface Log {
@@ -69,129 +31,58 @@ interface MockStore {
   getProjectById: (id: string) => Project | undefined;
   getDeploymentsByProject: (projectId: string) => Deployment[];
   getLogsByProject: (projectId: string) => Log[];
-  addProject: (project: {
-    name: string;
-    type: FrameworkType;
-    domain: string;
-    branch: string;
-  }) => void;
 }
 
-const mockProjects: Project[] = [
+export const mockDeployments: Deployment[] = [
   {
-    id: "1",
-    name: "api-gateway",
-    type: "python",
-    status: "ready",
-    domain: "api.code2cloud.dev",
-    lastDeployed: "2 min ago",
-    branch: "main",
-    commit: "a3f2c1b",
-    commitMessage: "feat: add rate limiting middleware",
-    duration: 45,
-    teamId: "team-1",
-  },
-  {
-    id: "2",
-    name: "web-dashboard",
-    type: "nextjs",
-    status: "building",
-    domain: "dashboard.code2cloud.dev",
-    lastDeployed: "Building...",
-    branch: "develop",
-    commit: "f8d9e2a",
-    commitMessage: "fix: responsive layout issues",
-    duration: 0,
-    teamId: "team-1",
-  },
-  {
-    id: "3",
-    name: "ml-service",
-    type: "python",
-    status: "ready",
-    domain: "ml.code2cloud.dev",
-    lastDeployed: "1 hour ago",
-    branch: "main",
-    commit: "c7b4a3d",
-    commitMessage: "chore: upgrade tensorflow to 2.15",
-    duration: 120,
-    teamId: "team-1",
-  },
-  {
-    id: "4",
-    name: "landing-page",
-    type: "nextjs",
-    status: "ready",
-    domain: "code2cloud.dev",
-    lastDeployed: "3 hours ago",
-    branch: "main",
-    commit: "e1f0d9c",
-    commitMessage: "feat: add pricing section",
-    duration: 32,
-    teamId: "team-1",
-  },
-];
+    id: "dep_1",
+    projectId: "proj_1",
+    status: DeploymentStatus.READY,
+    environment: EnvironmentType.PRODUCTION,
 
-const mockDeployments: Deployment[] = [
-  {
-    id: "d1",
-    projectId: "1",
-    status: "ready",
-    commit: "a3f2b1c",
-    commitMessage: "feat: add rate limiting middleware",
+    machineCpu: 2,
+    machineRam: 4096,
+    machineStorage: 20,
+    machineOS: "ubuntu-22.04",
+
+    buildLogs: "Installing deps...\nBuilding app...\nDeployment successful.",
+    deploymentRegion: "us-east-1",
+
+    startedAt: "2025-01-05T10:14:22.000Z",
+    finishedAt: "2025-01-05T10:16:40.000Z",
+    duration: 138,
+
     branch: "main",
-    duration: "45s",
-    runtime: "Python 3.11",
-    createdAt: "2 min ago",
-    author: "sarah.chen",
+    commitHash: "a91df34c82f91a7fa921",
+    commitMessage: "feat: add auth flow",
+    commitAuthor: "Lakshman Siva",
+
+    deploymentUrl: "nextpath.code2cloud.dev",
   },
   {
-    id: "d2",
-    projectId: "2",
-    status: "building",
-    commit: "b7e4d2a",
-    commitMessage: "fix: resolve hydration mismatch",
-    branch: "develop",
-    duration: "1m 23s",
-    runtime: "Node 18.x",
-    createdAt: "15 min ago",
-    author: "alex.kim",
-  },
-  {
-    id: "d3",
-    projectId: "1",
-    status: "ready",
-    commit: "c9f8e3d",
-    commitMessage: "refactor: optimize database queries",
-    branch: "main",
-    duration: "38s",
-    runtime: "Python 3.11",
-    createdAt: "1 hour ago",
-    author: "sarah.chen",
-  },
-  {
-    id: "d4",
-    projectId: "3",
-    status: "ready",
-    commit: "d2a1b4c",
-    commitMessage: "feat: add batch inference endpoint",
-    branch: "main",
-    duration: "2m 15s",
-    runtime: "Python 3.11",
-    createdAt: "1 hour ago",
-    author: "mike.zhang",
-  },
-  {
-    id: "d5",
-    projectId: "4",
-    status: "ready",
-    commit: "e5c3f7b",
-    commitMessage: "update: new hero section design",
-    branch: "main",
-    duration: "52s",
-    runtime: "Node 18.x",
-    createdAt: "3 hours ago",
-    author: "emma.wilson",
+    id: "dep_2",
+    projectId: "proj_12",
+    status: DeploymentStatus.FAILED,
+    environment: EnvironmentType.PREVIEW,
+
+    machineCpu: 1,
+    machineRam: 2048,
+    machineStorage: 10,
+    machineOS: "ubuntu-22.04",
+
+    buildLogs: "npm run build\nError: Cannot find module 'next'",
+    deploymentRegion: "us-west-2",
+
+    startedAt: "2025-01-08T18:04:11.000Z",
+    finishedAt: "2025-01-08T18:05:03.000Z",
+    duration: 52,
+
+    branch: "feature/navbar",
+    commitHash: "9fd23ab7812cbb01",
+    commitMessage: "wip: navbar animation",
+    commitAuthor: "Lakshman Siva",
+
+    deploymentUrl: "feature-navbar-nextpath.code2cloud.dev",
   },
 ];
 
@@ -212,25 +103,104 @@ const mockEnvVars: EnvVar[] = [
     id: "e1",
     key: "DATABASE_URL",
     value: "postgresql://...",
-    environments: ["production", "preview"],
+    environments: [EnvironmentType.PRODUCTION, EnvironmentType.PREVIEW],
   },
   {
     id: "e2",
     key: "API_SECRET",
     value: "sk_live_...",
-    environments: ["production"],
+    environments: [EnvironmentType.PRODUCTION],
   },
   {
     id: "e3",
     key: "NEXT_PUBLIC_API_URL",
     value: "https://api.code2cloud.dev",
-    environments: ["production", "preview", "development"],
+    environments: [EnvironmentType.PRODUCTION, EnvironmentType.PREVIEW, EnvironmentType.DEVELOPMENT],
   },
   {
     id: "e4",
     key: "REDIS_URL",
     value: "redis://...",
-    environments: ["production", "preview"],
+    environments: [EnvironmentType.PRODUCTION, EnvironmentType.PREVIEW],
+  },
+];
+
+export const mockProjects: Project[] = [
+  {
+    id: "proj_1",
+    name: "NextPath Visualizer",
+    framework: "Next.js",
+    language: "TypeScript",
+    rootDirectory: "apps/web",
+    installCommand: "pnpm install",
+    buildCommand: "pnpm build",
+    runCommand: "pnpm start",
+    outputDirectory: ".next",
+    autoDeploy: true,
+
+    gitRepoName: "nextpath",
+    gitRepoOwner: "lakshman-99",
+    gitBranch: "main",
+    gitRepoId: 9328123,
+    gitRepoUrl: "",
+    gitCloneUrl: "",
+
+    deployments: mockDeployments,
+
+    envVars: [
+      { id: "e1", key: "DATABASE_URL", value: "postgres://prod-db-url", environments: [EnvironmentType.PRODUCTION, EnvironmentType.PREVIEW] },
+      { id: "e2", key: "NEXTAUTH_SECRET", value: "super-secret-key", environments: [EnvironmentType.PRODUCTION] },
+      { id: "e3", key: "NEXT_PUBLIC_API_URL", value: "https://api.nextpath.dev", environments: [EnvironmentType.PRODUCTION, EnvironmentType.PREVIEW, EnvironmentType.DEVELOPMENT] },
+    ],
+
+    createdAt: "2024-12-15T12:00:00.000Z",
+    updatedAt: "2025-01-08T18:05:03.000Z",
+  },
+
+  {
+    id: "proj_2",
+    name: "CloudTasker",
+    framework: "Node.js",
+    language: "JavaScript",
+    rootDirectory: "apps/api",
+    installCommand: "npm install",
+    buildCommand: "npm run build",
+    runCommand: "npm run start:prod",
+    autoDeploy: false,
+
+    gitRepoName: "cloudtasker",
+    gitRepoOwner: "lakshman-99",
+    gitBranch: "develop",
+    gitRepoId: 7812332,
+    gitRepoUrl: "",
+    gitCloneUrl: "",
+
+    deployments: [
+      {
+        id: "dep_3",
+        projectId: "proj_2",
+        status: DeploymentStatus.BUILDING,
+        environment: EnvironmentType.DEVELOPMENT,
+
+        machineCpu: 1,
+        machineRam: 2048,
+        machineStorage: 10,
+        machineOS: "alpine",
+
+        deploymentRegion: "eu-central-1",
+
+        startedAt: "2025-01-09T21:12:10.000Z",
+
+        branch: "develop",
+        commitHash: "bf2d99123",
+        commitMessage: "refactor: task queue",
+        commitAuthor: "Lakshman Siva",
+        deploymentUrl: "dev-cloudtasker.code2cloud.dev",
+      },
+    ],
+
+    createdAt: "2024-11-20T09:30:00.000Z",
+    updatedAt: "2025-01-09T21:12:10.000Z",
   },
 ];
 
@@ -382,39 +352,6 @@ export const useMockStore = create<MockStore>((set, get) => ({
     get().deployments.filter((d) => d.projectId === projectId),
   getLogsByProject: (projectId) => {
     const project = get().projects.find((p) => p.id === projectId);
-    return project?.type === "python" ? pythonLogs : nextjsLogs;
-  },
-
-  addProject: ({ name, type, domain, branch }) => {
-    const newProject: Project = {
-      id: `project-${Date.now()}`,
-      name,
-      type,
-      status: "building",
-      domain,
-      lastDeployed: "Just now",
-      branch,
-      commit: Math.random().toString(36).substring(2, 9),
-      commitMessage: "Initial deployment",
-      duration: 0,
-      teamId: "team-1",
-    };
-    set((state) => ({ projects: [newProject, ...state.projects] }));
-
-    // Simulate build completion after 5 seconds
-    setTimeout(() => {
-      set((state) => ({
-        projects: state.projects.map((p) =>
-          p.id === newProject.id
-            ? {
-                ...p,
-                status: "ready",
-                lastDeployed: "Just now",
-                duration: Math.floor(Math.random() * 60) + 30,
-              }
-            : p,
-        ),
-      }));
-    }, 5000);
+    return project?.language === "python" ? pythonLogs : nextjsLogs;
   },
 }));

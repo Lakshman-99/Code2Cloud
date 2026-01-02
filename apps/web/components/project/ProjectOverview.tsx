@@ -14,20 +14,24 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PipelineVisualizer } from "./PipelineVisualizer"; // Adjust path if needed
-import { Project } from "@/stores/useMockStore";
+import { Project } from "@/types/project";
+import { FRAMEWORKS } from "@/types/git";
+import { formatDistanceToNow } from "date-fns";
 
 interface ProjectOverviewProps {
   project: Project;
 }
 
 export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
+  const latestDeployment = project.deployments?.[0];
+  
   return (
     <>
       {/* 1. Pipeline Visualizer */}
       <PipelineVisualizer />
 
       {/* 2. Quick Actions & Info Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         
         {/* --- Project Info Card --- */}
         <div className="glass-card rounded-xl p-6 relative overflow-hidden group">
@@ -57,21 +61,8 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
                 <Terminal className="w-3.5 h-3.5" /> Framework
               </dt>
               <dd>
-                <span className={cn(
-                  "inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-sm font-medium border",
-                  project.type === 'nextjs' 
-                    ? "bg-black/80 border-white/10 text-white" 
-                    : "bg-yellow-500/10 border-yellow-500/20 text-yellow-500"
-                )}>
-                  {project.type === 'nextjs' ? (
-                    <>
-                      <div className="w-2 h-2 rounded-full bg-white" /> Next.js
-                    </>
-                  ) : (
-                    <>
-                      <div className="w-2 h-2 rounded-full bg-yellow-500" /> Python
-                    </>
-                  )}
+                <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-sm font-medium border">
+                  {FRAMEWORKS[project.framework]}
                 </span>
               </dd>
             </div>
@@ -84,7 +75,7 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
               <dd className="flex items-center gap-2">
                 <span className="text-sm font-medium text-foreground bg-secondary/50 px-2 py-0.5 rounded flex items-center gap-1">
                   <GitBranch className="w-3 h-3" />
-                  {project.branch}
+                  {project.gitBranch}
                 </span>
               </dd>
             </div>
@@ -96,12 +87,12 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
               </dt>
               <dd>
                 <a 
-                  href={`https://${project.domain}`} 
+                  href={`https://${latestDeployment.deploymentUrl}`} 
                   target="_blank"
                   rel="noreferrer"
                   className="text-sm font-medium text-primary hover:text-primary/80 hover:underline flex items-center gap-1 transition-colors"
                 >
-                  {project.domain}
+                  {latestDeployment.deploymentUrl}
                   <ArrowUpRight className="w-3 h-3" />
                 </a>
               </dd>
@@ -113,13 +104,13 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
                 <dt className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
                   <GitCommit className="w-3.5 h-3.5" /> Commits
                 </dt>
-                <dd className="text-sm font-medium text-foreground">{project.commit}</dd>
+                <dd className="text-sm font-medium text-foreground">{latestDeployment.commitHash}</dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5" /> Last Deployed
                 </dt>
-                <dd className="text-sm font-medium text-foreground">{project.lastDeployed}</dd>
+                <dd className="text-sm font-medium text-foreground capitalize">{formatDistanceToNow(new Date(latestDeployment.startedAt))} ago</dd>
               </div>
             </div>
           </dl>
@@ -139,14 +130,14 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
                 icon: Globe, 
                 color: "text-blue-400", 
                 bg: "group-hover:bg-blue-500/10",
-                href: `https://${project.domain}`
+                href: `https://${latestDeployment.deploymentUrl}`
               },
               { 
                 label: "View Source Code", 
                 icon: Github, 
                 color: "text-white", 
                 bg: "group-hover:bg-white/10",
-                href: project.repoUrl || "#" 
+                href: project.gitRepoUrl || "#" 
               },
               { 
                 label: "View Analytics", 

@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Plus, Search, Filter, LayoutGrid, List, X, 
 } from "lucide-react";
 import ProjectCard from "@/components/dashboard/ProjectCard";
-import { useMockStore } from "@/stores/useMockStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NewProjectDialog } from "@/components/project/NewProjectDialog";
@@ -19,52 +18,51 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DeploymentStatus } from "@/types/project";
+import { STATUS_OPTIONS } from "@/components/project/utils";
+import { useProjects } from "@/hooks/use-projects";
 
 const Projects = () => {
-  const { projects } = useMockStore();
+  const { projects } = useProjects();
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   // --- FILTER STATE ---
   // Store selected filters in state sets for O(1) lookup
-  const [selectedStatus, setSelectedStatus] = useState<string[]>([]);
-  const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState<DeploymentStatus[]>([]);
 
   // Filtering Logic
-  const filteredProjects = projects.filter((project) => {
-    // 1. Search Query
-    const matchesSearch = 
-      project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.type.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredProjects = useMemo(() => {
+    if (!projects) return [];
 
-    // 2. Status Filter (if any selected, match one of them)
-    const matchesStatus = selectedStatus.length === 0 || selectedStatus.includes(project.status);
+    return projects.filter((project) => {
+      const matchesSearch =
+        project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        project.framework.toLowerCase().includes(searchQuery.toLowerCase());
 
-    // 3. Framework Filter
-    const matchesFramework = selectedFrameworks.length === 0 || selectedFrameworks.includes(project.type);
+      const latestStatus = project.deployments?.[0]?.status;
 
-    return matchesSearch && matchesStatus && matchesFramework;
-  });
+      const matchesStatus =
+        selectedStatus.length === 0 ||
+        (latestStatus && selectedStatus.includes(latestStatus));
 
-  const toggleStatus = (status: string) => {
+      return matchesSearch && matchesStatus;
+    });
+  }, [projects, searchQuery, selectedStatus]);
+
+
+  const toggleStatus = (status: DeploymentStatus) => {
     setSelectedStatus(prev => 
       prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
     );
   };
 
-  const toggleFramework = (fw: string) => {
-    setSelectedFrameworks(prev => 
-      prev.includes(fw) ? prev.filter(f => f !== fw) : [...prev, fw]
-    );
-  };
-
   const clearFilters = () => {
     setSelectedStatus([]);
-    setSelectedFrameworks([]);
   };
 
-  const hasActiveFilters = selectedStatus.length > 0 || selectedFrameworks.length > 0;
+  const hasActiveFilters = selectedStatus.length > 0;
 
   // --- ANIMATION VARIANTS ---
   // This orchestrates the children animations
@@ -145,47 +143,22 @@ const Projects = () => {
                 Filter
                 {hasActiveFilters && (
                   <span className="ml-1 rounded-full bg-primary w-5 h-5 text-[10px] text-primary-foreground flex items-center justify-center">
-                    {selectedStatus.length + selectedFrameworks.length}
+                    {selectedStatus.length}
                   </span>
                 )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 bg-[#0a0a0a] border-white/10 text-foreground backdrop-blur-xl">
               <DropdownMenuLabel>Status</DropdownMenuLabel>
-              <DropdownMenuCheckboxItem 
-                checked={selectedStatus.includes('ready')}
-                onCheckedChange={() => toggleStatus('ready')}
-              >
-                Ready
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem 
-                checked={selectedStatus.includes('building')}
-                onCheckedChange={() => toggleStatus('building')}
-              >
-                Building
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem 
-                checked={selectedStatus.includes('error')}
-                onCheckedChange={() => toggleStatus('error')}
-              >
-                Error
-              </DropdownMenuCheckboxItem>
-              
-              <DropdownMenuSeparator className="bg-white/10" />
-              
-              <DropdownMenuLabel>Framework</DropdownMenuLabel>
-              <DropdownMenuCheckboxItem 
-                checked={selectedFrameworks.includes('nextjs')}
-                onCheckedChange={() => toggleFramework('nextjs')}
-              >
-                Next.js
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem 
-                checked={selectedFrameworks.includes('python')}
-                onCheckedChange={() => toggleFramework('python')}
-              >
-                Python
-              </DropdownMenuCheckboxItem>
+              {STATUS_OPTIONS.map(({ label, value }) => (
+                <DropdownMenuCheckboxItem
+                  key={value}
+                  checked={selectedStatus.includes(value)}
+                  onCheckedChange={() => toggleStatus(value)}
+                >
+                  {label}
+                </DropdownMenuCheckboxItem>
+              ))}
 
               {hasActiveFilters && (
                 <>
@@ -244,7 +217,7 @@ const Projects = () => {
         variants={containerVariants} // Apply stagger logic here
         initial="hidden"
         animate="visible"
-        key={searchQuery + viewMode + selectedStatus.join('') + selectedFrameworks.join('') + filteredProjects.length} // Forces re-animation on filter change
+        key={searchQuery + viewMode + selectedStatus.join('') + filteredProjects.length} // Forces re-animation on filter change
         className={cn(
           "grid gap-4",
           viewMode === "grid"
@@ -264,7 +237,7 @@ const Projects = () => {
       </motion.div>
 
       {/* Empty State */}
-      {filteredProjects.length === 0 && (
+      {projects && projects.length > 0 && filteredProjects.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -288,6 +261,34 @@ const Projects = () => {
             className="border-white/10 hover:bg-white/5"
           >
             Clear Search & Filters
+          </Button>
+        </motion.div>
+      )}
+
+      {projects?.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col items-center justify-center py-28 text-center"
+        >
+          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6 ring-1 ring-primary/30">
+            <Plus className="w-9 h-9 text-primary" />
+          </div>
+
+          <h3 className="text-2xl font-semibold text-foreground mb-2">
+            Create your first project
+          </h3>
+
+          <p className="text-muted-foreground mb-8 max-w-sm">
+            Connect a Git repository and deploy your app in seconds.
+          </p>
+
+          <Button
+            onClick={() => setNewProjectOpen(true)}
+            className="gap-2 bg-gradient-to-r from-primary to-accent shadow-lg shadow-primary/20"
+          >
+            <Plus className="w-4 h-4" />
+            New Project
           </Button>
         </motion.div>
       )}

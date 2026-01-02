@@ -7,44 +7,23 @@ import {
   Globe, Check, AlertCircle, Save, X, RefreshCw, Copy, RotateCcw,
   Loader2
 } from "lucide-react";
-import { useMockStore } from "@/stores/useMockStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Domain, DomainDnsStatus, EnvironmentType, EnvVar, Project } from "@/types/project";
 
-// --- TYPES ---
-type Environment = "production" | "preview" | "development";
-
-interface EnvVar {
-  id: string;
-  key: string;
-  value: string;
-  environments: Environment[];
-  isNew?: boolean; 
-  isDeleted?: boolean;
+interface ProjectOverviewProps {
+  project: Project;
 }
 
-interface Domain {
-  id: string;
-  name: string;
-  status: "active" | "pending" | "error" | "verifying";
-  type: "production" | "preview";
-  dnsRecords?: { type: string; name: string; value: string }[];
-}
-
-export const EnvVarsPanel = () => {
-  const { envVars: initialEnvVars } = useMockStore();
-  
-  // --- STATE ---
-  const [envVars, setEnvVars] = useState<EnvVar[]>(initialEnvVars);
+export const EnvVarsPanel = ({ project }: ProjectOverviewProps) => {  
+  const [envVars, setEnvVars] = useState<EnvVar[]>(project.envVars || []);
   const [isEnvDirty, setIsEnvDirty] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   
-  const [domains, setDomains] = useState<Domain[]>([
-    { id: "1", name: "app.code2cloud.dev", status: "active", type: "production" }
-  ]);
+  const [domains, setDomains] = useState<Domain[]>(project.domains || []);
   const [newDomain, setNewDomain] = useState("");
   const [isAddingDomain, setIsAddingDomain] = useState(false);
 
@@ -58,7 +37,7 @@ export const EnvVarsPanel = () => {
     setIsEnvDirty(true);
   };
 
-  const toggleEnv = (id: string, env: Environment) => {
+  const toggleEnv = (id: string, env: EnvironmentType) => {
     setEnvVars(prev => prev.map(v => {
       if (v.id !== id) return v;
       const nextEnvs = v.environments.includes(env)
@@ -74,8 +53,7 @@ export const EnvVarsPanel = () => {
       id: Math.random().toString(36).substr(2, 9),
       key: "",
       value: "",
-      environments: ["production", "preview", "development"],
-      isNew: true
+      environments: [],
     };
     // Add to TOP of list
     setEnvVars([newVar, ...envVars]);
@@ -127,8 +105,7 @@ export const EnvVarsPanel = () => {
             id: Math.random().toString(36).substr(2, 9),
             key: key,
             value: value,
-            environments: ["production", "preview", "development"],
-            isNew: true
+            environments: [],
           });
         }
       });
@@ -164,7 +141,7 @@ export const EnvVarsPanel = () => {
   };
 
   const discardChanges = () => {
-    setEnvVars(initialEnvVars);
+    setEnvVars(project.envVars || []);
     setIsEnvDirty(false);
     toast.info("Changes discarded");
   };
@@ -180,8 +157,8 @@ export const EnvVarsPanel = () => {
     const domain: Domain = {
       id: Math.random().toString(),
       name: newDomain,
-      status: "pending",
-      type: "production",
+      status: DomainDnsStatus.PENDING,
+      type: EnvironmentType.PRODUCTION,
       dnsRecords: [
         { type: "A", name: "@", value: "76.76.21.21" },
         { type: "CNAME", name: "www", value: "cname.code2cloud.dev" }
@@ -195,10 +172,10 @@ export const EnvVarsPanel = () => {
   };
 
   const verifyDomain = (id: string) => {
-    setDomains(prev => prev.map(d => d.id === id ? { ...d, status: "verifying" } : d));
+    setDomains(prev => prev.map(d => d.id === id ? { ...d, status: DomainDnsStatus.VERIFYING } : d));
     
     setTimeout(() => {
-      setDomains(prev => prev.map(d => d.id === id ? { ...d, status: "active" } : d));
+      setDomains(prev => prev.map(d => d.id === id ? { ...d, status: DomainDnsStatus.ACTIVE } : d));
       toast.success("Domain Verified", { description: "Traffic is now routing to this project." });
     }, 2000);
   };
@@ -231,15 +208,15 @@ export const EnvVarsPanel = () => {
           
           <div className="flex items-center gap-2">
              {/* Hidden File Input */}
-             <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                accept=".env,text/plain" 
-                onChange={handleFileUpload} 
-             />
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept=".env,text/plain" 
+              onChange={handleFileUpload} 
+            />
 
-             {isEnvDirty ? (
+            {isEnvDirty ? (
                 <div className="flex items-center gap-2">
                   <Button variant="ghost" size="sm" onClick={discardChanges} className="text-muted-foreground hover:text-red-400">
                     <RotateCcw className="w-4 h-4 mr-2" /> Discard
@@ -325,20 +302,20 @@ export const EnvVarsPanel = () => {
                         <div className="flex justify-center gap-3 pt-2">
                           <EnvCheckbox 
                             label="Prod" 
-                            checked={envVar.environments.includes('production')} 
-                            onChange={() => toggleEnv(envVar.id, 'production')}
+                            checked={envVar.environments.includes(EnvironmentType.PRODUCTION)} 
+                            onChange={() => toggleEnv(envVar.id, EnvironmentType.PRODUCTION)}
                             activeColor="bg-emerald-500"
                           />
                           <EnvCheckbox 
                             label="Prev" 
-                            checked={envVar.environments.includes('preview')} 
-                            onChange={() => toggleEnv(envVar.id, 'preview')}
+                            checked={envVar.environments.includes(EnvironmentType.PREVIEW)} 
+                            onChange={() => toggleEnv(envVar.id, EnvironmentType.PREVIEW)}
                             activeColor="bg-blue-500"
                           />
                           <EnvCheckbox 
                             label="Dev" 
-                            checked={envVar.environments.includes('development')} 
-                            onChange={() => toggleEnv(envVar.id, 'development')}
+                            checked={envVar.environments.includes(EnvironmentType.DEVELOPMENT)} 
+                            onChange={() => toggleEnv(envVar.id, EnvironmentType.DEVELOPMENT)}
                             activeColor="bg-yellow-500"
                           />
                         </div>
@@ -434,10 +411,10 @@ export const EnvVarsPanel = () => {
                   <div className="flex items-center gap-4">
                     {/* Status Dot */}
                     <div className="relative">
-                      {domain.status === 'active' && <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />}
-                      {domain.status === 'pending' && <div className="w-3 h-3 rounded-full bg-yellow-500 animate-pulse" />}
-                      {domain.status === 'verifying' && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
-                      {domain.status === 'error' && <div className="w-3 h-3 rounded-full bg-red-500" />}
+                      {domain.status === DomainDnsStatus.ACTIVE && <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />}
+                      {domain.status === DomainDnsStatus.PENDING && <div className="w-3 h-3 rounded-full bg-yellow-500 animate-pulse" />}
+                      {domain.status === DomainDnsStatus.VERIFYING && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
+                      {domain.status === DomainDnsStatus.ERROR && <div className="w-3 h-3 rounded-full bg-red-500" />}
                     </div>
                     
                     <div>
@@ -445,10 +422,10 @@ export const EnvVarsPanel = () => {
                         <a href={`https://${domain.name}`} target="_blank" className="hover:underline hover:text-blue-400 transition-colors">
                           {domain.name}
                         </a>
-                        {domain.status === 'active' && <Check className="w-3 h-3 text-emerald-500" />}
+                        {domain.status === DomainDnsStatus.ACTIVE && <Check className="w-3 h-3 text-emerald-500" />}
                         <Badge variant="outline" className="text-[10px] h-5 border-white/10 bg-white/5 uppercase tracking-wider ml-2">{domain.type}</Badge>
                       </h4>
-                      {domain.status === 'pending' && (
+                      {domain.status === DomainDnsStatus.PENDING && (
                         <p className="text-xs text-yellow-500 mt-0.5 flex items-center gap-1.5">
                           <AlertCircle className="w-3 h-3" /> Invalid Configuration
                         </p>
@@ -457,9 +434,9 @@ export const EnvVarsPanel = () => {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {domain.status !== 'active' && (
+                    {domain.status !== DomainDnsStatus.ACTIVE && (
                       <Button variant="outline" size="sm" onClick={() => verifyDomain(domain.id)} className="border-white/10 h-8 text-xs hover:bg-white/5">
-                        <RefreshCw className={cn("w-3 h-3 mr-2", domain.status === 'verifying' && "animate-spin")} /> 
+                        <RefreshCw className={cn("w-3 h-3 mr-2", domain.status === DomainDnsStatus.VERIFYING && "animate-spin")} /> 
                         Refresh
                       </Button>
                     )}
@@ -470,7 +447,7 @@ export const EnvVarsPanel = () => {
                 </div>
 
                 {/* DNS Configuration Panel (Only if not active) */}
-                {domain.status !== 'active' && domain.dnsRecords && (
+                {domain.status !== DomainDnsStatus.ACTIVE && domain.dnsRecords && (
                   <div className="bg-black/30 rounded-lg border border-white/5 p-4 mt-2">
                     <p className="text-xs text-muted-foreground mb-3 flex items-center gap-2">
                       <Globe className="w-3 h-3" />

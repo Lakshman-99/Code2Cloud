@@ -1,29 +1,22 @@
 import { motion } from 'framer-motion';
 import { ExternalLink, GitBranch, RefreshCw, MoreHorizontal } from 'lucide-react';
-import { Project } from '@/stores/useMockStore';
+import { DeploymentStatus, Project } from '@/types/project';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { SiNextdotjs, SiPython } from 'react-icons/si';
+import { getFrameworkIcon, getStatusConfig } from './utils';
 
 interface ProjectHeaderProps {
   project: Project;
 }
 
-const statusConfig = {
-  ready: { color: 'bg-emerald-500', glow: 'shadow-emerald-500/50', text: 'text-emerald-500' },
-  building: { color: 'bg-blue-500', glow: 'shadow-blue-500/50', text: 'text-blue-500' },
-  error: { color: 'bg-red-500', glow: 'shadow-red-500/50', text: 'text-red-500' },
-  queued: { color: 'bg-yellow-500', glow: 'shadow-yellow-500/50', text: 'text-yellow-500' },
-};
-
-
 export const ProjectHeader = ({ project }: ProjectHeaderProps) => {
-  const status = statusConfig[project.status as keyof typeof statusConfig] || statusConfig.ready;
+  const latestDeployment = project.deployments?.[0];
+  const status = getStatusConfig(latestDeployment?.status);
 
   const handleRedeploy = () => {
     toast.success('Deployment queued', {
-      description: `${project.name} is being redeployed from ${project.branch}`,
+      description: `${project.name} is being redeployed from ${project.gitBranch} branch.`,
     });
   };
 
@@ -34,13 +27,8 @@ export const ProjectHeader = ({ project }: ProjectHeaderProps) => {
       className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
     >
       <div className="flex items-center gap-4">
-        <div className={cn(
-          "w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold",
-          project.type === 'nextjs'
-            ? "bg-white/10 text-foreground"
-            : "bg-emerald-500/20 text-emerald-400"
-        )}>
-          {project.type === 'nextjs' ? <SiNextdotjs size={24} /> : <SiPython size={24} />}
+        <div className="w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold bg-white/5 border border-white/10 text-white">
+          {getFrameworkIcon(project.framework, project.language, 30)}
         </div>
 
         <div>
@@ -49,30 +37,30 @@ export const ProjectHeader = ({ project }: ProjectHeaderProps) => {
 
             <div className="flex flex-shrink-0 items-center gap-2 px-2.5 py-1 rounded-full bg-white/10 border border-white/5">
               <span className={cn("relative flex h-2 w-2")}>
-                {project.status === 'building' && (
+                {latestDeployment?.status === DeploymentStatus.BUILDING && (
                   <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", status.color)}></span>
                 )}
                 <span className={cn("relative inline-flex rounded-full h-2 w-2", status.color, status.glow)}></span>
               </span>
               <span className={cn("text-xs font-medium capitalize", status.text)}>
-                {project.status}
+                {latestDeployment?.status}
               </span>
             </div>
           </div>
           <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
             <a
-              href={`https://${project.domain}`}
+              href={`https://${latestDeployment.deploymentUrl}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 hover:text-foreground transition-colors"
             >
-              {project.domain}
+              {latestDeployment.deploymentUrl}
               <ExternalLink className="w-3 h-3" />
             </a>
             <span>•</span>
             <div className="flex items-center gap-1">
               <GitBranch className="w-3 h-3" />
-              {project.branch}
+              {project.gitBranch}
             </div>
           </div>
         </div>
@@ -81,7 +69,7 @@ export const ProjectHeader = ({ project }: ProjectHeaderProps) => {
       <div className="flex items-center gap-3">
         <Button 
           className="gap-2 bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-bold hover:opacity-90 shadow-[0_0_20px_-5px_rgba(52,211,153,0.5)] transition-all border-0"
-          onClick={() => window.open(`https://${project.domain}`, '_blank')}
+          onClick={() => window.open(`https://${latestDeployment.deploymentUrl}`, '_blank')}
         >
           <ExternalLink className="w-4 h-4" />
           Visit

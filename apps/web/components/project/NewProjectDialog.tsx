@@ -14,7 +14,6 @@ import { RepoListSkeleton } from '../ui/skeleton';
 import { ScrollArea } from '../ui/scroll-area';
 import { Input } from '../ui/input';
 import { formatDistanceToNow } from 'date-fns';
-import { FrameworkType, useMockStore } from '@/stores/useMockStore';
 import { toast } from 'sonner';
 import { Label } from '../ui/label';
 import { FRAMEWORK_ICONS, FRAMEWORK_PRESETS, GitRepository } from '@/types/git';
@@ -23,39 +22,20 @@ import { cn } from '@/lib/utils';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { ProjectSchema, projectSchema } from '@/lib/validation/project';
 import { zodResolver } from '@hookform/resolvers/zod';
-import Image from 'next/image';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { RootDirectorySelector } from './root-directory-selector';
+import { getFrameworkIcon } from './utils';
+import { urlConfig } from '@/lib/url-config';
+import { useProjects } from '@/hooks/use-projects';
 
 interface NewProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export const getFrameworkIcon = (framework: string, language: string | null) => {
-  const fw = framework?.toLowerCase();
-  const lang = language?.toLowerCase() || "";
-  const size = 20;
-
-  // Framework-specific
-  if (fw && FRAMEWORK_ICONS[fw]) {
-    return <Image src={FRAMEWORK_ICONS[fw]} alt={fw} width={size} height={size} />;
-  }
-
-  // Fallback to language
-  if (fw && (fw.includes("unknown") || fw.includes("other"))) return <div className="w-5 h-5 border-2 border-gray-400 border-dotted rounded-full" />;
-  if (lang.includes("python")) return <Image src={FRAMEWORK_ICONS["python"]} alt="python" width={size} height={size} />;
-  if (lang.includes("node") || lang.includes("javascript")) return <Image src={FRAMEWORK_ICONS["node"]} alt="nodejs" width={size} height={size} />;
-  if (lang.includes("typescript")) return <Image src={FRAMEWORK_ICONS["typescript"]} alt="typescript" width={size} height={size} />;
-  if (lang.includes("go")) return <Image src={FRAMEWORK_ICONS["golang"]} alt="golang" width={size} height={size} />;
-
-  // Default fallback
-  return <div className="w-5 h-5 bg-white/50 rounded-sm" />;
-};
-
 export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) => {
   const { isConnected, accounts, repos, isLoading, selectedAccount, setSelectedAccount, refreshStatus, detectFramework } = useGit();
-  const { addProject } = useMockStore();
+  const { createProject } = useProjects();
   
   // Local UI State
   const [searchQuery, setSearchQuery] = useState("");
@@ -172,7 +152,7 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
     const toastId = toast.loading("Opening GitHub Authentication...");
 
     const popup = window.open(
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/github/connect`,
+      `${urlConfig.apiUrl}/auth/github/connect`,
       "GitHubConnect",
       `width=${width},height=${height},top=${top},left=${left}`
     );
@@ -212,20 +192,54 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
   };
 
   const onSubmit = async (data: ProjectSchema) => {
-    setDeploying(true);
-    await new Promise(r => setTimeout(r, 2000));
-    
-    addProject({
-      name: data.projectName,
-      type: data.framework as FrameworkType,
-      domain: `${data.projectName}.code2cloud.dev`,
-      branch: selectedRepo?.defaultBranch || 'main',
-    });
-    
-    toast.success("Deployment Initiated");
-    handleClose(false);
-  };
+    if (!selectedRepo) {
+      toast.error("No repository selected");
+      return;
+    }
 
+    setDeploying(true);
+    const toastId = toast.loading("Creating project and queuing deployment...");
+
+    try {
+      // 1. Prepare Payload
+      const payload = {
+        name: data.projectName,
+        framework: data.framework,
+        rootDirectory: data.rootDirectory,
+        language: selectedRepo.language || "Unknown",
+        
+        // Build Settings
+        installCommand: data.installCommand,
+        buildCommand: data.buildCommand,
+        runCommand: data.runCommand,
+        outputDirectory: data.outputDirectory,
+        
+        // Git Metadata (From the selectedRepo object)
+        gitRepoName: selectedRepo.name,
+        gitRepoOwner: selectedRepo.fullName.split('/')[0], // Extract owner from "owner/repo"
+        gitBranch: selectedRepo.defaultBranch,
+        gitRepoUrl: selectedRepo.htmlUrl,
+        gitCloneUrl: selectedRepo.cloneUrl,
+        
+        // Environment Variables
+        envVars: data.envVars.filter(v => v.key.trim() !== "" && v.value.trim() !== "").map(v => ({ key: v.key, value: v.value })),
+      };
+
+      // 2. Send to Backend
+      const newProject = await createProject(payload);
+      
+      // 3. Success State
+      toast.success("Project created and deployment queued!", { id: toastId, description: `Deployment ID: ${newProject.deployments[0].id}` });
+      handleClose(false);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to create project", { id: toastId });
+    } finally {
+      setDeploying(false);
+    }
+  };
+    
   const importEnvFile = async (file: File) => {
     const text = await file.text();
     const parsed = text.split("\n").reduce((acc, line) => {

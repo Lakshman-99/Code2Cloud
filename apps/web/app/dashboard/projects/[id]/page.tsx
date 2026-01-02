@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { ProjectOverview } from "@/components/project/ProjectOverview";
 import { useEffect, useState } from "react";
 import { ProjectNotFoundState } from "@/components/feedback/ProjectNotFoundState";
+import { useProjects } from "@/hooks/use-projects";
 
 const tabs = ["Overview", "Deployments", "Logs", "Storage", "Settings"];
 
@@ -22,7 +23,8 @@ const ProjectDetail = () => {
   const searchParams = useSearchParams();
 
   const projectId = params.id as string;
-  const { getProjectById, getDeploymentsByProject, getLogsByProject } = useMockStore();
+  const { getDeploymentsByProject, getLogsByProject } = useMockStore();
+  const { getProjectById } = useProjects();
 
   // Determine active tab
   const [activeTab, setActiveTab] = useState(() => {
@@ -73,7 +75,7 @@ const ProjectDetail = () => {
       case "Storage":
         return <StoragePanel />;
       case "Settings":
-        return <EnvVarsPanel />;
+        return <EnvVarsPanel project={project} />;
       default:
         return null;
     }

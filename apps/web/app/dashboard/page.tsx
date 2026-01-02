@@ -1,20 +1,19 @@
 "use client";
 
-import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import SystemHealthChart from '@/components/dashboard/SystemHealthChart';
 import ActiveDeployments from '@/components/dashboard/ActiveDeployments';
 import ProjectCard from '@/components/dashboard/ProjectCard';
 import { ChartSkeleton, ListSkeleton, CardSkeleton, NameSkeleton } from '@/components/ui/skeleton';
-import { useMockStore } from '@/stores/useMockStore';
 import { useUser } from '@/hooks/use-user';
 import { useRouter } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { useProjects } from '@/hooks/use-projects';
+import { ArrowRight } from 'lucide-react';
 
 const Dashboard = () => {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
-  const { projects, loading, setLoading } = useMockStore();
+  const { projects, isLoading: isProjectsLoading } = useProjects();
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -27,10 +26,6 @@ const Dashboard = () => {
     }
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 1500);
-    return () => clearTimeout(timer);
-  }, [setLoading]);
 
   return (
     <div className="p-6 space-y-6">
@@ -58,7 +53,7 @@ const Dashboard = () => {
       {/* Bento Grid */}
       <div className="grid grid-cols-4 gap-4">
         {/* System Health - Large Card */}
-        {loading ? (
+        {isProjectsLoading ? (
           <div className="col-span-2 row-span-2">
             <ChartSkeleton />
           </div>
@@ -67,7 +62,7 @@ const Dashboard = () => {
         )}
 
         {/* Active Deployments */}
-        {loading ? (
+        {isProjectsLoading ? (
           <div className="col-span-2">
             <ListSkeleton />
           </div>
@@ -76,7 +71,7 @@ const Dashboard = () => {
         )}
 
         {/* Quick Stats */}
-        {loading ? (
+        {isProjectsLoading ? (
           <>
             <div className="col-span-1">
               <CardSkeleton />
@@ -124,28 +119,48 @@ const Dashboard = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-foreground">Active Projects</h2>
             <button className="text-sm text-primary hover:text-primary/80 transition-colors" onClick={() => router.push('/dashboard/projects')}>
-              View all →
+              View all
+              <ArrowRight className="w-4 h-4 inline-block ml-1" />
             </button>
           </div>
-          <motion.div
-            key={loading ? "loading" : "loaded"}
-            variants={containerVariants} // Apply stagger logic here
-            initial="hidden"
-            animate="visible"
-            className={cn(
-              "grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
-            )}
-          >
-            <AnimatePresence mode="popLayout">
-              {loading
-                ? Array.from({ length: 4 }).map((_, i) => (
+
+          {/* Empty State */}
+          {projects && projects.length === 0 && !isProjectsLoading && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col items-center justify-center py-24 text-center"
+            >
+              <h3 className="text-xl font-semibold text-foreground mb-2">
+                No projects found
+              </h3>
+              <p className="text-muted-foreground mb-8 max-w-sm">
+                Get started by creating a new project from your Git repository.
+              </p>
+            </motion.div>
+          )}
+
+          {/* Grid */}
+          {(isProjectsLoading || (projects && projects.length > 0)) && (
+            <motion.div
+              key={isProjectsLoading ? "loading" : "loaded"}
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            >
+              <AnimatePresence mode="popLayout">
+                {isProjectsLoading &&
+                  Array.from({ length: 4 }).map((_, i) => (
                     <CardSkeleton key={i} />
-                  ))
-                : projects.map((project, ) => (
-                    <ProjectCard key={project.id} project={project} layout={false} />
                   ))}
-            </AnimatePresence>
-          </motion.div>
+
+                {projects?.map((project) => (
+                  <ProjectCard key={project.id} project={project} layout={false} />
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          )}
         </motion.div>
       </div>
     </div>

@@ -121,7 +121,6 @@ export const RepoListSkeleton = () => (
     </div>
     <div className="p-4 space-y-2">
       {[1, 2, 3, 4, 5, 6].map((i) => (
-        <>
         <motion.div 
           key={i}
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -137,7 +136,6 @@ export const RepoListSkeleton = () => (
           <Skeleton className="h-8 w-20 rounded-lg bg-white/10" />
 
         </motion.div>
-        </>
       ))}
     </div>
   </motion.div>

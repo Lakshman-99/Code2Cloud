@@ -38,6 +38,24 @@ export interface GitFrameworkDetection {
   outputDirectory: string
 }
 
+export const FRAMEWORKS: Record<string, string> = {
+  nextjs: "Next.js",
+  nestjs: "NestJS",
+  vite: "Vite",
+  "create-react-app": "Create React App",
+  vue: "Vue.js",
+  express: "Express.js",
+  angular: "Angular",
+  django: "Django",
+  flask: "Flask",
+  fastapi: "FastAPI",
+  streamlit: "Streamlit",
+  node: "Node.js",
+  python: "Python",
+  golang: "Go",
+  fastify: "Fastify",
+};
+
 export const FRAMEWORK_ICONS: Record<string, string> = {
   nextjs: "/icons/nextjs_icon_dark.svg",
   nestjs: "/icons/nestjs.svg",
