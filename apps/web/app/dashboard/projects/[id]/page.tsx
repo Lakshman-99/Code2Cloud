@@ -2,7 +2,7 @@
 
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { ProjectHeader } from "@/components/project/ProjectHeader";
 import { DeploymentsTable } from "@/components/project/DeploymentsTable";
 import { TerminalLogs } from "@/components/project/TerminalLogs";
@@ -14,6 +14,9 @@ import { ProjectOverview } from "@/components/project/ProjectOverview";
 import { useEffect, useState } from "react";
 import { ProjectNotFoundState } from "@/components/feedback/ProjectNotFoundState";
 import { useProjects } from "@/hooks/use-projects";
+import { useDeployments } from "@/hooks/use-deployments";
+import { ProjectDetailSkeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 
 const tabs = ["Overview", "Deployments", "Logs", "Storage", "Settings"];
 
@@ -23,8 +26,9 @@ const ProjectDetail = () => {
   const searchParams = useSearchParams();
 
   const projectId = params.id as string;
-  const { getDeploymentsByProject, getLogsByProject } = useMockStore();
-  const { getProjectById } = useProjects();
+  const { getLogsByProject } = useMockStore();
+  const { getProjectById, isLoading: isProjectLoading } = useProjects();
+  const { deployments, redeploy, isLoading: isDeploymentsLoading } = useDeployments(projectId);
 
   // Determine active tab
   const [activeTab, setActiveTab] = useState(() => {
@@ -33,7 +37,6 @@ const ProjectDetail = () => {
   });
 
   const project = getProjectById(projectId);
-  const deployments = getDeploymentsByProject(projectId);
   const logs = getLogsByProject(projectId);
 
   const handleTabChange = (tab: string) => {
@@ -58,6 +61,10 @@ const ProjectDetail = () => {
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
+  if (isProjectLoading || isDeploymentsLoading) {
+    return <ProjectDetailSkeleton />;
+  }
 
   if (!project) {
     return <ProjectNotFoundState projectId={projectId} />;
@@ -96,6 +103,48 @@ const ProjectDetail = () => {
 
       {/* Header */}
       <ProjectHeader project={project} />
+
+      {/* 2. CONFIG CHANGED BANNER */}
+      <AnimatePresence>
+        {project.configChanged && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+            animate={{ opacity: 1, height: "auto", marginBottom: 32 }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-500/20 text-amber-500">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-amber-200">Configuration Changed</h3>
+                  <p className="text-xs text-amber-200/70">
+                    Environment variables or domains have been modified. Redeploy to apply changes.
+                  </p>
+                </div>
+              </div>
+              <Button 
+                onClick={() => redeploy(project.id)}
+                disabled={isDeploymentsLoading}
+                size="sm"
+                className="bg-amber-500 text-black hover:bg-amber-400 font-bold border-0 shrink-0 min-w-[140px]"
+              >
+                {isDeploymentsLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Queuing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" /> Redeploy Now
+                  </>
+                )}
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Tabs */}
       <div className="border-b border-white/5 mb-8">

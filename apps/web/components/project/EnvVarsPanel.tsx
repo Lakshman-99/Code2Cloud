@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Eye, EyeOff, Plus, Trash2, Shield, Upload, FileText, 
-  Globe, Check, AlertCircle, Save, X, RefreshCw, Copy, RotateCcw,
+  Globe, Check, AlertCircle, Save, X, RefreshCw, Copy, 
   Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,51 +13,136 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Domain, DomainDnsStatus, EnvironmentType, EnvVar, Project } from "@/types/project";
+import { useProjects } from "@/hooks/use-projects";
 
 interface ProjectOverviewProps {
   project: Project;
 }
 
 export const EnvVarsPanel = ({ project }: ProjectOverviewProps) => {  
-  const [envVars, setEnvVars] = useState<EnvVar[]>(project.envVars || []);
-  const [isEnvDirty, setIsEnvDirty] = useState(false);
-  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
-  
-  const [domains, setDomains] = useState<Domain[]>(project.domains || []);
-  const [newDomain, setNewDomain] = useState("");
-  const [isAddingDomain, setIsAddingDomain] = useState(false);
+  const { saveEnvVars } = useProjects();
+
+  const [envVars, setEnvVars] = useState<EnvVar[]>(project.envVars ?? []);
+  const [domains, setDomains] = useState<Domain[]>(project.domains ?? []);
+  const [ui, setUi] = useState({
+    dirty: false,
+    showValues: new Set<string>(),
+    showAll: false,
+    newDomain: "",
+    addingDomain: false,
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- ACTIONS: ENV VARS ---
+  const generateId = () => crypto.randomUUID();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleEnvChange = (id: string, field: keyof EnvVar, value: any) => {
+  const parseEnvLine = (line: string) => {
+    const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+    if (!match) return null;
+
+    let value = match[2] ?? "";
+    value = value.replace(/^['"]|['"]$/g, "").trim();
+
+    return { key: match[1].trim(), value };
+  };
+
+
+  const importEnvFile = async (file: File) => {
+    const text = await file.text();
+
+    const parsed = text
+      .split("\n")
+      .map(parseEnvLine)
+      .filter(Boolean) as { key: string; value: string }[];
+
+    if (!parsed.length) {
+      toast.error("No valid environment variables found.");
+      return;
+    }
+
+    setEnvVars(prev => {
+      const existingKeys = new Set(prev.map(v => v.key));
+
+      const fresh: EnvVar[] = parsed
+        .filter(v => !existingKeys.has(v.key))
+        .map(v => ({
+          id: generateId(),
+          key: v.key,
+          value: v.value,
+          targets: [EnvironmentType.PRODUCTION],
+        }));
+
+      return [...fresh, ...prev];
+    });
+
+    setUi(prev => ({ ...prev, dirty: true }));
+    toast.success(`Imported ${parsed.length} variables`);
+  };
+
+  const saveEnvChanges = async () => {
+    if (envVars.some(v => !v.key.trim())) {
+      toast.error("All variables must have a key.");
+      return;
+    }
+
+    try {
+      await saveEnvVars(project.id, envVars);
+      setUi(prev => ({ ...prev, dirty: false }));
+      toast.success("Environment variables saved");
+    } catch {
+      toast.error("Failed to save variables");
+    }
+  };
+
+  const discardChanges = () => {
+    setEnvVars(project.envVars ?? []);
+    setUi(prev => ({ ...prev, dirty: false }));
+    toast.info("Changes discarded");
+  };
+
+  const isVisible = (id: string) => ui.showAll || ui.showValues.has(id);
+
+  const toggleVisibility = (id: string) =>
+    setUi(prev => {
+      const next = new Set(prev.showValues);
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      next.has(id) ? next.delete(id) : next.add(id);
+      return { ...prev, showValues: next };
+    });
+
+  const toggleAllVisibility = () =>
+    setUi(prev => ({
+      ...prev,
+      showAll: !prev.showAll,
+    }));
+
+  const handleEnvChange = (id: string, field: keyof EnvVar, value: string) => {
     setEnvVars(prev => prev.map(v => v.id === id ? { ...v, [field]: value } : v));
-    setIsEnvDirty(true);
+    setUi(prev => ({ ...prev, dirty: true }));;
   };
 
   const toggleEnv = (id: string, env: EnvironmentType) => {
     setEnvVars(prev => prev.map(v => {
       if (v.id !== id) return v;
-      const nextEnvs = v.environments.includes(env)
-        ? v.environments.filter(e => e !== env)
-        : [...v.environments, env];
-      return { ...v, environments: nextEnvs };
+      const nextEnvs = v.targets.includes(env)
+        ? v.targets.filter(e => e !== env)
+        : [...v.targets, env];
+      return { ...v, targets: nextEnvs };
     }));
-    setIsEnvDirty(true);
+    setUi(prev => ({ ...prev, dirty: true }));;
   };
 
   const addEmptyVar = () => {
     const newVar: EnvVar = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: generateId(),
       key: "",
       value: "",
-      environments: [],
+      targets: [],
     };
     // Add to TOP of list
     setEnvVars([newVar, ...envVars]);
-    setIsEnvDirty(true);
+    setUi(prev => ({ ...prev, dirty: true }));;
+    toggleVisibility(newVar.id);
   };
 
   const removeVar = (id: string) => {
@@ -66,7 +151,7 @@ export const EnvVarsPanel = ({ project }: ProjectOverviewProps) => {
 
     // Optimistic delete
     setEnvVars(prev => prev.filter(v => v.id !== id));
-    setIsEnvDirty(true);
+    setUi(prev => ({ ...prev, dirty: true }));;
 
     // Toast with Undo capability
     toast("Variable deleted", {
@@ -79,84 +164,17 @@ export const EnvVarsPanel = ({ project }: ProjectOverviewProps) => {
     });
   };
 
-  // --- FILE UPLOAD (BULK IMPORT) ---
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      const lines = text.split("\n");
-      const newVars: EnvVar[] = [];
-
-      lines.forEach(line => {
-        // Regex to match KEY=VALUE, handling quotes and comments
-        const match = line.match(/^\s*([\w_]+)\s*=\s*(.*)?\s*$/);
-        if (match) {
-          const key = match[1];
-          let value = match[2] || "";
-          // Remove surrounding quotes if present
-          if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-            value = value.slice(1, -1);
-          }
-          
-          newVars.push({
-            id: Math.random().toString(36).substr(2, 9),
-            key: key,
-            value: value,
-            environments: [],
-          });
-        }
-      });
-
-      if (newVars.length > 0) {
-        setEnvVars(prev => [...newVars, ...prev]);
-        setIsEnvDirty(true);
-        toast.success(`Imported ${newVars.length} variables`);
-      } else {
-        toast.error("No valid variables found in file");
-      }
-      
-      // Reset input so same file can be selected again
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    };
-    reader.readAsText(file);
-  };
-
-  const saveEnvChanges = () => {
-    const invalid = envVars.find(v => !v.key.trim());
-    if (invalid) {
-      toast.error("Invalid Configuration", { description: "All variables must have a key." });
-      return;
-    }
-
-    setIsEnvDirty(false);
-    setEnvVars(prev => prev.map(v => ({ ...v, isNew: undefined })));
-    
-    toast.success("Environment Variables Saved", {
-      description: "Changes will apply to the next deployment.",
-      icon: <Check className="w-4 h-4 text-emerald-500" />
-    });
-  };
-
-  const discardChanges = () => {
-    setEnvVars(project.envVars || []);
-    setIsEnvDirty(false);
-    toast.info("Changes discarded");
-  };
-
   // --- ACTIONS: DOMAINS ---
 
   const handleAddDomain = () => {
-    if (!newDomain.includes(".")) {
+    if (!ui.newDomain.includes(".")) {
       toast.error("Invalid Domain", { description: "Please enter a valid domain name (e.g. example.com)" });
       return;
     }
 
     const domain: Domain = {
-      id: Math.random().toString(),
-      name: newDomain,
+      id: generateId(),
+      name: ui.newDomain,
       status: DomainDnsStatus.PENDING,
       type: EnvironmentType.PRODUCTION,
       dnsRecords: [
@@ -166,8 +184,7 @@ export const EnvVarsPanel = ({ project }: ProjectOverviewProps) => {
     };
 
     setDomains([...domains, domain]);
-    setNewDomain("");
-    setIsAddingDomain(false);
+    setUi(p => ({ ...p, newDomain: "", addingDomain: false }))
     toast.success("Domain Added", { description: "Please configure your DNS records." });
   };
 
@@ -213,15 +230,22 @@ export const EnvVarsPanel = ({ project }: ProjectOverviewProps) => {
               ref={fileInputRef} 
               className="hidden" 
               accept=".env,text/plain" 
-              onChange={handleFileUpload} 
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) importEnvFile(file);
+                e.target.value = "";
+              }} 
             />
 
-            {isEnvDirty ? (
+            {ui.dirty ? (
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" onClick={discardChanges} className="text-muted-foreground hover:text-red-400">
-                    <RotateCcw className="w-4 h-4 mr-2" /> Discard
+                  <Button size="sm" className="gap-2 bg-red-500 text-primary-foreground hover:bg-red-500 hover:opacity-90" onClick={discardChanges}>
+                    <Trash2 className="w-4 h-4 mr-2" /> Discard
                   </Button>
-                  <Button onClick={saveEnvChanges} className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2 shadow-lg shadow-emerald-500/20">
+                  <Button size="sm" className="gap-2 bg-primary text-primary-foreground hover:opacity-90" onClick={addEmptyVar}>
+                    <Plus className="w-4 h-4" /> Add Variable
+                  </Button>
+                  <Button size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2 shadow-lg shadow-emerald-500/20" onClick={saveEnvChanges}>
                     <Save className="w-4 h-4" /> Save Changes
                   </Button>
                 </div>
@@ -245,8 +269,15 @@ export const EnvVarsPanel = ({ project }: ProjectOverviewProps) => {
               <thead>
                 <tr className="bg-white/5 border-b border-white/5">
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[35%]">Key</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[35%]">Value</th>
-                  <th className="text-center px-2 py-3 text-xs font-semibold text-muted-foreground uppercase w-[20%]">Environments</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[35%]">
+                    <div className="flex items-center justify-between">
+                      <span>Value</span>
+                      <button onClick={toggleAllVisibility}>
+                        {ui.showAll ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </th>
+                  <th className="text-center px-2 py-3 text-xs font-semibold text-muted-foreground uppercase w-[20%]">targets</th>
                   <th className="w-[10%]"></th>
                 </tr>
               </thead>
@@ -274,27 +305,17 @@ export const EnvVarsPanel = ({ project }: ProjectOverviewProps) => {
                       <td className="px-4 py-3 align-top">
                         <div className="relative">
                           <Input 
-                            type={visibleKeys.has(envVar.id) ? "text" : "password"}
-                            value={envVar.value} 
+                            type={isVisible(envVar.id) ? "text" : "password"}
+                            value={isVisible(envVar.id) ? envVar.value : "••••••••••••••••"} 
                             onChange={(e) => handleEnvChange(envVar.id, 'value', e.target.value)}
                             placeholder="Value..."
                             className="font-mono text-sm bg-transparent border-transparent hover:border-white/10 focus:border-primary/50 focus:bg-black/20 h-9 pr-8 transition-all"
                           />
                           <button 
-                            onClick={() => {
-                              setVisibleKeys(prev => {
-                                const next = new Set(prev);
-                                if (next.has(envVar.id)) {
-                                  next.delete(envVar.id);
-                                } else {
-                                  next.add(envVar.id);
-                                }
-                                return next;
-                              });
-                            }}
+                            onClick={() => toggleVisibility(envVar.id)}
                             className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 p-1"
                           >
-                            {visibleKeys.has(envVar.id) ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            {ui.showValues.has(envVar.id) ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                           </button>
                         </div>
                       </td>
@@ -302,19 +323,19 @@ export const EnvVarsPanel = ({ project }: ProjectOverviewProps) => {
                         <div className="flex justify-center gap-3 pt-2">
                           <EnvCheckbox 
                             label="Prod" 
-                            checked={envVar.environments.includes(EnvironmentType.PRODUCTION)} 
+                            checked={envVar.targets.includes(EnvironmentType.PRODUCTION)} 
                             onChange={() => toggleEnv(envVar.id, EnvironmentType.PRODUCTION)}
                             activeColor="bg-emerald-500"
                           />
                           <EnvCheckbox 
                             label="Prev" 
-                            checked={envVar.environments.includes(EnvironmentType.PREVIEW)} 
+                            checked={envVar.targets.includes(EnvironmentType.PREVIEW)} 
                             onChange={() => toggleEnv(envVar.id, EnvironmentType.PREVIEW)}
                             activeColor="bg-blue-500"
                           />
                           <EnvCheckbox 
                             label="Dev" 
-                            checked={envVar.environments.includes(EnvironmentType.DEVELOPMENT)} 
+                            checked={envVar.targets.includes(EnvironmentType.DEVELOPMENT)} 
                             onChange={() => toggleEnv(envVar.id, EnvironmentType.DEVELOPMENT)}
                             activeColor="bg-yellow-500"
                           />
@@ -359,7 +380,7 @@ export const EnvVarsPanel = ({ project }: ProjectOverviewProps) => {
               Manage domains assigned to your project.
             </p>
           </div>
-          <Button variant="outline" size="sm" className="gap-2 border-white/10 bg-white/5 hover:bg-white/10" onClick={() => setIsAddingDomain(true)}>
+          <Button variant="outline" size="sm" className="gap-2 border-white/10 bg-white/5 hover:bg-white/10" onClick={() => setUi(p => ({ ...p, addingDomain: true }))}>
             <Plus className="w-4 h-4" /> Add Domain
           </Button>
         </div>
@@ -367,7 +388,7 @@ export const EnvVarsPanel = ({ project }: ProjectOverviewProps) => {
         <div className="space-y-3">
           {/* Add Domain Input - Shows only when active */}
           <AnimatePresence>
-            {isAddingDomain && (
+            {ui.addingDomain && (
               <motion.div 
                 initial={{ opacity: 0, height: 0, marginBottom: 0 }} 
                 animate={{ opacity: 1, height: 'auto', marginBottom: 16 }} 
@@ -377,15 +398,15 @@ export const EnvVarsPanel = ({ project }: ProjectOverviewProps) => {
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Input 
                     placeholder="e.g. my-app.com" 
-                    value={newDomain}
-                    onChange={(e) => setNewDomain(e.target.value)}
+                    value={ui.newDomain}
+                    onChange={(e) => setUi(p => ({ ...p, newDomain: e.target.value }))}
                     className="bg-black/40 border-white/10 focus:border-blue-500/50 flex-1"
                     autoFocus
                     onKeyDown={(e) => e.key === 'Enter' && handleAddDomain()}
                   />
                   <div className="flex gap-2">
                     <Button onClick={handleAddDomain} className="bg-blue-600 hover:bg-blue-700 text-white min-w-[80px]">Add</Button>
-                    <Button variant="ghost" onClick={() => setIsAddingDomain(false)}><X className="w-4 h-4"/></Button>
+                    <Button variant="ghost" onClick={() => setUi(p => ({ ...p, addingDomain: false }))}><X className="w-4 h-4"/></Button>
                   </div>
                 </div>
                 <p className="text-xs text-blue-400/70 mt-2">

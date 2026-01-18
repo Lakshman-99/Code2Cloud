@@ -1,12 +1,23 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { urlConfig } from 'lib/url-config';
+import { QueuesService } from 'src/queues/queues.service';
+import { EncryptionService } from 'src/common/utils/encryption.service';
+import { GithubAppService } from 'src/git/git.service';
+import { EnvironmentVariable } from 'generated/prisma/client';
 
 @Injectable()
 export class ProjectsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(ProjectsService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private queuesService: QueuesService,
+    private encryptionService: EncryptionService,
+    private gitService: GithubAppService,
+  ) {}
 
   async create(userId: string, dto: CreateProjectDto) {
     // 1. Check if project name exists globally (Crucial for subdomains!)
@@ -18,15 +29,29 @@ export class ProjectsService {
       throw new BadRequestException('Project name is already taken. Please choose another.');
     }
 
-    // 2. Fetch Git Repo ID (We need the numeric ID for stability)
-    // In a real app, you'd fetch this from GitHub API using the user's token.
-    // For now, we'll assume the frontend passes it or we fetch it here.
-    // Let's assume we fetch it via the GitHub Service we built earlier.
-    // NOTE: For simplicity in this step, I'll use a placeholder or you can pass it in DTO.
-    const gitRepoId = 0; // TODO: Fetch from GitHub API using gitRepoOwner/Name
-    const deploymentUrl = `${dto.name.toLowerCase()}.${urlConfig.domain}`;
+    const gitAccounts = await this.prisma.gitAccount.findMany({ where: { userId } });
+    
+    if (gitAccounts.length === 0) {
+        throw new BadRequestException("No linked GitHub accounts found.");
+    }
 
-    const project = await this.prisma.$transaction(async (tx) => {
+    // Try to match owner, otherwise pick the first (likely correct for single-user scenarios)
+    const matchingAccount = gitAccounts.find(acc => acc.username === dto.gitRepoOwner) || gitAccounts[0];
+    
+    if (!matchingAccount.installationId) {
+        throw new BadRequestException("Selected GitHub account is not installed.");
+    }
+
+    // 3. FETCH THE REAL COMMIT SHA
+    const commitData = await this.gitService.getLatestCommit(
+        matchingAccount.installationId,
+        dto.gitRepoOwner,
+        dto.gitRepoName,
+        dto.gitBranch
+    );
+
+    // 2. Transaction: DB Writes + Queue Trigger
+    const result = await this.prisma.$transaction(async (tx) => {
       // A. Create Project
       const project = await tx.project.create({
         data: {
@@ -41,39 +66,42 @@ export class ProjectsService {
           outputDirectory: dto.outputDirectory,
           gitRepoOwner: dto.gitRepoOwner,
           gitRepoName: dto.gitRepoName,
-          gitRepoId: gitRepoId, // You should fetch this from GitHub API
+          gitRepoId: dto.gitRepoId,
           gitBranch: dto.gitBranch,
           gitRepoUrl: dto.gitRepoUrl,
           gitCloneUrl: dto.gitCloneUrl,
         },
       });
 
-      // B. Create Env Vars
+      // B. Create Encrypted Env Vars
       if (dto.envVars && dto.envVars.length > 0) {
         await tx.environmentVariable.createMany({
           data: dto.envVars.map((v) => ({
             key: v.key,
-            value: v.value, // TODO: Encrypt this before saving!
+            value: this.encryptionService.encrypt(v.value),
             projectId: project.id,
           })),
         });
       }
 
       // C. Create Initial Deployment
+      const deploymentUrl = `https://${project.name}.${urlConfig.domain}`.toLowerCase();
+      
       const deployment = await tx.deployment.create({
         data: {
           projectId: project.id,
           initiatorId: userId,
           status: 'QUEUED',
-          deploymentUrl: deploymentUrl,
-          // Metadata (Snapshot)
+          deploymentUrl, 
+          // Metadata Snapshot
           branch: dto.gitBranch,
-          commitHash: 'HEAD', // In reality, fetch the latest commit SHA from GitHub
-          commitMessage: 'Initial deployment',
+          commitHash: commitData.sha, 
+          commitMessage: commitData.message,
+          commitAuthor: commitData.author,
         },
       });
 
-      // D. Create Domain Entry
+      // D. Create Domain Entry (Default Subdomain)
       await tx.domain.create({
         data: {
           projectId: project.id,
@@ -81,17 +109,36 @@ export class ProjectsService {
         },
       });
 
-      // D. TODO: Trigger BullMQ Job Here
-      console.log(`[Queue] Triggering build for deployment ${deployment.id}`);
+      // E. Trigger Build Queue
+      await this.queuesService.addBuildJob({
+        deploymentId: deployment.id,
+        projectId: project.id,
+        gitUrl: dto.gitCloneUrl,
+        branch: project.gitBranch,
+        commitHash: commitData.sha,
+        buildConfig: {
+          framework: project.framework,
+          installCommand: project.installCommand || undefined,
+          buildCommand: project.buildCommand || undefined,
+          outputDir: project.outputDirectory || undefined,
+        },
+        // Decrypt env vars for the builder (it needs raw values)
+        envVars: dto.envVars?.reduce((acc, curr) => ({
+            ...acc, [curr.key]: curr.value
+        }), {}) || {}
+      });
+
+      this.logger.log(`[Queue] Triggered build for deployment ${deployment.id}`);
 
       return project;
     });
 
-    return this.findOne(project.id, userId);
+    // Return the full object
+    return this.findOne(result.id, userId);
   }
 
   async findAll(userId: string) {
-    return this.prisma.project.findMany({
+    const projects = await this.prisma.project.findMany({
       where: { userId },
       orderBy: { updatedAt: 'desc' },
       include: {
@@ -100,16 +147,36 @@ export class ProjectsService {
           orderBy: { startedAt: 'desc' }, // Latest deployment status
         },
         domains: true,
-        envVars: { select: { key: true, value: true } }, // Be careful returning values!
+        envVars: {
+          select: { id: true, key: true, value: true, targets: true }
+        },
       },
     });
+
+    const decrypted = projects.map((project) => {
+      const envs = project.envVars as EnvironmentVariable[];
+
+      const decryptedVars = envs.map((v) => ({
+        ...v,
+        value: this.encryptionService.decrypt(v.value),
+      })) || [];
+
+      return {
+        ...project,
+        envVars: decryptedVars,
+      };
+    });
+
+    return decrypted;
   }
 
   async findOne(id: string, userId: string) {
     const project = await this.prisma.project.findFirst({
       where: { id, userId },
       include: {
-        envVars: { select: { key: true, value: true } }, // Be careful returning values!
+        envVars: { 
+          select: { id: true, key: true, value: true, targets: true } 
+        },
         domains: true,
         deployments: {
           take: 5,

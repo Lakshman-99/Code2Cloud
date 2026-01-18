@@ -1,22 +1,34 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, FolderKanban, Rocket, Settings, X } from 'lucide-react';
 import { useMockStore } from '@/stores/useMockStore';
 import { cn } from '@/lib/utils';
+import { getFrameworkIcon } from '../project/utils';
+import { useProjects } from '@/hooks/use-projects';
 
 export const CommandPalette = () => {
   const router = useRouter();
-  const { commandPaletteOpen, toggleCommandPalette, projects } = useMockStore();
+  const { commandPaletteOpen, toggleCommandPalette } = useMockStore();
+
+  const { projects } = useProjects();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const filteredProjects = projects.filter(p =>
-    p.name.toLowerCase().includes(query.toLowerCase())
-  );
+  const filteredProjects = useMemo(() => {
+    if (!projects) return [];
+
+    return projects.filter((project) => {
+      const matchesSearch =
+        project.name.toLowerCase().includes(query.toLowerCase()) ||
+        project.framework.toLowerCase().includes(query.toLowerCase());
+
+      return matchesSearch;
+    });
+  }, [projects, query]);
 
   const actions = [
     { icon: FolderKanban, label: 'Go to Projects', action: () => router.push('/dashboard/projects') },
@@ -144,17 +156,16 @@ export const CommandPalette = () => {
                               : "text-muted-foreground hover:bg-white/5"
                           )}
                         >
-                          <div className={cn(
-                            "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold",
-                            project.type === 'nextjs' 
-                              ? "bg-white/10 text-foreground"
-                              : "bg-emerald-500/20 text-emerald-400"
-                          )}>
-                            {project.type === 'nextjs' ? 'N' : 'Py'}
+                          <div
+                            className={cn(
+                              "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ring-1 ring-white/10 bg-black text-white",
+                            )}
+                          >
+                            {getFrameworkIcon(project?.framework || "", project?.language || "")}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{project.name}</p>
-                            <p className="text-xs text-muted-foreground truncate">{project.domain}</p>
+                            <p className="text-xs text-muted-foreground truncate">{project.deployments[0].deploymentUrl}</p>
                           </div>
                         </button>
                       ))}

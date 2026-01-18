@@ -172,3 +172,157 @@ export const RootDirectorySkeleton = () => {
     </div>
   );
 };
+
+export const DeploymentRowSkeleton = () => {
+  return (
+    <tr className="border-b border-white/5 animate-pulse">
+      {/* Project */}
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-3">
+          <Skeleton className="w-8 h-8 rounded-lg bg-white/10" />
+          <div className="space-y-1">
+            <Skeleton className="h-3.5 w-28 bg-white/10" />
+            <Skeleton className="h-3 w-16 bg-white/5" />
+          </div>
+        </div>
+      </td>
+
+      {/* Status */}
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-2">
+          <Skeleton className="w-4 h-4 rounded-full bg-white/10" />
+          <Skeleton className="h-3.5 w-20 bg-white/10" />
+        </div>
+      </td>
+
+      {/* Commit */}
+      <td className="px-6 py-4">
+        <div className="space-y-1.5">
+          <Skeleton className="h-4 w-20 bg-white/10 rounded" />
+          <Skeleton className="h-3 w-36 bg-white/5" />
+        </div>
+      </td>
+
+      {/* Branch */}
+      <td className="px-6 py-4">
+        <Skeleton className="h-6 w-20 bg-white/10 rounded-md" />
+      </td>
+
+      {/* Runtime */}
+      <td className="px-6 py-4">
+        <Skeleton className="h-3.5 w-16 bg-white/10" />
+      </td>
+
+      {/* Duration */}
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-2">
+          <Skeleton className="w-4 h-4 rounded-full bg-white/10" />
+          <Skeleton className="h-3.5 w-10 bg-white/10" />
+        </div>
+      </td>
+
+      {/* Started At */}
+      <td className="px-6 py-4">
+        <Skeleton className="h-3.5 w-24 bg-white/10" />
+      </td>
+
+      {/* Action */}
+      <td className="px-6 py-4 text-right">
+        <Skeleton className="w-8 h-8 rounded-lg bg-white/5" />
+      </td>
+    </tr>
+  );
+};
+
+export const ProjectDetailSkeleton = () => {
+  return (
+    <div className="p-8 max-w-[1600px] mx-auto">
+      {/* Back Button */}
+      <Skeleton className="h-4 w-32 mb-8" />
+
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-4">
+          <Skeleton className="w-14 h-14 rounded-xl" />
+          <div className="space-y-3">
+            <Skeleton className="h-6 w-52" />
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-4 w-36" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-9 w-28 rounded-lg" />
+          <Skeleton className="h-9 w-28 rounded-lg" />
+          <Skeleton className="h-8 w-8 rounded-md" />
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-white/5 mb-8">
+        <div className="flex gap-3">
+          {[...Array(5)].map((_, index) => (
+            <Skeleton key={index} className="h-10 w-24" />
+          ))}
+        </div>
+      </div>
+
+      {/* Pipeline */}
+      <div className="glass-card p-6 mb-6">
+        <Skeleton className="h-6 w-52 mb-8" />
+        <Skeleton className="h-1 w-full mb-6 rounded-full" />
+
+        <div className="flex justify-between">
+          {[...Array(5)].map((_, index) => (
+            <div key={index} className="flex flex-col items-center">
+              <Skeleton className="w-12 h-12 rounded-full" />
+              <Skeleton className="h-3 w-16 mt-3" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Overview Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Project Details */}
+        <div className="glass-card p-6 space-y-6">
+          <div className="flex justify-between">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-6 w-28 rounded-full" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-5 w-32" />
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-6 pt-4 border-t border-white/5">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-5 w-36" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="glass-card p-6 flex flex-col">
+          <Skeleton className="h-5 w-32 mb-6" />
+          <div className="flex-1 space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-xl" />
+            ))}
+          </div>
+          <Skeleton className="h-12 w-full rounded-xl mt-6" />
+        </div>
+      </div>
+    </div>
+  );
+};

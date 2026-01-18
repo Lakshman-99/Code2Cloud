@@ -1,6 +1,8 @@
 import { FRAMEWORK_ICONS } from "@/types/git";
 import { DeploymentStatus } from "@/types/project";
+import { Ban, CheckCircle2, Hammer, Hourglass, Rocket, XCircle } from "lucide-react";
 import Image from "next/image";
+import { JSX } from "react";
 
 export const getFrameworkIcon = (framework: string, language: string | null, size: number = 20) => {
   const fw = framework?.toLowerCase();
@@ -22,21 +24,67 @@ export const getFrameworkIcon = (framework: string, language: string | null, siz
   return <div className="w-5 h-5 bg-white/50 rounded-sm" />;
 };
 
-export const getStatusConfig = (status?: DeploymentStatus) => {
-  switch (status) {
-    case 'READY': return { color: 'bg-emerald-500', text: 'text-emerald-500', glow: 'shadow-[0_0_10px_rgba(16,185,129,0.4)]', label: 'Ready' };
-    case 'FAILED': return { color: 'bg-red-500', text: 'text-red-500', glow: 'shadow-[0_0_10px_rgba(239,68,68,0.4)]', label: 'Failed' };
-    case 'BUILDING': return { color: 'bg-blue-500', text: 'text-blue-500', glow: 'shadow-[0_0_10px_rgba(59,130,246,0.4)]', label: 'Building' };
-    case 'DEPLOYING': return { color: 'bg-purple-500', text: 'text-purple-500', glow: 'shadow-[0_0_10px_rgba(168,85,247,0.4)]', label: 'Deploying' };
-    case 'QUEUED': return { color: 'bg-yellow-500', text: 'text-yellow-500', glow: 'shadow-[0_0_10px_rgba(234,179,8,0.4)]', label: 'Queued' };
-    default: return { color: 'bg-gray-500', text: 'text-gray-500', glow: '', label: 'Unknown' };
-  }
+type StatusConfig = {
+  label: string;
+  color: string;
+  text: string;
+  glow: string;
+  icon: JSX.Element;
 };
 
-export const STATUS_OPTIONS: { label: string; value: DeploymentStatus }[] = [
-  { label: "Ready", value: DeploymentStatus.READY },
-  { label: "Building", value: DeploymentStatus.BUILDING },
-  { label: "Deploying", value: DeploymentStatus.DEPLOYING },
-  { label: "Failed", value: DeploymentStatus.FAILED },
-  { label: "Canceled", value: DeploymentStatus.CANCELED },
-];
+const baseIcon = "w-4 h-4 transition-all duration-300";
+
+const STATUS_CONFIG: Record<DeploymentStatus, StatusConfig> = {
+  QUEUED: {
+    label: "Queued",
+    color: "bg-yellow-500",
+    text: "text-yellow-500",
+    glow: "shadow-[0_0_10px_rgba(234,179,8,0.4)]",
+    icon: <Hourglass className={`${baseIcon} text-yellow-400 animate-hourglass`} />,
+  },
+  READY: {
+    label: "Ready",
+    color: "bg-emerald-500",
+    text: "text-emerald-500",
+    glow: "shadow-[0_0_10px_rgba(16,185,129,0.4)]",
+    icon: <CheckCircle2 className={`${baseIcon} text-emerald-400`} />,
+  },
+  BUILDING: {
+    label: "Building",
+    color: "bg-blue-500",
+    text: "text-blue-500",
+    glow: "shadow-[0_0_10px_rgba(59,130,246,0.4)]",
+    icon: <Hammer className={`${baseIcon} text-blue-400 animate-hammer`} />,
+  },
+  DEPLOYING: {
+    label: "Deploying",
+    color: "bg-purple-500",
+    text: "text-purple-500",
+    glow: "shadow-[0_0_10px_rgba(168,85,247,0.4)]",
+    icon: <Rocket className={`${baseIcon} text-purple-400 animate-fly`} />,
+  },
+  FAILED: {
+    label: "Failed",
+    color: "bg-red-500",
+    text: "text-red-500",
+    glow: "shadow-[0_0_10px_rgba(239,68,68,0.4)]",
+    icon: <XCircle className={`${baseIcon} text-red-500 animate-shake`} />,
+  },
+  CANCELED: {
+    label: "Canceled",
+    color: "bg-gray-500",
+    text: "text-gray-500",
+    glow: "shadow-[0_0_10px_rgba(161,161,170,0.35)]",
+    icon: <Ban className={`${baseIcon} text-zinc-400`} />,
+  },
+};
+
+export const getStatusConfig = (status?: DeploymentStatus) =>
+  status ? STATUS_CONFIG[status] : { color: 'bg-gray-500', text: 'text-gray-500', glow: '', label: 'Unknown', icon: <Ban className={`${baseIcon} text-zinc-400`} /> };
+
+export const STATUS_OPTIONS = Object.entries(STATUS_CONFIG).map(
+  ([value, { label }]) => ({
+    value: value as DeploymentStatus,
+    label,
+  })
+);

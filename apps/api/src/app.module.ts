@@ -4,9 +4,13 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { GitModule } from './git/git.module';
 import { ProjectsModule } from './projects/projects.module';
+import { DeploymentsModule } from './deployments/deployments.module';
+import { DomainsModule } from './domains/domains.module';
+import { EnvVarsModule } from './envs/env-vars.module';
+import { QueuesModule } from './queues/queues.module';
 
 @Module({
-  imports: [AuthModule, GitModule, ProjectsModule],
+  imports: [AuthModule, GitModule, ProjectsModule, DeploymentsModule, DomainsModule, EnvVarsModule, QueuesModule],
   controllers: [AppController],
   providers: [AppService],
 })

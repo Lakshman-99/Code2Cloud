@@ -83,7 +83,9 @@ model Project {
   gitRepoUrl       String
 
   // ─── Deployment Config ─────────────────────────
+  configChanged    Boolean  @default(false)
   autoDeploy       Boolean  @default(true)
+  onlineStatus     DomainDnsStatus  @default(PENDING)
 
   userId           String
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -136,6 +138,7 @@ enum EnvironmentType {
 
 enum DomainDnsStatus {
   ACTIVE
+  INACTIVE
   PENDING
   VERIFYING
   ERROR

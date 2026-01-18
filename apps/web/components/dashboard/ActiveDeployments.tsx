@@ -1,20 +1,21 @@
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useMockStore } from '@/stores/useMockStore';
 import { Rocket, GitCommit, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Deployment, Project } from '@/types/project';
+import { getStatusConfig } from '../project/utils';
+import { formatDistanceToNow } from 'date-fns';
+import { FRAMEWORKS } from '@/types/git';
+import { useRouter } from 'next/navigation';
 
-const statusColors = {
-  ready: 'bg-success',
-  building: 'bg-info',
-  error: 'bg-destructive',
-  queued: 'bg-warning',
-};
+interface DeploymentCardProps {
+  deployments: Deployment[];
+  projects: Project[];
+}
 
-const ActiveDeployments = () => {
-  const { deployments, projects } = useMockStore();
-
+const ActiveDeployments = ({ deployments, projects }: DeploymentCardProps) => {
+  const router = useRouter();
   const recentDeployments = deployments.slice(0, 4);
 
   return (
@@ -39,26 +40,28 @@ const ActiveDeployments = () => {
         <CardContent className="space-y-3">
           {recentDeployments.map((deployment, index) => {
             const project = projects.find((p) => p.id === deployment.projectId);
+            const status = getStatusConfig(deployment.status);
+
             return (
               <motion.div
                 key={deployment.id}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer group"
+                onClick={() => router.push(`/dashboard/deployments/${deployment.id}`)}
+                className={cn(
+                  'flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all cursor-pointer group',
+                  status.glow
+                )}
               >
                 <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <div className={cn('w-2.5 h-2.5 rounded-full', statusColors[deployment.status])} />
-                    {deployment.status === 'building' && (
-                      <div
-                        className={cn(
-                          'absolute inset-0 rounded-full animate-ping',
-                          statusColors[deployment.status]
-                        )}
-                      />
+                  <div className="relative flex-shrink-0">
+                    <div className={cn('w-3 h-3 rounded-full', status.color)} />
+                    {(deployment.status === 'BUILDING' || deployment.status === 'DEPLOYING') && (
+                      <div className={cn('absolute inset-0 rounded-full animate-ping', status.color)} />
                     )}
                   </div>
+
                   <div>
                     <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
                       {project?.name}
@@ -66,22 +69,22 @@ const ActiveDeployments = () => {
                     <div className="flex items-center gap-2 mt-0.5">
                       <GitCommit className="w-3 h-3 text-muted-foreground" />
                       <span className="text-xs text-muted-foreground font-mono">
-                        {deployment.commit}
+                        {deployment.commitHash.slice(0, 7)}
                       </span>
                       <span className="text-xs text-muted-foreground">·</span>
-                      <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                      <span className="text-xs text-muted-foreground truncate " title={deployment.commitMessage}>
                         {deployment.commitMessage}
                       </span>
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Badge variant={project?.type === 'nextjs' ? 'nextjs' : 'python'} className="text-[10px]">
-                    {deployment.runtime}
+                  <Badge variant={'python'} className="text-[10px]">
+                    {FRAMEWORKS[project?.framework || "Unknown"]}
                   </Badge>
                   <div className="flex items-center gap-1 text-muted-foreground">
                     <Clock className="w-3 h-3" />
-                    <span className="text-xs">{deployment.createdAt}</span>
+                    <span className="text-xs">{formatDistanceToNow(new Date(deployment.startedAt))} ago</span>
                   </div>
                 </div>
               </motion.div>

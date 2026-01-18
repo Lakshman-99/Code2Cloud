@@ -9,11 +9,13 @@ import { useUser } from '@/hooks/use-user';
 import { useRouter } from 'next/navigation';
 import { useProjects } from '@/hooks/use-projects';
 import { ArrowRight } from 'lucide-react';
+import { useDeployments } from '@/hooks/use-deployments';
 
 const Dashboard = () => {
-  const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const { user, isUserLoading } = useUser();
   const { projects, isLoading: isProjectsLoading } = useProjects();
+  const { deployments, isLoading: isDeploymentsLoading } = useDeployments();
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -62,12 +64,12 @@ const Dashboard = () => {
         )}
 
         {/* Active Deployments */}
-        {isProjectsLoading ? (
+        {isDeploymentsLoading || isProjectsLoading ? (
           <div className="col-span-2">
             <ListSkeleton />
           </div>
         ) : (
-          <ActiveDeployments />
+          <ActiveDeployments deployments={deployments} projects={projects || []} />
         )}
 
         {/* Quick Stats */}

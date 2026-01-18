@@ -8,7 +8,7 @@ import * as bcrypt from "bcrypt";
 import { JwtService } from "@nestjs/jwt";
 import { SignUpDto } from "./dto/sign-up.dto";
 import { SignInDto } from "./dto/sign-in.dto";
-import { CompleteGithubPayload, OAuthUser } from "./common/type";
+import { CompleteGithubPayload, OAuthUser } from "../common/types/type";
 import { User } from "generated/prisma/client";
 
 @Injectable()
@@ -40,7 +40,12 @@ export class AuthService {
     });
 
     // Automatically log them in on signup
-    const tokens = await this.getTokens(user.id, user.email, user.name, user.avatar);
+    const tokens = await this.getTokens(
+      user.id,
+      user.email,
+      user.name,
+      user.avatar,
+    );
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
     return tokens;
   }
@@ -55,7 +60,12 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.password, user.password || "");
     if (!valid) throw new UnauthorizedException("Invalid credentials");
 
-    const tokens = await this.getTokens(user.id, user.email, user.name, user.avatar);
+    const tokens = await this.getTokens(
+      user.id,
+      user.email,
+      user.name,
+      user.avatar,
+    );
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
 
     return tokens;
@@ -74,14 +84,19 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
-    
+
     if (!user || !user.hashedRefreshToken)
       throw new ForbiddenException("Access Denied");
 
     const rtMatches = await bcrypt.compare(rt, user.hashedRefreshToken);
     if (!rtMatches) throw new ForbiddenException("Access Denied");
 
-    const tokens = await this.getTokens(user.id, user.email, user.name, user.avatar);
+    const tokens = await this.getTokens(
+      user.id,
+      user.email,
+      user.name,
+      user.avatar,
+    );
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
 
     return tokens;
@@ -108,37 +123,50 @@ export class AuthService {
       // Optional: Update avatar if they changed it on Google/GitHub
       user = await this.prisma.user.update({
         where: { id: user.id },
-        data: { 
+        data: {
           avatar: profile.picture,
-          provider: profile.provider 
-        }
+          provider: profile.provider,
+        },
       });
     }
 
     // 3. Generate Tokens (using your existing logic)
-    const tokens = await this.getTokens(user.id, user.email, user.name, user.avatar);
+    const tokens = await this.getTokens(
+      user.id,
+      user.email,
+      user.name,
+      user.avatar,
+    );
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
-    
+
     return tokens;
   }
 
   async processGithubCallback(
     payload: CompleteGithubPayload,
     installationId?: string,
-    currentUserId?: string
+    currentUserId?: string,
   ) {
-    const { githubId, username, email, name, avatarUrl, accessToken, refreshToken } = payload;
+    const {
+      githubId,
+      username,
+      email,
+      name,
+      avatarUrl,
+      accessToken,
+      refreshToken,
+    } = payload;
 
     // --- SCENARIO 1: LINKING AN ACCOUNT (User already logged in) ---
     if (currentUserId) {
       // Just create/update the GitAccount link. Do NOT touch the main User profile.
       await this.prisma.gitAccount.upsert({
         where: {
-          provider_providerId: { provider: 'github', providerId: githubId }
+          provider_providerId: { provider: "github", providerId: githubId },
         },
         create: {
           userId: currentUserId, // Link to the logged-in user
-          provider: 'github',
+          provider: "github",
           providerId: githubId,
           username,
           avatarUrl,
@@ -153,26 +181,38 @@ export class AuthService {
           username,
           avatarUrl,
           ...(installationId ? { installationId } : {}),
-        }
+        },
       });
 
       // Return existing user's tokens (refreshed)
-      const user = await this.prisma.user.findUnique({ where: { id: currentUserId } });
-      const tokens = await this.getTokens(user!.id, user!.email, user!.name, user!.avatar);
+      const user = await this.prisma.user.findUnique({
+        where: { id: currentUserId },
+      });
+      const tokens = await this.getTokens(
+        user!.id,
+        user!.email,
+        user!.name,
+        user!.avatar,
+      );
       await this.updateRefreshTokenHash(user!.id, tokens.refreshToken);
 
       return tokens;
     }
 
     // --- SCENARIO 2: LOGIN / SIGNUP (No user session) ---
-    
-    // 1. Try to find user by existing Git Link OR Email
-    if (!email) throw new UnauthorizedException("GitHub account must have a public email");
 
-    let user: User | null | undefined = await this.prisma.gitAccount.findFirst({
-      where: { provider: 'github', providerId: githubId },
-      include: { user: true }
-    }).then(account => account?.user);
+    // 1. Try to find user by existing Git Link OR Email
+    if (!email)
+      throw new UnauthorizedException(
+        "GitHub account must have a public email",
+      );
+
+    let user: User | null | undefined = await this.prisma.gitAccount
+      .findFirst({
+        where: { provider: "github", providerId: githubId },
+        include: { user: true },
+      })
+      .then((account) => account?.user);
 
     if (!user) {
       user = await this.prisma.user.findUnique({ where: { email } });
@@ -186,8 +226,8 @@ export class AuthService {
           email,
           name: name || username,
           avatar: avatarUrl,
-          provider: 'github',
-        }
+          provider: "github",
+        },
       });
     } else {
       // UPDATE EXISTING (Merge logic)
@@ -195,38 +235,43 @@ export class AuthService {
       await this.prisma.user.update({
         where: { id: user.id },
         data: {
-          provider: 'github',
+          provider: "github",
           avatar: avatarUrl || undefined,
-        }
+        },
       });
     }
 
     // 3. Upsert the GitAccount (The primary one used for login)
     await this.prisma.gitAccount.upsert({
-        where: {
-            provider_providerId: { provider: 'github', providerId: githubId }
-        },
-        create: {
-            userId: user.id,
-            provider: 'github',
-            providerId: githubId,
-            username,
-            avatarUrl,
-            accessToken,
-            refreshToken,
-            installationId: installationId || null,
-        },
-        update: {
-            userId: user.id,
-            accessToken,
-            refreshToken,
-            username,
-            avatarUrl,
-            ...(installationId ? { installationId } : {}),
-        }
+      where: {
+        provider_providerId: { provider: "github", providerId: githubId },
+      },
+      create: {
+        userId: user.id,
+        provider: "github",
+        providerId: githubId,
+        username,
+        avatarUrl,
+        accessToken,
+        refreshToken,
+        installationId: installationId || null,
+      },
+      update: {
+        userId: user.id,
+        accessToken,
+        refreshToken,
+        username,
+        avatarUrl,
+        ...(installationId ? { installationId } : {}),
+      },
     });
 
-    const tokens = await this.getTokens(user.id, user.email, user.name, user.avatar);
+    const tokens = await this.getTokens(
+      user.id,
+      user.email,
+      user.name,
+      user.avatar,
+    );
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
 
     return tokens;
@@ -242,7 +287,12 @@ export class AuthService {
     });
   }
 
-  async getTokens(userId: string, email: string, name: string | null, avatar: string | null = null) {
+  async getTokens(
+    userId: string,
+    email: string,
+    name: string | null,
+    avatar: string | null = null,
+  ) {
     const payload = {
       sub: userId,
       email,
@@ -251,8 +301,14 @@ export class AuthService {
     };
 
     const [at, rt] = await Promise.all([
-      this.jwt.signAsync(payload, { secret: process.env.JWT_SECRET, expiresIn: '15m' }),
-      this.jwt.signAsync(payload, { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '7d' }),
+      this.jwt.signAsync(payload, {
+        secret: process.env.JWT_SECRET,
+        expiresIn: "15m",
+      }),
+      this.jwt.signAsync(payload, {
+        secret: process.env.JWT_REFRESH_SECRET,
+        expiresIn: "7d",
+      }),
     ]);
 
     return { accessToken: at, refreshToken: rt };

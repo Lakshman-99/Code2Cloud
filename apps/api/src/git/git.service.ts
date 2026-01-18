@@ -4,7 +4,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { App } from 'octokit';
 import axios from 'axios';
-import { GitHubInstallationsResponse, GitHubOAuthResponse, GitHubOAuthSuccess, GitHubUserEmail, GitHubUserProfile } from 'src/auth/common/type';
+import { GitHubInstallationsResponse, GitHubOAuthResponse, GitHubOAuthSuccess, GitHubUserEmail, GitHubUserProfile } from 'src/common/types/type';
 import { GraphQLResponse } from './common/type';
 
 @Injectable()
@@ -108,10 +108,12 @@ export class GithubAppService {
           viewer {
             repositories(first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) {
               nodes {
+                id
                 databaseId 
                 name
                 nameWithOwner
                 url
+                sshUrl
                 isPrivate
                 updatedAt
                 defaultBranchRef { name }
@@ -148,8 +150,9 @@ export class GithubAppService {
           name: node.name,
           fullName: node.nameWithOwner,
           private: node.isPrivate,
-          htmlUrl: node.url,
-          cloneUrl: `${node.url}.git`, // Construct clone URL
+          url: node.url,
+          sshUrl: node.sshUrl,
+          cloneUrl: `${node.url}.git`,
           language: node.primaryLanguage?.name || null,
           defaultBranch: node.defaultBranchRef?.name || 'main',
           updatedAt: node.updatedAt,
@@ -297,5 +300,27 @@ export class GithubAppService {
 
     // Reuse the detection logic 
     return this.detectFrameworkFromContents(pkgJsonStr, reqTxtStr);
+  }
+
+  async getLatestCommit(installationId: string, owner: string, repo: string, branch: string) {
+    try {
+      const octokit = await this.app.getInstallationOctokit(Number(installationId));
+      
+      const { data } = await octokit.rest.repos.getBranch({
+        owner,
+        repo,
+        branch,
+      });
+
+      return {
+        sha: data.commit.sha,
+        message: data.commit.commit.message,
+        author: data.commit.commit.author?.name || data.commit.author?.login,
+      };
+    } catch (error) {
+      console.error(`Failed to fetch commit for ${owner}/${repo}/${branch}`, error);
+      // Fallback to avoid breaking the flow, but ideally this should throw
+      return { sha: 'HEAD', message: 'Initial deployment', author: 'System' };
+    }
   }
 }

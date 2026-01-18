@@ -2,21 +2,15 @@
 
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { GitBranch, Clock, CheckCircle2, XCircle, Loader2, PlayCircle, ArrowRight, Rocket } from 'lucide-react';
-import { Deployment, Project } from '@/stores/useMockStore';
-import { cn } from '@/lib/utils';
+import { GitBranch, Clock, ArrowRight, Rocket } from 'lucide-react';
+import { Deployment, Project } from '@/types/project';
+import { getStatusConfig } from './utils';
+import { formatDistanceToNow } from 'date-fns';
 
 interface DeploymentsTableProps {
   deployments: Deployment[];
   project: Project;
 }
-
-const statusIcons = {
-  ready: <CheckCircle2 className="w-4 h-4 text-emerald-500" />,
-  building: <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />,
-  error: <XCircle className="w-4 h-4 text-red-500" />,
-  queued: <PlayCircle className="w-4 h-4 text-yellow-500" />,
-};
 
 export const DeploymentsTable = ({ deployments }: DeploymentsTableProps) => {
   const router = useRouter();
@@ -40,7 +34,10 @@ export const DeploymentsTable = ({ deployments }: DeploymentsTableProps) => {
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {deployments.map((deployment, index) => (
+            {deployments.map((deployment, index) => {
+              const deploymentStatus = getStatusConfig(deployment.status);
+
+              return (
               <motion.tr
                 key={deployment.id}
                 initial={{ opacity: 0, x: -10 }}
@@ -51,21 +48,22 @@ export const DeploymentsTable = ({ deployments }: DeploymentsTableProps) => {
               >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
-                    {statusIcons[deployment.status as keyof typeof statusIcons]}
-                    <span className={cn(
-                      "text-sm font-medium capitalize",
-                      deployment.status === 'ready' && "text-emerald-400",
-                      deployment.status === 'building' && "text-blue-400",
-                      deployment.status === 'error' && "text-red-400"
-                    )}>
-                      {deployment.status}
+                    {deploymentStatus.icon}
+                    <span className={`${deploymentStatus.text} text-sm font-medium capitalize`}>
+                      {deploymentStatus.label}
                     </span>
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-mono text-foreground font-medium">{deployment.commit.substring(0, 7)}</span>
-                    <span className="text-xs text-muted-foreground truncate max-w-[250px]">{deployment.commitMessage}</span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <code className="text-xs bg-white/10 px-1.5 py-0.5 rounded text-foreground font-mono">
+                        {deployment.commitHash.substring(0, 7)}
+                      </code>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 truncate max-w-[250px]" title={deployment.commitMessage}>
+                      {deployment.commitMessage}
+                    </p>
                   </div>
                 </td>
                 <td className="px-6 py-4">
@@ -77,17 +75,25 @@ export const DeploymentsTable = ({ deployments }: DeploymentsTableProps) => {
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                     <Clock className="w-3.5 h-3.5" />
-                    <span>{deployment.duration}</span>
+                    {deployment.duration ? (
+                      <span className="text-foreground">{deployment.duration}s</span>
+                    ) : deployment.status === "BUILDING" || deployment.status === "DEPLOYING" ? (
+                      <span className="italic text-blue-400 animate-pulse">Calculating…</span>
+                    ) : (
+                      <span className="italic opacity-60">—</span>
+                    )}
                   </div>
                 </td>
                 <td className="px-6 py-4 text-sm text-muted-foreground">
-                  {deployment.timestamp}
+                  <span className="text-sm text-muted-foreground">
+                    {formatDistanceToNow(deployment.startedAt)} ago
+                  </span>
                 </td>
                 <td className="px-6 py-4 text-right">
                   <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </td>
               </motion.tr>
-            ))}
+            )})}
           </tbody>
         </table>
 

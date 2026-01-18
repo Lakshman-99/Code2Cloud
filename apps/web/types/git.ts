@@ -17,7 +17,8 @@ export interface GitRepository {
   name: string;
   fullName: string;
   private: boolean;
-  htmlUrl: string;
+  url: string;
+  sshUrl: string;
   cloneUrl: string;
   language: string | null;
   defaultBranch: string;

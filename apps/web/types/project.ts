@@ -11,6 +11,7 @@ export enum DeploymentStatus {
 export enum DomainDnsStatus {
   PENDING = 'PENDING',
   ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
   ERROR = 'ERROR',
   VERIFYING = 'VERIFYING',
 }
@@ -25,7 +26,7 @@ export interface EnvVar {
   id: string;
   key: string;
   value: string;
-  environments: EnvironmentType[];
+  targets: EnvironmentType[];
 }
 
 export interface Domain {
@@ -77,6 +78,8 @@ export interface Project {
   runCommand?: string;
   outputDirectory?: string;
   autoDeploy: boolean;
+  configChanged: boolean;
+  onlineStatus: DomainDnsStatus;
 
   // Git Info
   gitRepoName: string;

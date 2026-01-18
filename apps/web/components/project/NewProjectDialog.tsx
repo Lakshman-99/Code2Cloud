@@ -215,10 +215,11 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
         outputDirectory: data.outputDirectory,
         
         // Git Metadata (From the selectedRepo object)
+        gitRepoId: selectedRepo.id,
         gitRepoName: selectedRepo.name,
         gitRepoOwner: selectedRepo.fullName.split('/')[0], // Extract owner from "owner/repo"
         gitBranch: selectedRepo.defaultBranch,
-        gitRepoUrl: selectedRepo.htmlUrl,
+        gitRepoUrl: selectedRepo.url,
         gitCloneUrl: selectedRepo.cloneUrl,
         
         // Environment Variables

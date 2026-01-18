@@ -1,18 +1,29 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 // api/src/auth/auth.controller.ts
-import { Body, Controller, Post, HttpCode, HttpStatus, UseGuards, Get, Req, Res, Query } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Post,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+  Get,
+  Req,
+  Res,
+  Query,
+} from "@nestjs/common";
 import { AuthService } from "./auth.service";
 import { SignInDto } from "./dto/sign-in.dto";
 import { SignUpDto } from "./dto/sign-up.dto";
-import { AtGuard } from "./common/guards/at.guard";
-import { AuthGuard } from '@nestjs/passport';
+import { AtGuard } from "../common/guards/at.guard";
+import { AuthGuard } from "@nestjs/passport";
 import { Request, Response } from "express";
-import { CompleteGithubPayload, OAuthUser } from "./common/type";
-import { GetCurrentUserId } from "./common/decorators/get-current-user-id.decorator";
-import { RtGuard } from "./common/guards/rt.guard";
-import { GetCurrentUser } from "./common/decorators/get-current-user.decorator";
-import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
+import { CompleteGithubPayload, OAuthUser } from "../common/types/type";
+import { GetCurrentUserId } from "../common/decorators/get-current-user-id.decorator";
+import { RtGuard } from "../common/guards/rt.guard";
+import { GetCurrentUser } from "../common/decorators/get-current-user.decorator";
+import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { GithubAppService } from "src/git/git.service";
 import { ConfigService } from "@nestjs/config";
 import { urlConfig } from "lib/url-config";
@@ -24,7 +35,7 @@ export class AuthController {
     private auth: AuthService,
     private githubApp: GithubAppService,
     private config: ConfigService,
-    private jwtService: JwtService
+    private jwtService: JwtService,
   ) {}
 
   @Post("signup")
@@ -50,7 +61,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   refresh(
     @GetCurrentUserId() userId: string,
-    @GetCurrentUser('refreshToken') refreshToken: string,
+    @GetCurrentUser("refreshToken") refreshToken: string,
   ) {
     // The Guard validated the token; the Strategy extracted it.
     // We just pass it to the service.
@@ -58,13 +69,13 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('me')
+  @Get("me")
   getProfile(@Req() req: Request) {
     return req.user;
   }
 
-  @Get('google')
-  @UseGuards(AuthGuard('google'))
+  @Get("google")
+  @UseGuards(AuthGuard("google"))
   googleAuth() {
     // Initiates the Google OAuth flow
   }
@@ -73,20 +84,20 @@ export class AuthController {
   @UseGuards(AuthGuard("google"))
   async googleAuthRedirect(
     @Req() req: Request & { user: OAuthUser },
-    @Res() res: Response
+    @Res() res: Response,
   ): Promise<void> {
     const tokens = await this.auth.validateOAuthLogin(req.user);
     const frontendUrl = urlConfig.appUrl;
 
     res.redirect(
-      `${frontendUrl}/auth/callback?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}`
-      );
-    }
+      `${frontendUrl}/auth/callback?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}`,
+    );
+  }
 
-  @Get('github')
+  @Get("github")
   githubLogin(@Res() res: Response) {
-    const clientId = this.config.getOrThrow('GITHUB_CLIENT_ID');
-    const apiUrl = urlConfig.apiUrl;   
+    const clientId = this.config.getOrThrow("GITHUB_CLIENT_ID");
+    const apiUrl = urlConfig.apiUrl;
     const redirectUri = `${apiUrl}/auth/github/callback`;
 
     const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=read:user,user:email`;
@@ -94,19 +105,19 @@ export class AuthController {
   }
 
   // 2. CONNECT BUTTON (Dashboard) -> Identity + Access
-  @Get('github/connect')
+  @Get("github/connect")
   githubConnect(@Res() res: Response) {
-    const appName = this.config.getOrThrow('GITHUB_APP_NAME');
+    const appName = this.config.getOrThrow("GITHUB_APP_NAME");
     return res.redirect(`https://github.com/apps/${appName}/installations/new`);
   }
 
   // 3. UNIFIED CALLBACK
-  @Get('github/callback')
+  @Get("github/callback")
   async githubCallback(
-    @Query('code') code: string,
-    @Query('installation_id') installationId: string,
+    @Query("code") code: string,
+    @Query("installation_id") installationId: string,
     @Req() req: Request,
-    @Res() res: Response
+    @Res() res: Response,
   ) {
     const frontendUrl = urlConfig.appUrl;
 
@@ -114,19 +125,25 @@ export class AuthController {
 
     try {
       // A. Exchange Code
-      const { token, userProfile, installationId: discoveredId } = await this.githubApp.exchangeCodeForUser(code);
+      const {
+        token,
+        userProfile,
+        installationId: discoveredId,
+      } = await this.githubApp.exchangeCodeForUser(code);
 
       const finalInstallationId = installationId || discoveredId;
 
       let currentUserId: string | undefined;
-      const cookieToken = req.cookies?.['accessToken'];
+      const cookieToken = req.cookies?.["accessToken"];
 
       if (cookieToken) {
         try {
-          const secret = this.config.getOrThrow<string>('JWT_SECRET');
-          const decoded = this.jwtService.verify(cookieToken as string, { secret });
+          const secret = this.config.getOrThrow<string>("JWT_SECRET");
+          const decoded = this.jwtService.verify(cookieToken as string, {
+            secret,
+          });
           currentUserId = decoded.sub;
-        } catch (e) { 
+        } catch (e) {
           // Invalid token, ignore
           console.error("Token verification failed:", e.message);
         }
@@ -147,7 +164,7 @@ export class AuthController {
       const jwtTokens = await this.auth.processGithubCallback(
         payload,
         finalInstallationId,
-        currentUserId
+        currentUserId,
       );
 
       // E. Redirect
@@ -156,18 +173,17 @@ export class AuthController {
           // Explicit Install Flow -> Dashboard
           return res.redirect(`${frontendUrl}/auth/popup-close`);
         } else {
-            // Login Flow (but we auto-connected!) -> Auth Callback -> Dashboard
+          // Login Flow (but we auto-connected!) -> Auth Callback -> Dashboard
           return res.redirect(
-            `${frontendUrl}/auth/callback?accessToken=${jwtTokens.accessToken}&refreshToken=${jwtTokens.refreshToken}`
+            `${frontendUrl}/auth/callback?accessToken=${jwtTokens.accessToken}&refreshToken=${jwtTokens.refreshToken}`,
           );
         }
       } else {
         // Login Flow -> Back to Callback Page
         return res.redirect(
-          `${frontendUrl}/auth/callback?accessToken=${jwtTokens.accessToken}&refreshToken=${jwtTokens.refreshToken}`
+          `${frontendUrl}/auth/callback?accessToken=${jwtTokens.accessToken}&refreshToken=${jwtTokens.refreshToken}`,
         );
       }
-
     } catch (error) {
       console.error("GitHub Auth Failed:", error);
       return res.redirect(`${frontendUrl}/auth?error=auth_failed`);

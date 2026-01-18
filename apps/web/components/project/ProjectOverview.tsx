@@ -3,20 +3,24 @@
 import { motion } from "framer-motion";
 import { 
   Globe, 
-  GitCommit, 
   Zap, 
   GitBranch, 
   Clock, 
   ArrowUpRight, 
   Terminal, 
   Box,
-  Github
+  Github,
+  Copy,
+  GitCommitVertical,
+  MessageCircleCode
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PipelineVisualizer } from "./PipelineVisualizer"; // Adjust path if needed
 import { Project } from "@/types/project";
 import { FRAMEWORKS } from "@/types/git";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
+import { getFrameworkIcon } from "./utils";
 
 interface ProjectOverviewProps {
   project: Project;
@@ -24,6 +28,9 @@ interface ProjectOverviewProps {
 
 export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
   const latestDeployment = project.deployments?.[0];
+  const shortHash = latestDeployment.commitHash?.slice(0, 7);
+  const commitUrl = `https://github.com/${project.gitRepoOwner}/${project.gitRepoName}/commit/${latestDeployment.commitHash}`;
+  const branchUrl = `${project.gitRepoUrl}/tree/${project.gitBranch}`
   
   return (
     <>
@@ -34,7 +41,7 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         
         {/* --- Project Info Card --- */}
-        <div className="glass-card rounded-xl p-6 relative overflow-hidden group">
+        <div className="glass-card rounded-xl p-6 relative overflow-hidden">
           {/* Subtle background gradient splash */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -z-10 transition-all duration-500 group-hover:bg-primary/10" />
 
@@ -60,10 +67,25 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
               <dt className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5">
                 <Terminal className="w-3.5 h-3.5" /> Framework
               </dt>
-              <dd>
-                <span className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-sm font-medium border">
-                  {FRAMEWORKS[project.framework]}
+              <dd className="flex items-center gap-2 group">
+                <span
+                  className="inline-flex items-center gap-2 px-3 py-1 rounded-md text-sm font-medium border bg-secondary/40 backdrop-blur-md hover:bg-secondary/60 transition"
+                >
+                  {getFrameworkIcon(project.framework, project.language, 18)}
+                  <span className="truncate max-w-[120px]">
+                    {FRAMEWORKS[project.framework] ?? project.framework}
+                  </span>
                 </span>
+
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(project.framework);
+                    toast.success("Framework copied");
+                  }}
+                  className="opacity-0 group-hover:opacity-100 transition"
+                >
+                  <Copy className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                </button>
               </dd>
             </div>
 
@@ -72,11 +94,26 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
               <dt className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5">
                 <GitBranch className="w-3.5 h-3.5" /> Branch
               </dt>
-              <dd className="flex items-center gap-2">
-                <span className="text-sm font-medium text-foreground bg-secondary/50 px-2 py-0.5 rounded flex items-center gap-1">
-                  <GitBranch className="w-3 h-3" />
+              <dd className="flex items-center gap-2 group">
+                <a
+                  href={branchUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium text-foreground bg-secondary/50 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-secondary transition"
+                >
                   {project.gitBranch}
-                </span>
+                  <ArrowUpRight className="w-3 h-3 opacity-60" />
+                </a>
+
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(project.gitBranch)
+                    toast.success("Branch name copied")
+                  }}
+                  className="opacity-0 group-hover:opacity-100 transition"
+                >
+                  <Copy className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                </button>
               </dd>
             </div>
 
@@ -85,7 +122,7 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
               <dt className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5">
                 <Globe className="w-3.5 h-3.5" /> Production URL
               </dt>
-              <dd>
+              <dd className="flex items-center gap-2 group">
                 <a 
                   href={`https://${latestDeployment.deploymentUrl}`} 
                   target="_blank"
@@ -95,6 +132,15 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
                   {latestDeployment.deploymentUrl}
                   <ArrowUpRight className="w-3 h-3" />
                 </a>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(latestDeployment.deploymentUrl)
+                    toast.success("Production URL copied to clipboard!");
+                  }}
+                  className="opacity-0 group-hover:opacity-100 transition"
+                >
+                  <Copy className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                </button>
               </dd>
             </div>
 
@@ -102,9 +148,52 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
             <div className="col-span-2 grid grid-cols-2 gap-4 pt-2 border-t border-white/5">
               <div>
                 <dt className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
-                  <GitCommit className="w-3.5 h-3.5" /> Commits
+                  <GitCommitVertical className="w-3.5 h-3.5" /> Commit Hash
                 </dt>
-                <dd className="text-sm font-medium text-foreground">{latestDeployment.commitHash}</dd>
+                <dd className="flex items-center gap-2 group">
+                  <a
+                    href={commitUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                  >
+                    {shortHash}
+                    <ArrowUpRight className="w-3 h-3" />
+                  </a>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(latestDeployment.commitHash)
+                      toast.success("Commit hash copied to clipboard!");
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                  </button>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+                  <MessageCircleCode className="w-3.5 h-3.5 text-muted-foreground" />
+                  Commit Message
+                </dt>
+                <dd className="text-sm text-muted-foreground inline-flex items-center px-2 py-0.5 rounded-sm bg-secondary/30 italic">
+                  <span className="text-muted-foreground/60">❝</span>
+                  <span className="mx-1 text-foreground max-w-[270px] truncate">
+                    {latestDeployment.commitMessage || "No commit message"}
+                  </span>
+                  <span className="text-muted-foreground/60">❞</span>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+                  <Github className="w-3.5 h-3.5" /> Author
+                </dt>
+                <dd className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-2 bg-secondary/40 px-2 py-0.5 rounded text-sm font-medium">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    {latestDeployment.commitAuthor || "Unknown"}
+                  </span>
+                </dd>
               </div>
               <div>
                 <dt className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
@@ -137,7 +226,7 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
                 icon: Github, 
                 color: "text-white", 
                 bg: "group-hover:bg-white/10",
-                href: project.gitRepoUrl || "#" 
+                href: branchUrl || "#" 
               },
               { 
                 label: "View Analytics", 

@@ -10,6 +10,8 @@ export interface RepoNode {
   name: string;
   nameWithOwner: string;
   url: string;
+  sshUrl: string;
+  cloneUrl: string;
   isPrivate: boolean;
   defaultBranchRef: { name: string } | null;
   updatedAt: string;

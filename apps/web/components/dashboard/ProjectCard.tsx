@@ -74,7 +74,7 @@ const ProjectCard = ({ project, layout = false }: ProjectCardProps) => {
                 )}
                 <span className={cn("relative inline-flex rounded-full h-2 w-2", statusConfig.color, statusConfig.glow)}></span>
               </span>
-              <span className="text-xs font-medium text-white/90">
+              <span className={cn("text-xs font-medium capitalize", statusConfig.text)}>
                 {statusConfig.label}
               </span>
             </div>

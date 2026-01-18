@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Filter, Search, GitBranch, Clock, ExternalLink, 
-  CheckCircle2, XCircle, Loader2, PlayCircle, X 
+  Filter, Search, GitBranch, Clock, ExternalLink, X,
+  Timer
 } from "lucide-react";
-import { useMockStore } from "@/stores/useMockStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -19,35 +18,38 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
-
-const statusIcons = {
-  ready: <CheckCircle2 className="w-4 h-4 text-emerald-500" />,
-  building: <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />,
-  error: <XCircle className="w-4 h-4 text-red-500" />,
-  queued: <PlayCircle className="w-4 h-4 text-yellow-500" />,
-};
+import { getFrameworkIcon, getStatusConfig, STATUS_OPTIONS } from "@/components/project/utils";
+import { formatDistanceToNow } from "date-fns";
+import { useDeployments } from "@/hooks/use-deployments";
+import { useProjects } from "@/hooks/use-projects";
+import { DeploymentRowSkeleton } from "@/components/ui/skeleton";
 
 const Deployments = () => {
   const router = useRouter();
 
-  const { deployments, projects } = useMockStore();
+  const { deployments, isLoading: isDeploymentsLoading } = useDeployments();
+  const { projects, isLoading: isProjectsLoading } = useProjects();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
 
   // Join deployments with project data
-  const enrichedDeployments = deployments.map((d) => ({
-    ...d,
-    project: projects.find((p) => p.id === d.projectId),
-  }));
+  const enrichedDeployments = useMemo(() => {
+    if (!deployments || !projects) return [];
+
+    return deployments.map((deployment) => ({
+      ...deployment,
+      project: projects.find((project) => project.id === deployment.projectId),
+    }));
+  }, [deployments, projects]);
 
   // Filtering Logic
   const filteredDeployments = enrichedDeployments.filter((d) => {
     const query = searchQuery.toLowerCase();
     const matchesSearch = 
       d.project?.name.toLowerCase().includes(query) ||
-      d.commit.toLowerCase().includes(query) ||
+      d.commitHash.toLowerCase().includes(query) ||
       d.branch.toLowerCase().includes(query) ||
-      d.commitMessage.toLowerCase().includes(query);
+      (d.commitMessage ?? "").toLowerCase().includes(query);
 
     const matchesStatus = statusFilter.length === 0 || statusFilter.includes(d.status);
 
@@ -120,24 +122,15 @@ const Deployments = () => {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="bg-[#0a0a0a] border-white/10 backdrop-blur-xl">
             <DropdownMenuLabel>Filter Status</DropdownMenuLabel>
-            <DropdownMenuCheckboxItem 
-              checked={statusFilter.includes('ready')}
-              onCheckedChange={() => toggleStatus('ready')}
-            >
-              Ready
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem 
-              checked={statusFilter.includes('building')}
-              onCheckedChange={() => toggleStatus('building')}
-            >
-              Building
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem 
-              checked={statusFilter.includes('error')}
-              onCheckedChange={() => toggleStatus('error')}
-            >
-              Error
-            </DropdownMenuCheckboxItem>
+            {STATUS_OPTIONS.map(({ label, value }) => (
+              <DropdownMenuCheckboxItem
+                key={value}
+                checked={statusFilter.includes(value)}
+                onCheckedChange={() => toggleStatus(value)}
+              >
+                {label}
+              </DropdownMenuCheckboxItem>
+            ))}
             {statusFilter.length > 0 && (
               <>
                 <DropdownMenuSeparator className="bg-white/10" />
@@ -194,7 +187,10 @@ const Deployments = () => {
             </thead>
             <tbody className="divide-y divide-white/5">
               <AnimatePresence>
-                {filteredDeployments.map((deployment, index) => (
+                {filteredDeployments.map((deployment, index) => {
+                  const deploymentStatus = getStatusConfig(deployment.status);
+
+                  return (
                   <motion.tr
                     key={deployment.id}
                     initial={{ opacity: 0, y: 10 }}
@@ -208,36 +204,26 @@ const Deployments = () => {
                       <div className="flex items-center gap-3">
                         <div
                           className={cn(
-                            "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ring-1 ring-white/10",
-                            deployment.project?.type === "nextjs"
-                              ? "bg-black text-white"
-                              : "bg-yellow-500/10 text-yellow-500",
+                            "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ring-1 ring-white/10 bg-black text-white",
                           )}
                         >
-                          {deployment.project?.type === "nextjs" ? "N" : "Py"}
+                          {getFrameworkIcon(deployment.project?.framework || "", deployment.project?.language || "")}
                         </div>
                         <div>
                           <span className="text-sm font-medium text-foreground block">
                             {deployment.project?.name}
                           </span>
-                          <span className="text-xs text-muted-foreground">
-                            production
+                          <span className="text-xs text-muted-foreground capitalize">
+                            {deployment.environment.toLowerCase()}
                           </span>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        {statusIcons[deployment.status as keyof typeof statusIcons]}
-                        <span
-                          className={cn(
-                            "text-sm font-medium capitalize",
-                            deployment.status === "ready" && "text-emerald-500",
-                            deployment.status === "building" && "text-blue-500",
-                            deployment.status === "error" && "text-red-500",
-                          )}
-                        >
-                          {deployment.status}
+                        {deploymentStatus.icon}
+                        <span className={`${deploymentStatus.text} text-sm font-medium capitalize`}>
+                          {deploymentStatus.label}
                         </span>
                       </div>
                     </td>
@@ -245,10 +231,10 @@ const Deployments = () => {
                       <div>
                         <div className="flex items-center gap-2">
                           <code className="text-xs bg-white/10 px-1.5 py-0.5 rounded text-foreground font-mono">
-                            {deployment.commit.substring(0, 7)}
+                            {deployment.commitHash.substring(0, 7)}
                           </code>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1 truncate max-w-[180px]">
+                        <p className="text-xs text-muted-foreground mt-1 truncate max-w-[180px]" title={deployment.commitMessage}>
                           {deployment.commitMessage}
                         </p>
                       </div>
@@ -261,19 +247,26 @@ const Deployments = () => {
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-muted-foreground">
-                        Node.js 18
+                        {deployment.project?.language}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>{deployment.duration}</span>
+                        <Timer className="w-3.5 h-3.5" />
+                        {deployment.duration ? (
+                          <span className="text-foreground">{deployment.duration}s</span>
+                        ) : deployment.status === "BUILDING" || deployment.status === "DEPLOYING" ? (
+                          <span className="italic text-blue-400 animate-pulse">Calculating…</span>
+                        ) : (
+                          <span className="italic opacity-60">—</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-muted-foreground">
-                        {deployment.timestamp}
-                      </span>
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Clock className="w-3.5 h-3.5" />
+                        {formatDistanceToNow(deployment.startedAt)} ago
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button className="p-2 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all opacity-0 group-hover:opacity-100">
@@ -281,12 +274,18 @@ const Deployments = () => {
                       </button>
                     </td>
                   </motion.tr>
-                ))}
+                )})}
+
+                {(isDeploymentsLoading || isProjectsLoading) && (
+                  Array.from({ length: 5 }).map((_, idx) => (
+                    <DeploymentRowSkeleton key={idx} />
+                  ))
+                )}
               </AnimatePresence>
             </tbody>
           </table>
           
-          {filteredDeployments.length === 0 && (
+          {!isDeploymentsLoading && !isProjectsLoading && filteredDeployments.length === 0 && (
             <div className="py-12 text-center text-muted-foreground">
               No deployments found matching your filters.
             </div>

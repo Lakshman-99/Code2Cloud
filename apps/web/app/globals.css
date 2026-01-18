@@ -256,3 +256,45 @@
 .animate-shimmer-slide {
   animation: shimmer-slide 2s infinite linear;
 }
+
+@keyframes hourglass {
+  0% { transform: rotate(0deg); }
+  20% { transform: rotate(180deg); }
+  40% { transform: rotate(180deg); }
+  60% { transform: rotate(360deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes hammer {
+  0% { transform: rotate(0deg); }
+  40% { transform: rotate(-25deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes fly {
+  0% { transform: translateY(2px); }
+  50% { transform: translateY(-2px); }
+  100% { transform: translateY(2px); }
+}
+
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+.animate-hourglass {
+  animation: hourglass 2.8s ease-in-out infinite;
+}
+
+.animate-hammer {
+  animation: hammer 0.8s ease-in-out infinite;
+}
+
+.animate-fly {
+  animation: fly 1.2s ease-in-out infinite;
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out 1;
+}

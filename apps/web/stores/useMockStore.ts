@@ -37,7 +37,7 @@ export const mockDeployments: Deployment[] = [
   {
     id: "dep_1",
     projectId: "proj_1",
-    status: DeploymentStatus.READY,
+    status: DeploymentStatus.DEPLOYING,
     environment: EnvironmentType.PRODUCTION,
 
     machineCpu: 2,
@@ -103,25 +103,25 @@ const mockEnvVars: EnvVar[] = [
     id: "e1",
     key: "DATABASE_URL",
     value: "postgresql://...",
-    environments: [EnvironmentType.PRODUCTION, EnvironmentType.PREVIEW],
+    targets: [EnvironmentType.PRODUCTION, EnvironmentType.PREVIEW],
   },
   {
     id: "e2",
     key: "API_SECRET",
     value: "sk_live_...",
-    environments: [EnvironmentType.PRODUCTION],
+    targets: [EnvironmentType.PRODUCTION],
   },
   {
     id: "e3",
     key: "NEXT_PUBLIC_API_URL",
     value: "https://api.code2cloud.dev",
-    environments: [EnvironmentType.PRODUCTION, EnvironmentType.PREVIEW, EnvironmentType.DEVELOPMENT],
+    targets: [EnvironmentType.PRODUCTION, EnvironmentType.PREVIEW, EnvironmentType.DEVELOPMENT],
   },
   {
     id: "e4",
     key: "REDIS_URL",
     value: "redis://...",
-    environments: [EnvironmentType.PRODUCTION, EnvironmentType.PREVIEW],
+    targets: [EnvironmentType.PRODUCTION, EnvironmentType.PREVIEW],
   },
 ];
 
@@ -148,9 +148,9 @@ export const mockProjects: Project[] = [
     deployments: mockDeployments,
 
     envVars: [
-      { id: "e1", key: "DATABASE_URL", value: "postgres://prod-db-url", environments: [EnvironmentType.PRODUCTION, EnvironmentType.PREVIEW] },
-      { id: "e2", key: "NEXTAUTH_SECRET", value: "super-secret-key", environments: [EnvironmentType.PRODUCTION] },
-      { id: "e3", key: "NEXT_PUBLIC_API_URL", value: "https://api.nextpath.dev", environments: [EnvironmentType.PRODUCTION, EnvironmentType.PREVIEW, EnvironmentType.DEVELOPMENT] },
+      { id: "e1", key: "DATABASE_URL", value: "postgres://prod-db-url", targets: [EnvironmentType.PRODUCTION, EnvironmentType.PREVIEW] },
+      { id: "e2", key: "NEXTAUTH_SECRET", value: "super-secret-key", targets: [EnvironmentType.PRODUCTION] },
+      { id: "e3", key: "NEXT_PUBLIC_API_URL", value: "https://api.nextpath.dev", targets: [EnvironmentType.PRODUCTION, EnvironmentType.PREVIEW, EnvironmentType.DEVELOPMENT] },
     ],
 
     createdAt: "2024-12-15T12:00:00.000Z",

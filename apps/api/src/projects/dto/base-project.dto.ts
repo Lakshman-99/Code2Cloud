@@ -7,6 +7,9 @@ export class BaseProjectDto {
   name: string;
 
   // Git Source
+  @IsNotEmpty()
+  gitRepoId: number;
+
   @IsString()
   @IsNotEmpty()
   gitRepoName: string;

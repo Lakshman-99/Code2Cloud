@@ -1,23 +1,51 @@
 import { motion } from 'framer-motion';
-import { ExternalLink, GitBranch, RefreshCw, MoreHorizontal } from 'lucide-react';
+import { ExternalLink, GitBranch, RefreshCw, MoreHorizontal, Loader2, Trash2 } from 'lucide-react';
 import { DeploymentStatus, Project } from '@/types/project';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getFrameworkIcon, getStatusConfig } from './utils';
+import { useDeployments } from '@/hooks/use-deployments';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { useState } from 'react';
+import { useProjects } from '@/hooks/use-projects';
+import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 interface ProjectHeaderProps {
   project: Project;
 }
 
 export const ProjectHeader = ({ project }: ProjectHeaderProps) => {
+  const router = useRouter();
   const latestDeployment = project.deployments?.[0];
   const status = getStatusConfig(latestDeployment?.status);
+  const { deleteProject } = useProjects();
+  const { redeploy, isDeploying } = useDeployments();
+
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleRedeploy = () => {
-    toast.success('Deployment queued', {
-      description: `${project.name} is being redeployed from ${project.gitBranch} branch.`,
-    });
+    redeploy(project.id);
+  };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      // 2. Call the delete function from your hook
+      await deleteProject(project.id);
+      
+      toast.success("Project deleted successfully");
+      router.push("/dashboard/projects"); 
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Failed to delete project");
+      setIsDeleting(false); // Reset loading only on error
+      setShowDeleteAlert(false); // Close dialog
+    }
   };
 
   return (
@@ -37,13 +65,13 @@ export const ProjectHeader = ({ project }: ProjectHeaderProps) => {
 
             <div className="flex flex-shrink-0 items-center gap-2 px-2.5 py-1 rounded-full bg-white/10 border border-white/5">
               <span className={cn("relative flex h-2 w-2")}>
-                {latestDeployment?.status === DeploymentStatus.BUILDING && (
+                {(latestDeployment?.status === DeploymentStatus.BUILDING || latestDeployment?.status === DeploymentStatus.DEPLOYING) && (
                   <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", status.color)}></span>
                 )}
                 <span className={cn("relative inline-flex rounded-full h-2 w-2", status.color, status.glow)}></span>
               </span>
               <span className={cn("text-xs font-medium capitalize", status.text)}>
-                {latestDeployment?.status}
+                {status.label}
               </span>
             </div>
           </div>
@@ -77,15 +105,71 @@ export const ProjectHeader = ({ project }: ProjectHeaderProps) => {
         <Button
           variant="outline"
           className="gap-2 border-white/10 bg-white/5 hover:bg-white/10 text-foreground group"
+          disabled={isDeploying}
           onClick={handleRedeploy}
         >
-          <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+          {isDeploying ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+          )}
           Redeploy
         </Button>
-        <Button variant="ghost" size="icon" className="w-8 h-8">
-          <MoreHorizontal className="w-4 h-4" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="w-8 h-8 text-muted-foreground hover:text-white">
+              <MoreHorizontal className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48 bg-[#0A0A0A] border-white/10 text-white">
+            <DropdownMenuLabel>Project Actions</DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-white/10" />
+            
+            {/* DELETE OPTION */}
+            <DropdownMenuItem 
+              onClick={() => setShowDeleteAlert(true)}
+              className="text-red-400 focus:text-red-400 focus:bg-red-400/10 cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4 mr-2 text-red-400" />
+              Delete Project
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+
+      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+        <AlertDialogContent className="bg-[#0F1117] border-white/10 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl">Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              This action cannot be undone. This will permanently delete 
+              <span className="text-white font-semibold"> {project.name} </span>
+              and remove all associated deployments, domains, and environment variables.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-transparent border-white/10 hover:bg-white/5 text-white hover:text-white">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault(); // Prevent auto-closing to show loading state if needed
+                handleDelete();
+              }}
+              className="bg-red-500 hover:bg-red-600 text-white border-0"
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Deleting...
+                </>
+              ) : (
+                "Delete Project"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 };
