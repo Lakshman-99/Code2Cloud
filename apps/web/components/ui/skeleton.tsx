@@ -326,3 +326,67 @@ export const ProjectDetailSkeleton = () => {
     </div>
   );
 };
+
+export function SettingsSkeleton() {
+  return (
+    <div className="p-8 max-w-[1600px] mx-auto min-h-screen space-y-8">
+      
+      {/* --- HEADER SKELETON --- */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-3">
+          {/* Title */}
+          <Skeleton className="h-9 w-64 rounded-lg" />
+          {/* Subtitle */}
+          <Skeleton className="h-4 w-96 rounded-md" />
+        </div>
+        {/* Save Button Placeholder (Optional, usually hidden until dirty, but keeps layout stable) */}
+        <div className="w-32 h-10" /> 
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        
+        {/* --- SIDEBAR SKELETON --- */}
+        <div className="lg:col-span-1 space-y-2">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-xl" />
+          ))}
+        </div>
+
+        {/* --- MAIN CONTENT SKELETON --- */}
+        <div className="lg:col-span-3 space-y-6">
+          
+          {/* Mimic the "General" Glass Card */}
+          <div className="p-6 rounded-xl border border-white/10 bg-white/5 space-y-8">
+            
+            {/* Card Title */}
+            <Skeleton className="h-7 w-48 rounded-md" />
+
+            <div className="space-y-6">
+              {/* Region Select */}
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-40 rounded" /> {/* Label */}
+                <Skeleton className="h-12 w-full rounded-md" /> {/* Input */}
+                <Skeleton className="h-3 w-2/3 rounded" /> {/* Helper text */}
+              </div>
+
+              {/* Divider */}
+              <div className="h-px bg-white/5 w-full" />
+
+              {/* Resource Limits Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <Skeleton className="h-4 w-32 rounded" />
+                  <Skeleton className="h-10 w-full rounded-md" />
+                </div>
+                <div className="space-y-3">
+                  <Skeleton className="h-4 w-32 rounded" />
+                  <Skeleton className="h-10 w-full rounded-md" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

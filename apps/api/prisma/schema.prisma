@@ -29,6 +29,7 @@ model User {
   gitAccounts         GitAccount[]
   projects            Project[]
   deployments         Deployment[]  @relation("UserDeployments")
+  systemConfig        SystemConfig?
 
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
@@ -200,4 +201,31 @@ model Domain {
   updatedAt  DateTime         @updatedAt
 
   @@index([projectId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// System Config Models
+// ─────────────────────────────────────────────────────────────
+
+model SystemConfig {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+
+  // --- General ---
+  defaultRegion       String @default("us-east-1")
+  maxConcurrentBuilds Int    @default(1)
+  logRetentionDays    Int    @default(1)
+
+  // --- Lifecycle ---
+  turboMode           Boolean @default(false)
+  globalTTLMinutes    Int     @default(5) // Auto-destruct timer
+  autoDeploy          Boolean @default(true)
+
+  // --- Notifications ---
+  slackWebhook        String? 
+  emailDeployFailed   Boolean @default(true)
+  emailDeploySuccess  Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

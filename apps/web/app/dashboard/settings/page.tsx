@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Bell, Cpu, AlertTriangle, 
-  Slack, Globe, Save, Check, Mail, Clock, Server, Database
+  Slack, Globe, Save, Mail, Clock, Server, Database,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,9 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { SystemConfig } from "@/types/auth";
+import { useSettings } from "@/hooks/use-settings";
+import { SettingsSkeleton } from "@/components/ui/skeleton";
 
 // --- CONFIGURATION TABS ---
 const tabs = [
@@ -41,44 +45,49 @@ const regions = [
 ];
 
 export default function Settings() {
+  const { settings: serverSettings, updateSettings, isLoading } = useSettings();
+  
+  const [localSettings, setLocalSettings] = useState<SystemConfig | null>(null);
   const [activeTab, setActiveTab] = useState("general");
   const [isDirty, setIsDirty] = useState(false);
 
-  // Mock State
-  const [settings, setSettings] = useState({
-    // General
-    defaultRegion: "us-east-1",
-    maxConcurrentBuilds: "1",
-    logRetention: "1", // Days
-    
-    // Deployments
-    turboMode: false,
-    globalTTL: 5, // Default 5 mins
-    autoDeploy: true,
-    
-    // Notifications
-    slackWebhook: "",
-    emailDeployFailed: true,
-    emailDeploySuccess: false,
-    emailBilling: true,
-  });
+  // 3. Sync Server Data to Local State on Load
+  if (!localSettings && serverSettings) {
+    setLocalSettings(serverSettings);
+  }
 
-  const handleToggle = (key: keyof typeof settings) => {
-    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+  // Loading State
+  if (isLoading || !localSettings) {
+      return <SettingsSkeleton />;
+  }
+
+  const handleToggle = (key: keyof SystemConfig) => {
+    setLocalSettings(prev => prev ? ({ ...prev, [key]: !prev[key] }) : null);
     setIsDirty(true);
   };
 
-  const handleChange = (key: keyof typeof settings, value: unknown) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
+  const handleChange = (key: keyof SystemConfig, value: any) => {
+    // Convert strings to numbers for numeric fields
+    if (['maxConcurrentBuilds', 'logRetentionDays', 'globalTTLMinutes'].includes(key)) {
+        value = Number(value);
+    }
+    setLocalSettings(prev => prev ? ({ ...prev, [key]: value }) : null);
     setIsDirty(true);
   };
 
-  const saveSettings = () => {
-    setIsDirty(false);
-    toast.success("System Configuration Updated", {
-      description: "Resource limits and cost controls have been applied.",
-      icon: <Check className="w-4 h-4 text-emerald-500" />
-    });
+  const saveSettings = async () => {
+    if (!localSettings) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { updatedAt, ...cleanPayload } = localSettings;
+
+    try {
+      await updateSettings(cleanPayload);
+      setIsDirty(false);
+      toast.success("Settings saved successfully");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save settings");
+    }
   };
 
   return (
@@ -157,11 +166,11 @@ export default function Settings() {
                       {/* Region Selector */}
                       <div className="space-y-3">
                         <label className="text-sm font-medium text-white">Default Deployment Region</label>
-                        <Select value={settings.defaultRegion} onValueChange={(val) => handleChange("defaultRegion", val)}>
-                          <SelectTrigger className="bg-black/40 border-white/10 h-12">
+                        <Select value={localSettings.defaultRegion} onValueChange={(val) => handleChange("defaultRegion", val)}>
+                          <SelectTrigger className="w-[230px] bg-black/40 border-white/10 h-12">
                             <SelectValue placeholder="Select Region" />
                           </SelectTrigger>
-                          <SelectContent className="bg-[#0a0a0a] border-white/10">
+                          <SelectContent position="popper" side="bottom" sideOffset={4} avoidCollisions={false} className="bg-[#0a0a0a] border-white/10">
                             {regions.map((region) => (
                               <SelectItem key={region.value} value={region.value}>
                                 <span className="mr-2">{region.flag}</span> {region.label}
@@ -180,12 +189,12 @@ export default function Settings() {
                           <label className="text-sm font-medium text-white flex items-center gap-2">
                             <Server className="w-4 h-4 text-purple-400" /> Concurrent Builds
                           </label>
-                          <Select value={settings.maxConcurrentBuilds} onValueChange={(val) => handleChange("maxConcurrentBuilds", val)}>
-                            <SelectTrigger className="bg-black/40 border-white/10">
+                          <Select value={localSettings.maxConcurrentBuilds.toString()} onValueChange={(val) => handleChange("maxConcurrentBuilds", val)}>
+                            <SelectTrigger className="w-[230px] bg-black/40 border-white/10">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="bg-[#0a0a0a] border-white/10">
-                              <SelectItem value="1">1 Concurrent Build (Free)</SelectItem>
+                            <SelectContent position="popper" side="bottom" sideOffset={4} avoidCollisions={false} className="bg-[#0a0a0a] border-white/10">
+                              <SelectItem value="1">1 Concurrent Build</SelectItem>
                               <SelectItem value="2">2 Concurrent Builds</SelectItem>
                               <SelectItem value="5">5 Concurrent Builds (Pro)</SelectItem>
                             </SelectContent>
@@ -196,11 +205,11 @@ export default function Settings() {
                           <label className="text-sm font-medium text-white flex items-center gap-2">
                             <Database className="w-4 h-4 text-amber-400" /> Log Retention
                           </label>
-                          <Select value={settings.logRetention} onValueChange={(val) => handleChange("logRetention", val)}>
-                            <SelectTrigger className="bg-black/40 border-white/10">
+                          <Select value={localSettings.logRetentionDays.toString()} onValueChange={(val) => handleChange("logRetentionDays", val)}>
+                            <SelectTrigger className="w-[230px] bg-black/40 border-white/10">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="bg-[#0a0a0a] border-white/10">
+                            <SelectContent position="popper" side="bottom" sideOffset={4} avoidCollisions={false} className="bg-[#0a0a0a] border-white/10">
                               <SelectItem value="1">1 Day (Cost Saving)</SelectItem>
                               <SelectItem value="3">3 Days</SelectItem>
                               <SelectItem value="7">7 Days</SelectItem>
@@ -224,15 +233,11 @@ export default function Settings() {
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground">Deployment Failed</span>
-                          <Switch checked={settings.emailDeployFailed} onCheckedChange={() => handleToggle("emailDeployFailed")} />
+                          <Switch checked={localSettings.emailDeployFailed} onCheckedChange={() => handleToggle("emailDeployFailed")} />
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground">Successful Deployment</span>
-                          <Switch checked={settings.emailDeploySuccess} onCheckedChange={() => handleToggle("emailDeploySuccess")} />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Billing Threshold (80%)</span>
-                          <Switch checked={settings.emailBilling} onCheckedChange={() => handleToggle("emailBilling")} />
+                          <Switch checked={localSettings.emailDeploySuccess} onCheckedChange={() => handleToggle("emailDeploySuccess")} />
                         </div>
                     </div>
                   </section>
@@ -248,7 +253,7 @@ export default function Settings() {
                           <Input 
                             placeholder="https://hooks.slack.com/services/..." 
                             className="bg-black/40 border-white/10 focus:border-purple-500/50"
-                            value={settings.slackWebhook}
+                            value={localSettings.slackWebhook}
                             onChange={(e) => handleChange("slackWebhook", e.target.value)}
                           />
                           <Button variant="outline" className="border-white/10 bg-white/5">Test</Button>
@@ -282,17 +287,17 @@ export default function Settings() {
                         {ttlOptions.map((option) => (
                           <button
                             key={option.value}
-                            onClick={() => handleChange("globalTTL", option.value)}
+                            onClick={() => handleChange("globalTTLMinutes", option.value)}
                             className={cn(
                               "flex flex-col items-center justify-center p-4 rounded-xl border transition-all duration-200 relative overflow-hidden",
-                              settings.globalTTL === option.value
+                              localSettings.globalTTLMinutes === option.value
                                 ? "bg-red-500/20 border-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.2)]"
                                 : "bg-white/5 border-white/10 text-muted-foreground hover:bg-white/10 hover:border-white/20"
                             )}
                           >
                             <span className="text-lg font-bold">{option.label}</span>
                             <span className="text-[10px] opacity-70 mt-1">{option.desc}</span>
-                            {settings.globalTTL === option.value && (
+                            {localSettings.globalTTLMinutes === option.value && (
                                 <motion.div layoutId="activeTTL" className="absolute inset-0 border-2 border-red-500 rounded-xl" />
                             )}
                           </button>
@@ -309,7 +314,7 @@ export default function Settings() {
                           <p className="text-sm font-medium text-white">Auto-Deploy &apos;main&apos;</p>
                           <p className="text-xs text-muted-foreground">Trigger deployment when code is pushed.</p>
                         </div>
-                        <Switch checked={settings.autoDeploy} onCheckedChange={() => handleToggle("autoDeploy")} />
+                        <Switch checked={localSettings.autoDeploy} onCheckedChange={() => handleToggle("autoDeploy")} />
                       </div>
                     </div>
                   </section>

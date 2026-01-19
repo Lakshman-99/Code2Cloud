@@ -12,7 +12,7 @@ const SystemHealthChart = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="col-span-2 row-span-2"
+      className="col-span-2"
     >
       <Card className="h-full">
         <CardHeader className="pb-2">

@@ -36,6 +36,9 @@ export class AuthService {
         email: dto.email,
         password: hash,
         name: dto.name,
+        systemConfig: {
+          create: {}, // Create default system config
+        },
       },
     });
 

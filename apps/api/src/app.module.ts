@@ -8,9 +8,19 @@ import { DeploymentsModule } from './deployments/deployments.module';
 import { DomainsModule } from './domains/domains.module';
 import { EnvVarsModule } from './envs/env-vars.module';
 import { QueuesModule } from './queues/queues.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
-  imports: [AuthModule, GitModule, ProjectsModule, DeploymentsModule, DomainsModule, EnvVarsModule, QueuesModule],
+  imports: [
+    AuthModule, 
+    GitModule, 
+    ProjectsModule, 
+    DeploymentsModule, 
+    DomainsModule, 
+    EnvVarsModule, 
+    QueuesModule,
+    SettingsModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

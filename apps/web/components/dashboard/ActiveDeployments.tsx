@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Rocket, GitCommit, Clock } from 'lucide-react';
+import { Rocket, GitCommit, Clock, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Deployment, Project } from '@/types/project';
 import { getStatusConfig } from '../project/utils';
@@ -17,6 +17,40 @@ interface DeploymentCardProps {
 const ActiveDeployments = ({ deployments, projects }: DeploymentCardProps) => {
   const router = useRouter();
   const recentDeployments = deployments.slice(0, 4);
+
+  if (deployments.length === 0) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
+        className="col-span-2"
+      >
+        <Card className="h-full flex flex-col">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center">
+                <Rocket className="w-4 h-4 text-accent" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Active Deployments</CardTitle>
+                <p className="text-xs text-muted-foreground">Recent build activity</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col items-center justify-center text-center py-8 min-h-[200px]">
+            <div className="w-16 h-16 rounded-full bg-secondary/50 flex items-center justify-center mb-4 border border-white/5">
+              <Layers className="w-8 h-8 text-muted-foreground/50" />
+            </div>
+            <h3 className="text-sm font-semibold text-foreground">No deployments yet</h3>
+            <p className="text-xs text-muted-foreground max-w-[250px] mt-1 leading-relaxed">
+              Your deployment queue is empty. Push code to your repository or manually trigger a deploy to see activity here.
+            </p>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
