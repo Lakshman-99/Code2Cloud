@@ -2,7 +2,7 @@ import { FRAMEWORK_ICONS } from "@/types/git";
 import { DeploymentStatus } from "@/types/project";
 import { Ban, CheckCircle2, Hammer, Hourglass, Rocket, XCircle } from "lucide-react";
 import Image from "next/image";
-import { JSX } from "react";
+import { cloneElement, isValidElement, JSX, ReactElement } from "react";
 
 export const getFrameworkIcon = (framework: string, language: string | null, size: number = 20) => {
   const fw = framework?.toLowerCase();
@@ -32,59 +32,76 @@ type StatusConfig = {
   icon: JSX.Element;
 };
 
-const baseIcon = "w-4 h-4 transition-all duration-300";
-
 const STATUS_CONFIG: Record<DeploymentStatus, StatusConfig> = {
   QUEUED: {
     label: "Queued",
     color: "bg-yellow-500",
     text: "text-yellow-500",
     glow: "shadow-[0_0_10px_rgba(234,179,8,0.4)]",
-    icon: <Hourglass className={`${baseIcon} text-yellow-400 animate-hourglass`} />,
+    icon: <Hourglass className="text-yellow-400 animate-hourglass" />,
   },
   READY: {
     label: "Ready",
     color: "bg-emerald-500",
     text: "text-emerald-500",
     glow: "shadow-[0_0_10px_rgba(16,185,129,0.4)]",
-    icon: <CheckCircle2 className={`${baseIcon} text-emerald-400`} />,
+    icon: <CheckCircle2 className="text-emerald-400" />,
   },
   BUILDING: {
     label: "Building",
     color: "bg-blue-500",
     text: "text-blue-500",
     glow: "shadow-[0_0_10px_rgba(59,130,246,0.4)]",
-    icon: <Hammer className={`${baseIcon} text-blue-400 animate-hammer`} />,
+    icon: <Hammer className="text-blue-400 animate-hammer" />,
   },
   DEPLOYING: {
     label: "Deploying",
     color: "bg-purple-500",
     text: "text-purple-500",
     glow: "shadow-[0_0_10px_rgba(168,85,247,0.4)]",
-    icon: <Rocket className={`${baseIcon} text-purple-400 animate-fly`} />,
+    icon: <Rocket className="text-purple-400 animate-fly" />,
   },
   FAILED: {
     label: "Failed",
     color: "bg-red-500",
     text: "text-red-500",
     glow: "shadow-[0_0_10px_rgba(239,68,68,0.4)]",
-    icon: <XCircle className={`${baseIcon} text-red-500 animate-shake`} />,
+    icon: <XCircle className="text-red-500 animate-shake" />,
   },
   CANCELED: {
     label: "Canceled",
     color: "bg-gray-500",
     text: "text-gray-500",
     glow: "shadow-[0_0_10px_rgba(161,161,170,0.35)]",
-    icon: <Ban className={`${baseIcon} text-zinc-400`} />,
+    icon: <Ban className="text-zinc-400" />,
   },
 };
 
-export const getStatusConfig = (status?: DeploymentStatus) =>
-  status ? STATUS_CONFIG[status] : { color: 'bg-gray-500', text: 'text-gray-500', glow: '', label: 'Unknown', icon: <Ban className={`${baseIcon} text-zinc-400`} /> };
+export const getStatusConfig = (
+  status?: DeploymentStatus,
+  iconSize: number = 16
+) => {
+  const config = status ? STATUS_CONFIG[status] : {
+    color: 'bg-gray-500',
+    text: 'text-gray-500',
+    glow: '',
+    label: 'Unknown',
+    icon: <Ban className="text-zinc-400" />,
+  };
 
-export const STATUS_OPTIONS = Object.entries(STATUS_CONFIG).map(
-  ([value, { label }]) => ({
-    value: value as DeploymentStatus,
-    label,
-  })
+  let sizedIcon = config.icon;
+
+  if (isValidElement(config.icon)) {
+    // TypeScript cast: tell it this is a LucideIcon
+    sizedIcon = cloneElement(config.icon as ReactElement<React.SVGProps<SVGSVGElement> & { size?: number }>, { size: iconSize });
+  }
+
+  return { ...config, icon: sizedIcon };
+};
+
+export const STATUS_OPTIONS = Object.entries(STATUS_CONFIG).map( 
+  ([value, { label }]) => ({ 
+    value: value as DeploymentStatus, 
+    label, 
+  }) 
 );

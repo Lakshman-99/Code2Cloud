@@ -390,3 +390,144 @@ export function SettingsSkeleton() {
     </div>
   );
 }
+
+export function DeploymentDetailsSkeleton() {
+  return (
+    <div className="p-8 max-w-[1920px] mx-auto space-y-8 min-h-screen">
+      
+      {/* --- 1. HEADER SKELETON --- */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+        <div className="flex flex-col gap-4">
+          {/* Back Button */}
+          <Skeleton className="h-4 w-32 rounded" />
+
+          <div className="flex items-center gap-4">
+            {/* Status Icon Box */}
+            <Skeleton className="w-14 h-14 rounded-2xl" />
+            
+            <div className="space-y-2">
+              {/* Project Name / ID */}
+              <Skeleton className="h-8 w-64 rounded-lg" />
+              {/* Metadata Badges */}
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-6 w-24 rounded-full" />
+                <Skeleton className="h-4 w-4 rounded-full" />
+                <Skeleton className="h-4 w-32 rounded" />
+                <Skeleton className="h-4 w-4 rounded-full" />
+                <Skeleton className="h-4 w-24 rounded" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          <Skeleton className="h-10 w-32 rounded-md" />
+          <Skeleton className="h-10 w-28 rounded-md" />
+        </div>
+      </div>
+
+      {/* --- 2. STAT CARDS SKELETON --- */}
+      <div className="col-span-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="p-5 rounded-xl border border-white/5 bg-white/5 h-40 flex flex-col justify-between">
+            <div className="flex items-center gap-3">
+              <Skeleton className="w-8 h-8 rounded-lg" />
+              <Skeleton className="w-16 h-3 rounded" />
+            </div>
+            <div>
+              <Skeleton className="w-24 h-8 mb-2 rounded" />
+              <Skeleton className="w-20 h-3 rounded" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* --- 3. MAIN GRID SKELETON --- */}
+      <div className="grid grid-cols-12 gap-8">
+        
+        {/* LEFT COLUMN (Terminal & Configs) */}
+        <div className="col-span-12 lg:col-span-8 space-y-6">
+          
+          {/* Terminal Skeleton */}
+          <div className="h-[600px] flex flex-col rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+            {/* Terminal Header */}
+            <div className="h-12 border-b border-white/5 flex items-center px-4 gap-3">
+              <Skeleton className="w-32 h-4 rounded" />
+            </div>
+            {/* Terminal Filters */}
+            <div className="h-12 border-b border-white/5 flex items-center px-4 gap-2">
+              <Skeleton className="w-full h-8 rounded" />
+            </div>
+            {/* Terminal Body */}
+            <div className="flex-1 p-4 space-y-3">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Skeleton key={i} className="h-4 w-full rounded opacity-30" />
+              ))}
+            </div>
+          </div>
+
+          {/* Config Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Source Control Card */}
+            <div className="p-5 rounded-xl border border-white/10 bg-white/5 space-y-4">
+              <Skeleton className="w-32 h-4 rounded" />
+              <Skeleton className="w-full h-16 rounded-lg opacity-50" />
+              <div className="space-y-3">
+                <Skeleton className="w-full h-4 rounded" />
+                <Skeleton className="w-full h-4 rounded" />
+                <Skeleton className="w-full h-4 rounded" />
+              </div>
+            </div>
+            
+            {/* Build Config Card */}
+            <div className="p-5 rounded-xl border border-white/10 bg-white/5 space-y-4">
+              <Skeleton className="w-32 h-4 rounded" />
+              <div className="space-y-3">
+                <div className="flex justify-between"><Skeleton className="w-20 h-4" /><Skeleton className="w-24 h-4" /></div>
+                <div className="border-t border-white/5 pt-3 space-y-3">
+                    <Skeleton className="w-full h-8 rounded opacity-50" />
+                    <Skeleton className="w-full h-8 rounded opacity-50" />
+                    <Skeleton className="w-full h-8 rounded opacity-50" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN (Preview & Infra) */}
+        <div className="col-span-12 lg:col-span-4 space-y-6">
+          
+          {/* Preview Box Skeleton */}
+          <div className="rounded-[21px] p-[1px] border border-white/5">
+            <div className="rounded-2xl overflow-hidden bg-white/5">
+              {/* Browser Bar */}
+              <div className="h-10 border-b border-white/5 flex items-center px-3 gap-2">
+                  <Skeleton className="w-40 h-5 rounded" />
+              </div>
+              {/* Viewport */}
+              <div className="aspect-[16/10] flex items-center justify-center">
+                  <Skeleton className="w-12 h-12 rounded-full" />
+              </div>
+            </div>
+          </div>
+
+          {/* Infrastructure Card */}
+          <div className="p-5 rounded-xl border border-white/10 bg-white/5 space-y-6">
+            <div className="space-y-3">
+              <Skeleton className="w-40 h-4 rounded" />
+              <Skeleton className="w-full h-10 rounded-lg" />
+              <Skeleton className="w-full h-10 rounded-lg" />
+            </div>
+            <div className="pt-6 border-t border-white/5 space-y-3">
+              <Skeleton className="w-24 h-4 rounded" />
+              <Skeleton className="w-full h-5 rounded" />
+              <Skeleton className="w-full h-5 rounded" />
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}

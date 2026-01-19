@@ -17,19 +17,22 @@ import {
   Timer,
   Clock,
   ArrowUpRight,
-  GitCommitVertical
+  GitCommitVertical,
+  History,
+  ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { TerminalLogs } from "@/components/project/TerminalLogs";
-import { Badge } from "@/components/ui/badge";
 import { DeploymentNotFoundState } from "@/components/feedback/DeploymentNotFoundState";
 import { useDeployment } from "@/hooks/use-deployments";
 import { useProjects } from "@/hooks/use-projects";
 import { getStatusConfig } from "@/components/project/utils";
 import { formatDistanceToNow } from "date-fns";
 import { Log } from "@/stores/useMockStore";
+import { DeploymentStatus } from "@/types/project";
+import { DeploymentDetailsSkeleton } from "@/components/ui/skeleton";
 
 
 export default function DeploymentDetails() {
@@ -45,14 +48,14 @@ export default function DeploymentDetails() {
   const logs = [] as Log[];
 
   if (isDeploymentsLoading || isProjectsLoading) {
-    return <div>Loading...</div>;
+    return <DeploymentDetailsSkeleton />;
   }
 
   if (!deployment || !project) {
     return <DeploymentNotFoundState deploymentId={deploymentId} />;
   }
 
-  const statusConfig = getStatusConfig(deployment.status);
+  const statusConfig = getStatusConfig(deployment.status, 24);
   const isReady = deployment.status === 'READY';
   const commitUrl = `https://github.com/${project.gitRepoOwner}/${project.gitRepoName}/commit/${deployment.commitHash}`;
   const branchUrl = `${project.gitRepoUrl}/tree/${project.gitBranch}`
@@ -86,20 +89,28 @@ export default function DeploymentDetails() {
 
           <div className="flex items-center gap-4">
             <div className={cn(
-              "w-14 h-14 rounded-2xl flex items-center justify-center border backdrop-blur-xl",
-              statusConfig.text, statusConfig.glow
+              "w-14 h-14 rounded-2xl flex items-center justify-center border backdrop-blur-xl border-white/10 bg-white/5 shadow-md",
+              statusConfig.text
             )}>
               {statusConfig.icon}
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-foreground tracking-tight flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-3">
                 {project.name}
                 <span className="text-muted-foreground font-normal text-lg">/ {deploymentId.substring(0,8)}</span>
               </h1>
               <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                <Badge variant="outline" className={cn("capitalize border-white/10 px-2 py-0", statusConfig.text)}>
-                  {statusConfig.label}
-                </Badge>
+                <div className="flex flex-shrink-0 items-center gap-2 px-2.5 py-1 rounded-full border border-white/5">
+                  <span className={cn("relative flex h-2 w-2")}>
+                    {(deployment?.status === DeploymentStatus.BUILDING || deployment?.status === DeploymentStatus.DEPLOYING) && (
+                      <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", statusConfig.color)}></span>
+                    )}
+                    <span className={cn("relative inline-flex rounded-full h-2 w-2", statusConfig.color, statusConfig.glow)}></span>
+                  </span>
+                  <span className={cn("text-xs font-medium capitalize", statusConfig.text)}>
+                    {statusConfig.label}
+                  </span>
+                </div>
                 <span className="w-1 h-1 rounded-full bg-white/20" />
                 <span className="flex items-center gap-1.5 font-mono text-xs">
                   <GitBranch className="w-3 h-3" /> {deployment.branch}
@@ -136,153 +147,154 @@ export default function DeploymentDetails() {
         </div>
       </motion.div>
 
-      {/* --- 2. HERO ROW: PREVIEW & TELEMETRY --- */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Machine Telemetry (Takes 2/3) */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.1 }}
-          className="xl:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4"
-        >
-          <StatCard icon={Cpu} label="vCPU" value={deployment.machineCpu} subValue="High-Perf" colorName="blue" />
-          <StatCard icon={Zap} label="Memory" value={deployment.machineRam} subValue="DDR5 ECC" colorName="amber" />
-          <StatCard icon={HardDrive} label="Storage" value={deployment.machineStorage} subValue="NVMe SSD" colorName="purple" />
-          <StatCard icon={Server} label="System" value={deployment.machineOS} subValue={deployment.deploymentRegion} colorName="emerald" pulse />
-        </motion.div>
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="col-span-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+      >
+        <StatCard icon={Cpu} label="vCPU" value={deployment.machineCpu} subValue="High-Perf" colorName="blue" />
+        <StatCard icon={Zap} label="Memory" value={deployment.machineRam} subValue="DDR5 ECC" colorName="amber" />
+        <StatCard icon={HardDrive} label="Storage" value={deployment.machineStorage} subValue="NVMe SSD" colorName="purple" />
+        <StatCard icon={Server} label="System" value={deployment.machineOS} subValue={deployment.deploymentRegion} colorName="emerald" pulse />
+      </motion.div>
 
-        {/* Visual Preview (Takes 1/3) */}
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }} 
-          animate={{ opacity: 1, x: 0 }} 
-          transition={{ delay: 0.1 }}
-          className="group relative aspect-video xl:aspect-auto xl:h-40 w-full rounded-xl overflow-hidden border border-white/10 bg-[#0a0a0a] shadow-2xl flex flex-col"
-        >
-          {/* Mock Browser Header */}
-          <div className="h-8 bg-[#0f0f0f] border-b border-white/5 flex items-center px-3 gap-2">
-            <div className="flex gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500/20"/><div className="w-2 h-2 rounded-full bg-yellow-500/20"/><div className="w-2 h-2 rounded-full bg-emerald-500/20"/></div>
-            <div className="flex-1 bg-black/40 h-5 rounded text-[10px] flex items-center px-2 text-muted-foreground font-mono truncate">
-              {deployment.deploymentUrl}
-            </div>
+      <div className="grid grid-cols-12 gap-8">
+        
+        {/* LEFT COLUMN - STATS & PREVIEW (4 Cols) */}
+        <div className="col-span-12 lg:col-span-8 space-y-6">
+          {/* Terminal Console */}
+          <div className="h-[600px] flex flex-col">
+            <TerminalLogs logs={logs} projectName={project.name} />
           </div>
-          {/* Content */}
-          <div className="flex-1 bg-gradient-to-br from-indigo-900/10 via-[#050505] to-purple-900/10 flex items-center justify-center group-hover:bg-white/5 transition-colors cursor-pointer" onClick={() => window.open(`https://${deployment.deploymentUrl}`, '_blank')}>
-            {isReady ? (
-              <div
-                className="relative w-full h-full rounded-xl overflow-hidden cursor-pointer group"
-                onClick={() => window.open(`https://${deployment.deploymentUrl}`, "_blank")}
-              >
-                <iframe
-                  src={`/api/preview?url=https://${deployment.deploymentUrl}`}
-                  className="w-full h-full pointer-events-none scale-[0.25] origin-top-left"
-                  style={{ width: "400%", height: "400%" }}
-                />
 
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <ExternalLink className="w-6 h-6 text-white" />
-                </div>
-              </div>
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center gap-4 pt-9">
-                <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-                <p className="text-sm text-muted-foreground animate-pulse">
-                  Deployment in progress...
+          {/* Bottom Grid: Configs */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="glass-card p-5 rounded-xl border border-white/10 bg-white/5">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                <Box className="w-3.5 h-3.5" /> Source Control
+              </h3>
+              <div className="bg-[#0a0a0a]/50 rounded-lg p-3 border border-white/5 mb-4">
+                <p className="text-sm text-foreground leading-relaxed italic line-clamp-2">
+                  &quot;{deployment.commitMessage}&quot;
                 </p>
               </div>
-            )}
-          </div>
-        </motion.div>
-      </div>
-
-      {/* --- MAIN DASHBOARD LAYOUT --- */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 h-full">
-        
-        {/* LEFT: THE TERMINAL (2/3 width) */}
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-          className="xl:col-span-2 flex flex-col gap-6"
-        >
-          {/* Terminal Container */}
-          <TerminalLogs logs={logs} projectName={project.name} />
-        </motion.div>
-
-        {/* RIGHT: SYSTEM SPECS (1/3 width) */}
-        <motion.div 
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
-          className="space-y-6"
-        >
-          {/* Domains Card */}
-          <div className="glass-card p-5 rounded-xl border border-white/10 bg-white/5">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Globe className="w-3.5 h-3.5" /> Active Domains
-            </h3>
-            <div className="space-y-2">
-              <DomainRow 
-                url={deployment.deploymentUrl} 
-                main 
-                isCopied={copied === 'main'} 
-                onCopy={() => handleCopy(deployment.deploymentUrl, 'main')} 
-              />
-              <DomainRow 
-                url={`${deployment.id.substring(0,8)}-${project.name}.code2cloud.app`} 
-                isCopied={copied === 'sub'} 
-                onCopy={() => handleCopy(`${deploymentId}-app`, 'sub')} 
-              />
-            </div>
-          </div>
-
-          {/* Source Control Card */}
-          <div className="glass-card p-5 rounded-xl border border-white/10 bg-white/5">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Box className="w-3.5 h-3.5" /> Source Control
-            </h3>
-            <div className="bg-[#0a0a0a]/50 rounded-lg p-3 border border-white/5 mb-4">
-              <p className="text-sm text-foreground leading-relaxed italic line-clamp-2">
-                &quot;{deployment.commitMessage}&quot;
-              </p>
-            </div>
-            <div className="space-y-3">
-              <InfoRow label="Branch" value={deployment.branch} mono icon={<GitBranch className="w-3.5 h-3.5"/>} url={branchUrl} />
-              <InfoRow label="Commit" value={deployment.commitHash.substring(0, 7)} mono icon={<GitCommit className="w-3.5 h-3.5"/>} url={commitUrl} />
-              <InfoRow label="Committer" value={deployment.commitAuthor} icon={<User className="w-3.5 h-3.5"/>} />
-              <InfoRow 
-                label="Duration" 
-                value={
-                  deployment.duration 
-                    ? `${deployment.duration}s` 
-                    : (deployment.status === "BUILDING" || deployment.status === "DEPLOYING")
-                      ? "Calculating…" 
-                      : "—"
-                } 
-                icon={<Timer className="w-3.5 h-3.5"/>} 
-              />
-            </div>
-          </div>
-
-          {/* Config Card */}
-          <div className="glass-card p-5 rounded-xl border border-white/10 bg-white/5">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Layers className="w-3.5 h-3.5" /> Build Config
-            </h3>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Framework</span>
-                <span className="text-foreground font-medium flex items-center gap-1.5"><Box className="w-3.5 h-3.5"/>{project.framework}</span>
+              <div className="space-y-3">
+                <InfoRow label="Branch" value={deployment.branch} mono icon={<GitBranch className="w-3.5 h-3.5"/>} url={branchUrl} />
+                <InfoRow label="Commit" value={deployment.commitHash.substring(0, 7)} mono icon={<GitCommit className="w-3.5 h-3.5"/>} url={commitUrl} />
+                <InfoRow label="Committer" value={deployment.commitAuthor} icon={<User className="w-3.5 h-3.5"/>} />
+                <InfoRow 
+                  label="Duration" 
+                  value={
+                    deployment.duration 
+                      ? `${deployment.duration}s` 
+                      : (deployment.status === "BUILDING" || deployment.status === "DEPLOYING")
+                        ? "Calculating…" 
+                        : "—"
+                  } 
+                  icon={<Timer className="w-3.5 h-3.5"/>} 
+                />
               </div>
+            </div>
+            <div className="glass-card p-5 rounded-xl border border-white/10 bg-white/5">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                <Layers className="w-3.5 h-3.5" /> Build Config
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Framework</span>
+                  <span className="text-foreground font-medium flex items-center gap-1.5"><Box className="w-3.5 h-3.5"/>{project.framework}</span>
+                </div>
 
-              <div className="space-y-3 pt-3 border-t border-white/5">
-                <CommandRow label="Build Command" command={project.buildCommand} />
-                <CommandRow label="Output Directory" command={project.outputDirectory} />
-                <CommandRow label="Install Command" command={project.installCommand} />
+                <div className="space-y-3 pt-3 border-t border-white/5">
+                  <CommandRow label="Build Command" command={project.buildCommand} />
+                  <CommandRow label="Output Directory" command={project.outputDirectory} />
+                  <CommandRow label="Install Command" command={project.installCommand} />
+                </div>
               </div>
             </div>
           </div>
+        </div>
 
-        </motion.div>
+        {/* RIGHT COLUMN - LOGS & SOURCE (8 Cols) */}
+        <div className="col-span-12 lg:col-span-4 space-y-6">
+          
+          {/* Preview Box Wrapper with Animated Glow */}
+          <div className="relative group p-[1px] rounded-[21px] overflow-hidden">
+            {/* Main Container */}
+            <div className="relative rounded-2xl border border-white/10 bg-[#0a0a0a]/90 backdrop-blur-3xl overflow-hidden shadow-2xl">
+              
+              {/* Browser Header / Chrome */}
+              <div className="p-3 bg-white/5 border-b border-white/5 flex items-center gap-3">
+                {/* Left: Icon only */}
+                <span className="flex items-center text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-400 gap-1.5">
+                  <Globe className="w-3 h-3 animate-pulse" /> Preview
+                </span>
+
+                {/* Middle: URL Bar */}
+                <div className="flex-1 bg-black/60 h-6 rounded-md px-3 text-[10px] font-mono text-white/40 border border-white/5 flex items-center gap-2 truncate">
+                  <ShieldCheck className="w-3 h-3 text-emerald-500/50" />
+                  <span className="truncate">{deployment.deploymentUrl}</span>
+                </div>
+
+                {/* Right: Traffic lights */}
+                <div className="flex gap-1.5 px-1">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/40" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/40" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/40" />
+                </div>
+              </div>
+
+              {/* Content Area */}
+              <div className="aspect-[16/10] relative bg-[#050505] flex items-center justify-center overflow-hidden">
+                {isReady ? (
+                  <>
+                    <iframe
+                      src={`/api/preview?url=https://${deployment.deploymentUrl}`}
+                      className="w-full h-full scale-[0.4] origin-top-left absolute transition-transform duration-700 group-hover:scale-[0.42]"
+                      style={{ width: "250%", height: "250%" }}
+                    />
+                    {/* Overlay that fades on hover */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-transparent opacity-60 group-hover:opacity-20 transition-opacity duration-500" />
+                  </>
+                ) : (
+                  <div className="relative z-10 text-center space-y-4">
+                    <div className="relative inline-block">
+                      <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+                      <div className="absolute inset-0 blur-lg bg-emerald-500/50 animate-pulse" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] uppercase font-black tracking-[0.3em] text-white">Provisioning environment</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Infrastructure Card */}
+          <div className="glass-card p-5 rounded-xl border border-white/10 bg-white/5">
+            <section>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+                <ShieldCheck className="w-3.5 h-3.5" /> Security & Networking
+              </h3>
+              <div className="space-y-3">
+                <DomainRow url={deployment.deploymentUrl} main isCopied={copied === 'main'} onCopy={() => handleCopy(deployment.deploymentUrl, 'main')} />
+                <DomainRow url={`${deployment.id.substring(0,8)}.code2cloud.app`} isCopied={copied === 'sub'} onCopy={() => handleCopy(`${deploymentId}-app`, 'sub')} />
+              </div>
+            </section>
+
+            <section className="pt-6 border-t border-white/5">
+              <h4 className="text-[11px] font-bold text-white/40 uppercase mb-4 flex items-center gap-2">
+                <History className="w-3.5 h-3.5" /> Metadata
+              </h4>
+              <div className="space-y-4">
+                <InfoRow label="Environment" value={deployment.environment.toLowerCase()} icon={<Server className="w-3.5 h-3.5"/>} />
+                <InfoRow label="Region" value={deployment.deploymentRegion} icon={<Globe className="w-3.5 h-3.5"/>} />
+              </div>
+            </section>
+          </div>
+        </div>
       </div>
     </div>
   );
