@@ -54,6 +54,7 @@ export class DeploymentsService {
     );
 
     const deployment = await this.prisma.$transaction(async (tx) => {
+      const systemConfig = await tx.systemConfig.findUnique({ where: { userId } });
       const deploymentUrl = `https://${project.name}.${urlConfig.domain}`;
             
       const deployment = await tx.deployment.create({
@@ -67,6 +68,7 @@ export class DeploymentsService {
           commitHash: commitData.sha, 
           commitMessage: commitData.message,
           commitAuthor: commitData.author,
+          deploymentRegion: systemConfig?.defaultRegion || 'us-east-1',
         },
       });
 

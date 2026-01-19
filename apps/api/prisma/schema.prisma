@@ -166,7 +166,7 @@ model Deployment {
   containerImage    String?
   deploymentUrl     String?
   deploymentRegion  String           @default("us-east-1")
-  buildLogs         String?          @db.Text
+  logs              LogEntry[]       
 
   // ─── Timing ─────────────────────────────────────
   startedAt         DateTime         @default(now())
@@ -228,4 +228,27 @@ model SystemConfig {
 
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────────────────────
+// LOGGING MODELS (NEW)
+// ─────────────────────────────────────────────────────────────
+
+enum LogSource {
+  BUILD    // Logs from the Docker build process
+  RUNTIME  // stdout/stderr from the running container
+  SYSTEM   // Kubernetes/Infrastructure events
+}
+
+model LogEntry {
+  id           String      @id @default(uuid())
+  
+  deploymentId String
+  deployment   Deployment  @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+
+  source       LogSource
+  timestamp    DateTime    @default(now())
+  message      String      @db.Text
+
+  @@index([deploymentId, source, timestamp])
 }

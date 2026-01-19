@@ -1,4 +1,4 @@
-import { Deployment, DeploymentStatus, EnvironmentType, EnvVar } from "@/types/project";
+import { Deployment, EnvironmentType, EnvVar } from "@/types/project";
 import { create } from "zustand";
 
 export interface AnalyticsData {
@@ -15,7 +15,6 @@ export interface Log {
 }
 
 interface MockStore {
-  deployments: Deployment[];
   analytics: AnalyticsData[];
   envVars: EnvVar[];
   selectedProjectId: string | null;
@@ -30,59 +29,6 @@ interface MockStore {
   getDeploymentsByProject: (projectId: string) => Deployment[];
   getLogsByProject: (projectId: string) => Log[];
 }
-
-export const mockDeployments: Deployment[] = [
-  {
-    id: "dep_1",
-    projectId: "proj_1",
-    status: DeploymentStatus.DEPLOYING,
-    environment: EnvironmentType.PRODUCTION,
-
-    machineCpu: 2,
-    machineRam: 4096,
-    machineStorage: 20,
-    machineOS: "ubuntu-22.04",
-
-    buildLogs: "Installing deps...\nBuilding app...\nDeployment successful.",
-    deploymentRegion: "us-east-1",
-
-    startedAt: "2025-01-05T10:14:22.000Z",
-    finishedAt: "2025-01-05T10:16:40.000Z",
-    duration: 138,
-
-    branch: "main",
-    commitHash: "a91df34c82f91a7fa921",
-    commitMessage: "feat: add auth flow",
-    commitAuthor: "Lakshman Siva",
-
-    deploymentUrl: "nextpath.code2cloud.dev",
-  },
-  {
-    id: "dep_2",
-    projectId: "proj_12",
-    status: DeploymentStatus.FAILED,
-    environment: EnvironmentType.PREVIEW,
-
-    machineCpu: 1,
-    machineRam: 2048,
-    machineStorage: 10,
-    machineOS: "ubuntu-22.04",
-
-    buildLogs: "npm run build\nError: Cannot find module 'next'",
-    deploymentRegion: "us-west-2",
-
-    startedAt: "2025-01-08T18:04:11.000Z",
-    finishedAt: "2025-01-08T18:05:03.000Z",
-    duration: 52,
-
-    branch: "feature/navbar",
-    commitHash: "9fd23ab7812cbb01",
-    commitMessage: "wip: navbar animation",
-    commitAuthor: "Lakshman Siva",
-
-    deploymentUrl: "feature-navbar-nextpath.code2cloud.dev",
-  },
-];
 
 const generateAnalytics = (): AnalyticsData[] => {
   const data: AnalyticsData[] = [];
@@ -124,8 +70,7 @@ const mockEnvVars: EnvVar[] = [
 ];
 
 
-export const useMockStore = create<MockStore>((set, get) => ({
-  deployments: mockDeployments,
+export const useMockStore = create<MockStore>((set) => ({
   analytics: generateAnalytics(),
   envVars: mockEnvVars,
   selectedProjectId: null,
@@ -140,8 +85,8 @@ export const useMockStore = create<MockStore>((set, get) => ({
     set((state) => ({ commandPaletteOpen: !state.commandPaletteOpen })),
   setLoading: (loading) => set({ loading }),
 
-  getDeploymentsByProject: (projectId) =>
-    get().deployments.filter((d) => d.projectId === projectId),
+  getDeploymentsByProject: () =>
+    [],
   getLogsByProject: () => {
     return [];
   },

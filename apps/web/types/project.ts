@@ -22,6 +22,12 @@ export enum EnvironmentType {
   PREVIEW = 'PREVIEW',
 }
 
+export enum LogSource {
+  BUILD = 'BUILD',
+  RUNTIME = 'RUNTIME',
+  SYSTEM = 'SYSTEM',
+}
+
 export interface EnvVar {
   id: string;
   key: string;
@@ -41,6 +47,14 @@ export interface Domain {
   }[];
 }
 
+export interface LogEntry {
+  id: string;
+  deploymentId: string;
+  source: LogSource;
+  timestamp: string;
+  message: string;
+}
+
 export interface Deployment {
   id: string;
   projectId: string;
@@ -52,7 +66,7 @@ export interface Deployment {
   machineStorage: number;
   machineOS: string;
 
-  buildLogs?: string;
+  logs?: LogEntry[];
   deploymentRegion: string;
 
   startedAt: string;

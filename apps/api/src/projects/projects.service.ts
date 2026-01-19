@@ -52,6 +52,8 @@ export class ProjectsService {
 
     // 2. Transaction: DB Writes + Queue Trigger
     const result = await this.prisma.$transaction(async (tx) => {
+      const systemConfig = await tx.systemConfig.findUnique({ where: { userId } });
+
       // A. Create Project
       const project = await tx.project.create({
         data: {
@@ -98,6 +100,7 @@ export class ProjectsService {
           commitHash: commitData.sha, 
           commitMessage: commitData.message,
           commitAuthor: commitData.author,
+          deploymentRegion: systemConfig?.defaultRegion || 'us-east-1',
         },
       });
 
