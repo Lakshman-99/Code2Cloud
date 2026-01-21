@@ -124,9 +124,131 @@
       shell: kubectl apply -f /tmp/registry.yaml
       environment:
         KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+    
+    - name: Wait for Registry to be Ready
+      shell: kubectl rollout status deployment/registry -n kube-system --timeout=90s
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
 
     # -------------------------------------------------------
-    # 6. LOCAL CONFIG (The Remote Control)
+    # 6. BOOTSTRAP: BUILD THE WORKER IMAGE
+    # -------------------------------------------------------
+    - name: Create ConfigMap for Builder Dockerfile
+      copy:
+        dest: /tmp/builder-dockerfile.yaml
+        content: |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: builder-dockerfile
+            namespace: default
+          data:
+            Dockerfile: |
+              FROM ubuntu:24.04
+              RUN apt-get update && apt-get install -y git openssh-client curl ca-certificates && rm -rf /var/lib/apt/lists/*
+              RUN curl -fsSL https://railpack.com/install.sh | sh
+              ENV BUILDKIT_VERSION=0.26.3
+              RUN curl -fsSL "https://github.com/moby/buildkit/releases/download/v${BUILDKIT_VERSION}/buildkit-v${BUILDKIT_VERSION}.linux-amd64.tar.gz" | tar -xz -C /usr/local/bin/ --strip-components=1 bin/buildctl
+              WORKDIR /workspace
+              CMD ["/bin/bash"]
+
+    - name: Apply Builder Dockerfile ConfigMap
+      shell: kubectl apply -f /tmp/builder-dockerfile.yaml
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    - name: Create Kaniko Build Job
+      copy:
+        dest: /tmp/kaniko-builder.yaml
+        content: |
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: build-builder-image
+            namespace: default
+          spec:
+            ttlSecondsAfterFinished: 600
+            template:
+              spec:
+                containers:
+                - name: kaniko
+                  image: gcr.io/kaniko-project/executor:v1.24.0 
+                  args:
+                  - "--dockerfile=/tmp/dockerfile/Dockerfile"
+                  - "--destination=registry.kube-system.svc.cluster.local:5000/builder:latest"
+                  - "--context=dir:///workspace/"
+                  - "--insecure"
+                  volumeMounts:
+                  - name: dockerfile
+                    mountPath: /tmp/dockerfile
+                restartPolicy: Never
+                volumes:
+                - name: dockerfile
+                  configMap:
+                    name: builder-dockerfile
+                    items:
+                      - key: Dockerfile
+                        path: Dockerfile
+
+    - name: Run Kaniko Build Job
+      shell: kubectl delete job build-builder-image --ignore-not-found=true && kubectl apply -f /tmp/kaniko-builder.yaml
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    - name: Wait for Builder Image to be Ready
+      shell: kubectl wait --for=condition=complete job/build-builder-image --timeout=300s
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    # -------------------------------------------------------
+    # 7. DEPLOY BUILDKIT DAEMON (The Daily Driver)
+    # -------------------------------------------------------
+    - name: Create BuildKit Daemon Manifest
+      copy:
+        dest: /tmp/buildkitd.yaml
+        content: |
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: buildkitd
+            namespace: default
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: buildkitd
+            template:
+              metadata:
+                labels:
+                  app: buildkitd
+              spec:
+                containers:
+                - name: buildkitd
+                  image: moby/buildkit:v0.26.3
+                  args: ["--addr", "tcp://0.0.0.0:1234"]
+                  ports: [{containerPort: 1234}]
+                  securityContext:
+                    privileged: true
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: buildkitd
+            namespace: default
+          spec:
+            selector:
+              app: buildkitd
+            ports:
+              - port: 1234
+                targetPort: 1234
+
+    - name: Apply BuildKit Daemon
+      shell: kubectl apply -f /tmp/buildkitd.yaml
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    # -------------------------------------------------------
+    # 8. LOCAL CONFIG (The Remote Control)
     # -------------------------------------------------------
     - name: Remove stale Kubeconfig on Local Machine
       delegate_to: localhost
