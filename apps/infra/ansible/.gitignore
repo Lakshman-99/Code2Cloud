@@ -1,0 +1,11 @@
+# Ansible
+kubeconfig
+inventory.ini
+*.retry
+cmd.txt
+
+# Secrets
+.env
+*.pem
+*.key
+id_ed25519

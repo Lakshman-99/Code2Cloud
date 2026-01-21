@@ -1,0 +1,164 @@
+---
+- name: Code2Cloud Infrastructure Setup
+  hosts: all
+  become: True
+  vars:
+    # 1. Inject the Public IP into the Cert (TLS SAN) so kubectl works remotely
+    # 2. Disable default Traefik so we can install v3 manually
+    k3s_install_cmd: "curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig-mode 644 --disable traefik --tls-san {{ ansible_host }}"
+
+  tasks:
+    # -------------------------------------------------------
+    # 1. SECURITY & FIREWALL (The "Wall Breaker")
+    # -------------------------------------------------------
+    - name: Install iptables-persistent
+      apt:
+        name: iptables-persistent
+        state: present
+        update_cache: yes
+
+    - name: Flush existing firewall rules (Oracle defaults block K8s)
+      shell: |
+        iptables -F
+        iptables -X
+        iptables -t nat -F
+        iptables -t nat -X
+        iptables -P INPUT ACCEPT
+        iptables -P FORWARD ACCEPT
+        iptables -P OUTPUT ACCEPT
+        netfilter-persistent save
+
+    # -------------------------------------------------------
+    # 2. HOUSEKEEPING
+    # -------------------------------------------------------
+    - name: Upgrade all packages
+      apt:
+        upgrade: dist
+        autoremove: yes
+
+    # -------------------------------------------------------
+    # 3. INSTALL K3S (The Engine)
+    # -------------------------------------------------------
+    - name: Check if K3s is installed
+      stat:
+        path: /usr/local/bin/k3s
+      register: k3s_bin
+
+    - name: Install K3s (With TLS SAN & No Traefik)
+      shell: "{{ k3s_install_cmd }}"
+      when: not k3s_bin.stat.exists
+
+    - name: Wait for K3s API to be ready
+      wait_for:
+        port: 6443
+        delay: 5
+        timeout: 300
+
+    # -------------------------------------------------------
+    # 4. INSTALL HELM & TRAEFIK (The Router)
+    # -------------------------------------------------------
+    - name: Install Helm
+      shell: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Add Traefik Helm Repo
+      shell: |
+        helm repo add traefik https://traefik.github.io/charts
+        helm repo update
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    - name: Install Traefik v3
+      shell: |
+        helm upgrade --install traefik traefik/traefik \
+          --namespace kube-system \
+          --set service.type=LoadBalancer \
+          --set ports.web.port=80 \
+          --set ports.websecure.port=443
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    # -------------------------------------------------------
+    # 5. INSTALL REGISTRY (The Storage)
+    # -------------------------------------------------------
+    - name: Create Registry Manifest
+      copy:
+        dest: /tmp/registry.yaml
+        content: |
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: registry
+            namespace: kube-system
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: registry
+            template:
+              metadata:
+                labels:
+                  app: registry
+              spec:
+                containers:
+                - name: registry
+                  image: registry:2
+                  ports:
+                  - containerPort: 5000
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: registry
+            namespace: kube-system
+          spec:
+            selector:
+              app: registry
+            ports:
+              - protocol: TCP
+                port: 5000
+                targetPort: 5000
+
+    - name: Apply Registry Manifest
+      shell: kubectl apply -f /tmp/registry.yaml
+      environment:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+    # -------------------------------------------------------
+    # 6. LOCAL CONFIG (The Remote Control)
+    # -------------------------------------------------------
+    - name: Remove stale Kubeconfig on Local Machine
+      delegate_to: localhost
+      become: False
+      file:
+        path: "{{ lookup('env','HOME') }}/kubeconfig"
+        state: absent
+
+    - name: Fetch fresh Kubeconfig to WSL Home (~/)
+      fetch:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: "{{ lookup('env','HOME') }}/kubeconfig"
+        flat: yes
+      become: True
+
+    - name: Update Kubeconfig with Public IP (Robust Regex)
+      delegate_to: localhost
+      become: False
+      replace:
+        path: "{{ lookup('env','HOME') }}/kubeconfig"
+        regexp: 'server: https://.*:6443'
+        replace: 'server: https://{{ ansible_host }}:6443'
+
+    - name: Copy kubeconfig to Windows home for Powershell using shell
+      delegate_to: localhost
+      become: False
+      shell: cp "{{ lookup('env','HOME') }}/kubeconfig" "/mnt/c/Users/Lakshman/.kube/config"
+
+    - name: Setup instructions
+      debug:
+        msg: >
+          Setup Complete!
+          Run this in WSL:
+          mkdir -p ~/.kube && cp ~/kubeconfig ~/.kube/config
+          Then test with: kubectl get nodes
