@@ -4,7 +4,9 @@ export const BUILD_QUEUE_NAME = 'build-queue';
 export interface BuildJobData {
   deploymentId: string;
   projectId: string;
+  projectName: string;
   gitUrl: string;
+  installationId: number;
   branch: string;
   commitHash: string;
   // Build Config
@@ -13,6 +15,10 @@ export interface BuildJobData {
     buildCommand?: string;
     outputDir?: string;
     framework: string;
+  };
+  machineConfig: {
+    cpu: number;
+    memory: number;
   };
   // Environment Variables (Already encrypted!)
   envVars: Record<string, string>;

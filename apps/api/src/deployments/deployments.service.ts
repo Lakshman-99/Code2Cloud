@@ -106,8 +106,10 @@ export class DeploymentsService {
     await this.queueService.addBuildJob({
       deploymentId: deployment.id,
       projectId: project.id,
+      projectName: project.name,
       // Construct the secure clone URL (or pass token separately)
       gitUrl: `https://github.com/${project.gitRepoOwner}/${project.gitRepoName}.git`,
+      installationId: Number(matchingAccount.installationId),
       branch: project.gitBranch,
       commitHash: commitData.sha,
       buildConfig: {
@@ -115,6 +117,10 @@ export class DeploymentsService {
         installCommand: project.installCommand || undefined,
         buildCommand: project.buildCommand || undefined,
         outputDir: project.outputDirectory || undefined,
+      },
+      machineConfig: {
+        cpu: 0.25,
+        memory: 512,
       },
       envVars // Sending decrypted vars to the worker
     });
