@@ -116,7 +116,9 @@ export class ProjectsService {
       await this.queuesService.addBuildJob({
         deploymentId: deployment.id,
         projectId: project.id,
+        projectName: project.name,
         gitUrl: dto.gitCloneUrl,
+        installationId: Number(matchingAccount.installationId),
         branch: project.gitBranch,
         commitHash: commitData.sha,
         buildConfig: {
@@ -124,6 +126,10 @@ export class ProjectsService {
           installCommand: project.installCommand || undefined,
           buildCommand: project.buildCommand || undefined,
           outputDir: project.outputDirectory || undefined,
+        },
+        machineConfig: {
+          cpu: 0.25,
+          memory: 512,
         },
         // Decrypt env vars for the builder (it needs raw values)
         envVars: dto.envVars?.reduce((acc, curr) => ({

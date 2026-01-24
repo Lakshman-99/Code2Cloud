@@ -1,135 +1,302 @@
-# Turborepo starter
+# Code2Cloud
 
-This Turborepo starter is maintained by the Turborepo core team.
+A comprehensive cloud deployment management platform that streamlines the process of deploying applications, managing infrastructure, and orchestrating cloud environments with an integrated Git workflow.
 
-## Using this example
+## 🎯 What is Code2Cloud?
 
-Run the following command:
+Code2Cloud is an enterprise-grade deployment and cloud management platform designed to simplify the entire lifecycle of application deployment. It bridges the gap between development (Git repositories) and cloud infrastructure by providing a unified interface to:
 
-```sh
-npx create-turbo@latest
-```
+- **Deploy applications** to cloud environments with one click
+- **Manage multiple projects** and their configurations
+- **Configure custom domains** and environment variables
+- **Track deployment history** and rollback when needed
+- **Integrate with Git repositories** for automated deployments
+- **Scale infrastructure** across multiple environments
 
-## What's inside?
+## ✨ What Makes This Project Special
 
-This Turborepo includes the following packages/apps:
+This is a **full-stack, production-ready platform** built with modern technologies:
 
-### Apps and Packages
+- **Monorepo Architecture**: Leverages Turbo for optimized builds and shared configurations across multiple applications
+- **Polyglot Stack**: Combines TypeScript (frontend/backend), Go (infrastructure workers), and Infrastructure-as-Code (Terraform/Ansible) for comprehensive cloud management
+- **Scalable Design**: Separate worker services for handling long-running deployment tasks asynchronously
+- **Infrastructure Automation**: Includes complete infrastructure provisioning with Terraform and Ansible playbooks
+- **API-First Architecture**: RESTful NestJS backend with proper separation of concerns
+- **Modern UI**: Next.js frontend with React components and Tailwind CSS styling
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+## 🛠️ Tech Stack
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+### Backend
 
-### Utilities
+- **Framework**: [NestJS](https://nestjs.com/) - Progressive Node.js framework for building efficient, reliable, and scalable server-side applications
+- **Language**: TypeScript
+- **ORM**: [Prisma](https://www.prisma.io/) - Next-generation ORM for Node.js and TypeScript
+- **Database**: Prisma-compatible (PostgreSQL recommended)
+- **Queue Management**: Built-in queue system for async task processing
 
-This Turborepo has some additional tools already setup for you:
+### Frontend
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+- **Framework**: [Next.js](https://nextjs.org/) - React framework for production
+- **Language**: TypeScript
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
+- **UI Components**: Custom component library (shared across apps)
+- **State Management**: React Hooks with custom store implementations
 
-### Build
+### Infrastructure & Workers
 
-To build all apps and packages, run the following command:
+- **Worker Service**: [Go](https://golang.org/) - Lightweight service for handling background jobs and deployments
+- **Proxy Service**: Go-based proxy for request forwarding and load balancing
+- **Infrastructure as Code**:
+    - [Terraform](https://www.terraform.io/) - Manages cloud resources (compute, networking, security)
+    - [Ansible](https://www.ansible.com/) - Configuration management and automation
 
-```
-cd my-turborepo
+### Monorepo & Build Tools
 
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
+- **Monorepo Manager**: [Turbo](https://turbo.build/) - High-performance build system for JavaScript/TypeScript monorepos
+- **Package Manager**: npm 11.1.0+
+- **Node Version**: 18+
+- **Linting**: ESLint
+- **Formatting**: Prettier
+- **Type Checking**: TypeScript
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
-```
-
-You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
-
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
+## 📁 Folder Structure
 
 ```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
+Code2Cloud/
+├── apps/                          # Main applications
+│   ├── api/                       # NestJS backend API
+│   │   ├── src/
+│   │   │   ├── auth/             # Authentication & authorization
+│   │   │   ├── git/              # Git repository integration
+│   │   │   ├── projects/         # Project management
+│   │   │   ├── deployments/      # Deployment logic & tracking
+│   │   │   ├── domains/          # Custom domain management
+│   │   │   ├── envs/             # Environment variables
+│   │   │   ├── queues/           # Task queue management
+│   │   │   ├── settings/         # User/system settings
+│   │   │   └── common/           # Shared utilities
+│   │   ├── prisma/               # Database schema & migrations
+│   │   └── generated/prisma/     # Auto-generated Prisma client
+│   │
+│   ├── web/                       # Next.js frontend application
+│   │   ├── app/                  # Next.js app directory
+│   │   │   ├── auth/             # Authentication pages
+│   │   │   └── dashboard/        # Main dashboard
+│   │   ├── components/           # Reusable React components
+│   │   ├── hooks/                # Custom React hooks
+│   │   ├── lib/                  # Utility functions & API client
+│   │   ├── types/                # TypeScript type definitions
+│   │   └── stores/               # State management
+│   │
+│   ├── worker/                    # Go background worker service
+│   │   ├── cmd/                  # Worker entry point
+│   │   └── internal/
+│   │       ├── config/           # Configuration management
+│   │       ├── db/               # Database operations
+│   │       ├── k8s/              # Kubernetes integration
+│   │       ├── queue/            # Job queue processing
+│   │       ├── types/            # Type definitions
+│   │       └── worker/           # Core worker logic
+│   │
+│   ├── proxy/                     # Go proxy service
+│   │   └── main.go
+│   │
+│   └── infra/                     # Infrastructure configuration
+│       ├── terraform/            # Cloud resources (AWS/GCP/Azure)
+│       │   ├── compute.tf        # VM/compute instances
+│       │   ├── network.tf        # VPC/networking
+│       │   ├── security.tf       # Security groups & IAM
+│       │   ├── budget.tf         # Cost management
+│       │   └── ...
+│       └── ansible/              # Configuration management
+│           ├── playbook.yml      # Automation playbooks
+│           └── inventory.ini     # Host inventory
+│
+├── packages/                       # Shared packages (monorepo)
+│   ├── eslint-config/            # Shared ESLint configuration
+│   ├── typescript-config/        # Shared TypeScript configurations
+│   └── ui/                        # Shared UI component library
+│
+├── turbo.json                     # Turbo build configuration
+├── package.json                   # Root package configuration
+└── tsconfig.json                  # Root TypeScript configuration
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+## 🚀 What This Project Does
+
+### Core Features
+
+1. **Project Management**
+    - Create and manage multiple cloud projects
+    - Organize deployments by project
+    - Configure project-specific settings
+
+2. **Git Integration**
+    - Connect to Git repositories (GitHub, GitLab, etc.)
+    - Automatic deployment triggers on commits
+    - Webhook support for real-time updates
+
+3. **Deployment Management**
+    - One-click deployments to cloud environments
+    - Track deployment history
+    - Rollback to previous versions
+    - Multi-environment support (dev, staging, production)
+
+4. **Domain Management**
+    - Configure custom domains
+    - SSL/TLS certificate management
+    - DNS configuration
+
+5. **Environment Configuration**
+    - Manage environment variables
+    - Secret management per environment
+    - Configuration templating
+
+6. **Infrastructure Automation**
+    - Automated cloud resource provisioning with Terraform
+    - Infrastructure configuration with Ansible
+    - Multi-cloud support
+
+7. **Background Job Processing**
+    - Asynchronous deployment tasks
+    - Queue-based job processing
+    - Worker service for handling long-running operations
+
+8. **User Authentication & Settings**
+    - Secure user authentication
+    - User preferences and settings
+    - Role-based access control (implied)
+
+## 🏗️ Architecture Overview
 
 ```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+┌─────────────────────────────────────────────────────────────────┐
+│                     Code2Cloud Platform                         │
+└─────────────────────────────────────────────────────────────────┘
+         │                    │                   │
+    ┌────▼─────┐      ┌──────▼──────┐      ┌─────▼────────┐
+    │  Web UI   │      │   API       │      │   Worker     │
+    │ (Next.js) │◄────►│  (NestJS)   │◄────►│     (Go)     │
+    └──────────┘      └──────┬──────┘      └──────────────┘
+                             │
+                    ┌────────▼────────┐
+                    │   Database      │
+                    │  (via Prisma)   │
+                    └─────────────────┘
+                             │
+    ┌────────────────────────┼────────────────────────┐
+    │                        │                        │
+┌───▼───────┐         ┌─────▼──────┐         ┌──────▼──────┐
+│ Git Repos │         │  Cloud Env │         │  External   │
+│ (GitHub)  │         │ (Terraform)│         │  Services   │
+└───────────┘         └────────────┘         └─────────────┘
 ```
 
-### Remote Caching
+## 🎯 Getting Started
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+### Prerequisites
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+- Node.js 18 or higher
+- npm 11.1.0+
+- Docker (recommended for local development)
+- Go 1.19+ (for worker service)
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
+### Installation
 
-```
-cd my-turborepo
+```bash
+# Install dependencies
+npm install
 
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
+# Configure environment variables
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env
+cp apps/worker/.env.example apps/worker/.env
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
-```
+# Run database migrations
+npm run db:migrate
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
+# Start development
+npm run dev
 ```
 
-## Useful Links
+## 📚 Available Scripts
 
-Learn more about the power of Turborepo:
+```bash
+# Development
+npm run dev          # Start all apps in development mode
 
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
+# Production
+npm run build        # Build all apps
+npm run start        # Start production builds
+
+# Code Quality
+npm run lint         # Run linting across all apps
+npm run format       # Format code with Prettier
+npm run check-types  # Run TypeScript type checking
+```
+
+## 🔧 Development
+
+### Running Individual Apps
+
+```bash
+# Backend API only
+cd apps/api && npm run dev
+
+# Frontend only
+cd apps/web && npm run dev
+
+# Worker service only
+cd apps/worker && go run cmd/main.go
+```
+
+### Database Migrations
+
+```bash
+# Generate migration
+cd apps/api && npx prisma migrate dev --name migration_name
+
+# Apply migrations
+npx prisma migrate deploy
+```
+
+## 📦 Project Dependencies
+
+- **NestJS**: ^9.0.0 - Progressive Node.js framework
+- **Prisma**: Latest - Database ORM
+- **Next.js**: ^14.0.0 - React framework
+- **React**: ^18.0.0 - UI library
+- **Tailwind CSS**: ^3.0.0 - CSS framework
+- **TypeScript**: 5.9.2 - Type safety
+- **Turbo**: ^2.6.1 - Monorepo build system
+
+## 🔒 Security Features
+
+- Authentication and authorization modules
+- Environment-specific configuration
+- Secure secret management
+- Infrastructure security through Terraform (security groups, IAM)
+
+## 🌐 Deployment
+
+The project includes complete infrastructure configuration:
+
+- **Terraform**: Automated cloud resource provisioning
+- **Ansible**: Server configuration and deployment automation
+- **Docker**: Containerized applications (implied by infrastructure setup)
+
+## 📝 License
+
+[Your License Here]
+
+## 👥 Contributing
+
+[Contributing Guidelines]
+
+## 📞 Support
+
+[Support Information]
+
+---
+
+**Code2Cloud**: Simplifying cloud deployment and infrastructure management for modern teams.
