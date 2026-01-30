@@ -1,0 +1,128 @@
+# =============================================================================
+# Worker Service (Go)
+# =============================================================================
+# The Go worker handles:
+#   - Processing deployment jobs from queue
+#   - Building container images via BuildKit
+#   - Pushing images to registry
+#   - Creating/updating K8s deployments
+#
+# Needs RBAC permissions to manage resources in 'deployments' namespace
+# =============================================================================
+
+---
+# ServiceAccount for worker
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: worker
+  namespace: code2cloud
+
+---
+# Role with permissions in 'deployments' namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: worker-role
+  namespace: deployments
+rules:
+  # Manage deployments
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+  # Manage services
+  - apiGroups: [""]
+    resources: ["services", "configmaps", "secrets"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+  # Manage ingresses
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+  # View pods and logs
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+
+---
+# Bind role to worker ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: worker-rolebinding
+  namespace: deployments
+subjects:
+  - kind: ServiceAccount
+    name: worker
+    namespace: code2cloud
+roleRef:
+  kind: Role
+  name: worker-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Worker ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: worker-config
+  namespace: code2cloud
+data:
+  # Redis for job queue
+  REDIS_ADDR: "redis.code2cloud.svc.cluster.local:6379"
+  # BuildKit address
+  BUILDKIT_ADDR: "tcp://buildkitd.default.svc.cluster.local:1234"
+  # Registry address
+  REGISTRY_URL: "registry.registry.svc.cluster.local:5000"
+  # Namespace for user deployments
+  DEPLOY_NAMESPACE: "deployments"
+  # Domain for user apps
+  DEPLOY_DOMAIN: "${DEPLOY_WILDCARD}.${DOMAIN}"
+  # Log level
+  LOG_LEVEL: "info"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: code2cloud
+  labels:
+    app: worker
+    app.kubernetes.io/name: worker
+    app.kubernetes.io/part-of: code2cloud
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      serviceAccountName: worker
+      containers:
+        - name: worker
+          # Update this to your built image
+          image: registry.registry.svc.cluster.local:5000/code2cloud-worker:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: worker-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          # No HTTP endpoints - just a queue processor
+          # Use exec probe if you add health endpoint
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "pgrep -f worker || exit 1"
+            initialDelaySeconds: 10
+            periodSeconds: 30

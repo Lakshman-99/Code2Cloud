@@ -1,0 +1,77 @@
+# =============================================================================
+# Traefik Helm Values
+# =============================================================================
+# Traefik is our ingress controller - it routes external traffic to services
+#
+# Key concepts:
+#   - EntryPoints: Ports Traefik listens on (web:80, websecure:443)
+#   - IngressRoute: Traefik CRD for routing (more powerful than Ingress)
+#   - Middleware: Request/response transformations
+# =============================================================================
+
+# Service configuration
+service:
+  type: LoadBalancer
+  # On Oracle Cloud, LoadBalancer gets the node's IP
+
+# Ports configuration
+ports:
+  # HTTP entrypoint
+  web:
+    port: 8000
+    exposedPort: 80
+    expose:
+      default: true
+    protocol: TCP
+  
+  # HTTPS entrypoint
+  websecure:
+    port: 8443
+    exposedPort: 443
+    expose:
+      default: true
+    protocol: TCP
+    tls:
+      enabled: true
+
+# Enable Kubernetes providers
+providers:
+  kubernetesIngress:
+    enabled: true
+    # Allow Ingress from all namespaces
+    allowEmptyServices: true
+  kubernetesCRD:
+    enabled: true
+    # Allow IngressRoute from all namespaces
+    allowCrossNamespace: true
+
+# Traefik dashboard (optional - access via port-forward)
+ingressRoute:
+  dashboard:
+    enabled: false  # Disable public dashboard for security
+
+# Resource limits (adjust based on traffic)
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+# Logging
+logs:
+  general:
+    level: INFO
+  access:
+    enabled: true
+    format: json
+
+# Additional arguments
+additionalArguments:
+  # Enable API for dashboard
+  - "--api.dashboard=true"
+  - "--api.insecure=false"
+  # Increase timeouts for long-running requests
+  - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=300s"
+  - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=300s"

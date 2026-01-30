@@ -1,0 +1,105 @@
+# =============================================================================
+# Private Container Registry
+# =============================================================================
+# In-cluster Docker registry for storing built images
+#
+# Usage from within cluster:
+#   registry.registry.svc.cluster.local:5000/myapp:latest
+#
+# The Go worker will push built images here, then K8s pulls from here
+# =============================================================================
+
+---
+# Persistent storage for registry data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: registry-pvc
+  namespace: registry
+  labels:
+    app: registry
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path  # K3s default storage class
+  resources:
+    requests:
+      storage: ${REGISTRY_STORAGE_SIZE}
+
+---
+# Registry Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registry
+  namespace: registry
+  labels:
+    app: registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: registry
+  template:
+    metadata:
+      labels:
+        app: registry
+    spec:
+      containers:
+        - name: registry
+          image: registry:2
+          ports:
+            - containerPort: 5000
+              name: http
+          env:
+            # Enable deletion of images (for cleanup)
+            - name: REGISTRY_STORAGE_DELETE_ENABLED
+              value: "true"
+            # Garbage collection settings
+            - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
+              value: /var/lib/registry
+          volumeMounts:
+            - name: registry-data
+              mountPath: /var/lib/registry
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          # Health checks
+          livenessProbe:
+            httpGet:
+              path: /v2/
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /v2/
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: registry-data
+          persistentVolumeClaim:
+            claimName: registry-pvc
+
+---
+# Registry Service (ClusterIP - internal only)
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry
+  namespace: registry
+  labels:
+    app: registry
+spec:
+  type: ClusterIP
+  selector:
+    app: registry
+  ports:
+    - port: 5000
+      targetPort: 5000
+      name: http

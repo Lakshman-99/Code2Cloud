@@ -1,102 +1,118 @@
----
 # =============================================================================
-# Code2Cloud Infrastructure Setup for Oracle Cloud ARM (A1.Flex)
+# Code2Cloud Infrastructure Setup
 # =============================================================================
-# Prerequisites:
-#   1. Oracle VCN Security List must have these INGRESS rules (do manually):
-#      - 6443/TCP (Kubernetes API)
-#      - 80/TCP   (HTTP)
-#      - 443/TCP  (HTTPS)
-#      Source: 0.0.0.0/0 (or your IP range for security)
+# This playbook handles:
+#   1. System preparation (firewall, packages)
+#   2. K3s installation
+#   3. Helm installation
+#   4. Applying Kubernetes manifests from k8s/ directory
 #
-#   2. Run with: ansible-playbook -i inventory.ini playbook.yml -e "ansible_host=YOUR_IP"
+# Prerequisites:
+#   - Oracle VCN Security List must allow: 22, 80, 443, 6443 TCP
+#   - DNS records pointing to VM IP
+#
+# Usage:
+#   ansible-playbook -i inventory.ini playbook.yml
+#   ansible-playbook -i inventory.ini playbook.yml --tags k8s  # Only K8s manifests
 # =============================================================================
 
+---
 - name: Code2Cloud Infrastructure Setup
-  hosts: all
+  hosts: k3s_server
   become: true
   gather_facts: true
 
   vars:
-    public_ip: "{{ ansible_host }}"
-    local_kubeconfig_path: "{{ lookup('env', 'HOME') }}/.kube/config"
-    buildkit_version: "0.21.0"
-    kaniko_version: "v1.23.2"
-    registry_storage_size: "20Gi"
+    kubeconfig_remote: /etc/rancher/k3s/k3s.yaml
+    kubeconfig_dir: "{{ lookup('env', 'HOME') }}/kubeconfig"
+    kubeconfig_local: "{{ lookup('env', 'HOME') }}/.kube/config"
+    k8s_manifests_dir: "../k8s"
 
   handlers:
     - name: Save iptables
-      command: netfilter-persistent save
+      ansible.builtin.command: netfilter-persistent save
+
+    - name: Restart k3s
+      ansible.builtin.systemd:
+        name: k3s
+        state: restarted
 
   tasks:
     # =========================================================================
-    # PHASE 1: SYSTEM INFO
+    # PHASE 1: SYSTEM INFO & VALIDATION
     # =========================================================================
-    
-    - name: Display target information
-      debug:
-        msg: |
-          Target Host: {{ inventory_hostname }}
-          Public IP for TLS-SAN: {{ public_ip }}
+    - name: Display deployment information
+      ansible.builtin.pause:
+        seconds: 1
+        prompt: |
+          ══════════════════════════════════════════════════════════════
+          Target: {{ inventory_hostname }} ({{ ansible_host }})
+          Domain: {{ domain }}
           Architecture: {{ ansible_architecture }}
-      tags: [info]
+          ══════════════════════════════════════════════════════════════
+      tags: [always]
 
     # =========================================================================
     # PHASE 2: FIREWALL CONFIGURATION
     # =========================================================================
-    
-    - name: Install firewall prerequisites
-      apt:
-        name:
-          - iptables
-          - iptables-persistent
-          - netfilter-persistent
+    - name: Install firewall packages
+      ansible.builtin.apt:
+        name: [iptables, iptables-persistent, netfilter-persistent]
         state: present
-        update_cache: yes
-      tags: [firewall]
+        update_cache: true
+      tags: [system, firewall]
 
-    - name: Flush iptables rules (Oracle defaults block K8s traffic)
-      iptables:
+    - name: Check if K3s is already running
+      ansible.builtin.stat:
+        path: /usr/local/bin/k3s
+      register: k3s_pre_firewall
+      tags: [system, firewall]
+
+    - name: Flush iptables (Oracle defaults block K8s)
+      ansible.builtin.iptables:
         chain: "{{ item.chain }}"
         table: "{{ item.table | default('filter') }}"
-        flush: yes
+        flush: true
       loop:
         - { chain: INPUT }
         - { chain: FORWARD }
         - { chain: OUTPUT }
-        - { chain: PREROUTING, table: nat }
-        - { chain: POSTROUTING, table: nat }
-        - { chain: OUTPUT, table: nat }
       notify: Save iptables
-      tags: [firewall]
+      tags: [system, firewall]
 
-    - name: Set default iptables policies to ACCEPT
-      iptables:
+    - name: Set iptables default policy to ACCEPT
+      ansible.builtin.iptables:
         chain: "{{ item }}"
         policy: ACCEPT
-      loop:
-        - INPUT
-        - FORWARD
-        - OUTPUT
+      loop: [INPUT, FORWARD, OUTPUT]
       notify: Save iptables
-      tags: [firewall]
+      tags: [system, firewall]
 
-    - name: Ensure iptables rules are saved
-      meta: flush_handlers
-      tags: [firewall]
+    - name: Flush handlers
+      ansible.builtin.meta: flush_handlers
+      tags: [system, firewall]
+    
+    - name: Restart K3s to rebuild iptables rules
+      ansible.builtin.systemd:
+        name: k3s
+        state: restarted
+      when: k3s_pre_firewall.stat.exists
+      tags: [system, firewall]
+
+    - name: Wait for K3s API after firewall changes
+      ansible.builtin.wait_for:
+        port: 6443
+        host: 127.0.0.1
+        delay: 5
+        timeout: 120
+      when: k3s_pre_firewall.stat.exists
+      tags: [system, firewall]
 
     # =========================================================================
     # PHASE 3: SYSTEM PACKAGES
     # =========================================================================
-    
-    - name: Update apt cache
-      apt:
-        update_cache: yes
-        cache_valid_time: 3600
-      tags: [system]
-
-    - name: Install required system packages
-      apt:
+    - name: Install required packages
+      ansible.builtin.apt:
         name:
           - curl
           - wget
@@ -106,676 +122,328 @@
           - gzip
           - open-iscsi
           - nfs-common
+          - jq
         state: present
+        update_cache: true
+        cache_valid_time: 3600
       tags: [system]
 
     # =========================================================================
     # PHASE 4: K3S INSTALLATION
     # =========================================================================
-    
-    - name: Check if K3s is already installed
-      stat:
+    - name: Check if K3s installed
+      ansible.builtin.stat:
         path: /usr/local/bin/k3s
       register: k3s_binary
       tags: [k3s]
 
-    - name: Install K3s with TLS-SAN and disabled Traefik
-      shell: |
-        curl -sfL https://get.k3s.io | sh -s - \
+    - name: Install K3s
+      ansible.builtin.shell: |
+        curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="{{ k3s_version }}" sh -s - \
           --write-kubeconfig-mode 644 \
           --disable traefik \
-          --tls-san {{ public_ip }}
+          --tls-san {{ ansible_host }} \
+          --tls-san {{ domain }} \
+          --tls-san api.{{ domain }}
       when: not k3s_binary.stat.exists
       tags: [k3s]
 
-    - name: Wait for K3s to be ready
-      wait_for:
+    - name: Wait for K3s API
+      ansible.builtin.wait_for:
         port: 6443
         host: 127.0.0.1
         delay: 5
         timeout: 300
       tags: [k3s]
 
-    - name: Wait for K3s node to be ready
-      shell: kubectl wait --for=condition=Ready node --all --timeout=300s
+    - name: Wait for node ready
+      ansible.builtin.shell: kubectl wait --for=condition=Ready node --all --timeout=300s
       environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+        KUBECONFIG: "{{ kubeconfig_remote }}"
       retries: 5
       delay: 10
       register: node_ready
       until: node_ready.rc == 0
-      tags: [k3s]
-
-    - name: Display K3s nodes
-      shell: kubectl get nodes -o wide
-      environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      register: k3s_nodes
       changed_when: false
-      tags: [k3s]
-
-    - name: Show K3s nodes
-      debug:
-        var: k3s_nodes.stdout_lines
       tags: [k3s]
 
     # =========================================================================
     # PHASE 5: HELM INSTALLATION
     # =========================================================================
-    
-    - name: Check if Helm is installed
-      stat:
+    - name: Check if Helm installed
+      ansible.builtin.stat:
         path: /usr/local/bin/helm
       register: helm_binary
       tags: [helm]
 
-    - name: Download Helm install script
-      get_url:
-        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-        dest: /tmp/get-helm-3.sh
-        mode: '0755'
-      when: not helm_binary.stat.exists
-      tags: [helm]
-
     - name: Install Helm
-      shell: /tmp/get-helm-3.sh
-      environment:
-        DESIRED_VERSION: ""
-        BINARY_NAME: "helm"
-        USE_SUDO: "false"
-        VERIFY_CHECKSUM: "false"
       when: not helm_binary.stat.exists
-      tags: [helm]
+      block:
+        - name: Download Helm installer
+          ansible.builtin.shell: |
+            curl -4 -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 -o /tmp/get-helm-3.sh
+            chmod 755 /tmp/get-helm-3.sh
+          args:
+            creates: /tmp/get-helm-3.sh
 
-    - name: Verify Helm installation
-      command: helm version --short
-      register: helm_version
-      changed_when: false
-      tags: [helm]
-
-    - name: Show Helm version
-      debug:
-        var: helm_version.stdout
+        - name: Run Helm installer
+          ansible.builtin.shell: /tmp/get-helm-3.sh
       tags: [helm]
 
     # =========================================================================
-    # PHASE 6: TRAEFIK INSTALLATION
+    # PHASE 6: APPLY KUBERNETES MANIFESTS
     # =========================================================================
-    
-    - name: Check if Traefik is already installed
-      shell: helm list -n kube-system -q | grep -q traefik
+    - name: Create temp directory for manifests
+      ansible.builtin.file:
+        path: /tmp/k8s-manifests
+        state: directory
+        mode: "0755"
+      tags: [k8s]
+
+    - name: Copy K8s manifests to remote
+      ansible.builtin.copy:
+        src: "{{ k8s_manifests_dir }}/"
+        dest: /tmp/k8s-manifests/
+        mode: "0644"
+      tags: [k8s]
+
+    - name: Process manifest templates
+      ansible.builtin.shell: |
+        find /tmp/k8s-manifests -name "*.yaml" -exec sed -i \
+          -e 's/\${DOMAIN}/{{ domain }}/g' \
+          -e 's/\${API_SUBDOMAIN}/{{ api_subdomain }}/g' \
+          -e 's/\${LETSENCRYPT_EMAIL}/{{ letsencrypt_email }}/g' \
+          -e 's/\${REGISTRY_STORAGE_SIZE}/{{ registry_storage_size }}/g' \
+          {} \;
+      tags: [k8s]
+
+    # Apply in order: namespaces → cert-manager → traefik → registry → apps
+    - name: Apply namespaces
+      ansible.builtin.shell: kubectl apply -f /tmp/k8s-manifests/00-namespaces/
       environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      register: traefik_installed
-      failed_when: false
-      changed_when: false
-      tags: [traefik]
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, namespaces]
 
-    - name: Add Traefik Helm repository
-      shell: |
+    - name: Add Jetstack Helm repo (cert-manager)
+      ansible.builtin.shell: |
+        helm repo add jetstack https://charts.jetstack.io 2>/dev/null || true
+        helm repo update
+      environment:
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, cert-manager]
+
+    - name: Install cert-manager via Helm
+      ansible.builtin.shell: |
+        helm upgrade --install cert-manager jetstack/cert-manager \
+          --namespace cert-manager \
+          --create-namespace \
+          --version {{ cert_manager_version }} \
+          --set installCRDs=true \
+          --set resources.requests.cpu=50m \
+          --set resources.requests.memory=128Mi \
+          --set webhook.resources.requests.cpu=50m \
+          --set webhook.resources.requests.memory=128Mi \
+          --set cainjector.resources.requests.cpu=50m \
+          --set cainjector.resources.requests.memory=128Mi \
+          --wait --timeout 10m
+      environment:
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, cert-manager]
+
+    - name: Wait for cert-manager webhook
+      ansible.builtin.shell: |
+        kubectl wait --for=condition=Available deployment/cert-manager-webhook \
+          -n cert-manager --timeout=120s
+      environment:
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, cert-manager]
+
+    - name: Apply ClusterIssuers
+      ansible.builtin.shell: kubectl apply -f /tmp/k8s-manifests/01-cert-manager/
+      environment:
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      retries: 3
+      delay: 10
+      register: issuer_result
+      until: issuer_result.rc == 0
+      tags: [k8s, cert-manager]
+
+    - name: Add Traefik Helm repo
+      ansible.builtin.shell: |
         helm repo add traefik https://traefik.github.io/charts 2>/dev/null || true
         helm repo update
       environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      when: traefik_installed.rc != 0
-      tags: [traefik]
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, traefik]
 
-    - name: Install Traefik v3 with correct port configuration
-      shell: |
+    - name: Install Traefik via Helm
+      ansible.builtin.shell: |
         helm upgrade --install traefik traefik/traefik \
-          --namespace kube-system \
+          --namespace traefik \
           --create-namespace \
-          --set service.type=LoadBalancer \
-          --set ports.web.exposedPort=80 \
-          --set ports.web.port=8000 \
-          --set ports.websecure.exposedPort=443 \
-          --set ports.websecure.port=8443 \
-          --set providers.kubernetesIngress.enabled=true \
-          --set providers.kubernetesCRD.enabled=true \
-          --wait \
-          --timeout 5m
+          --version {{ traefik_chart_version }} \
+          --values /tmp/k8s-manifests/02-traefik/values.yaml \
+          --wait --timeout 5m
       environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      tags: [traefik]
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, traefik]
 
-    - name: Display Traefik pods
-      shell: kubectl get pods -n kube-system -l app.kubernetes.io/name=traefik -o wide
+    - name: Apply Traefik middleware
+      ansible.builtin.shell: kubectl apply -f /tmp/k8s-manifests/02-traefik/middleware.yaml
       environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      register: traefik_pods
-      changed_when: false
-      tags: [traefik]
-
-    - name: Show Traefik pods
-      debug:
-        var: traefik_pods.stdout_lines
-      tags: [traefik]
-
-    - name: Display Traefik service
-      shell: kubectl get svc -n kube-system traefik -o wide
-      environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      register: traefik_svc
-      changed_when: false
-      tags: [traefik]
-
-    - name: Show Traefik service
-      debug:
-        var: traefik_svc.stdout_lines
-      tags: [traefik]
-
-    # =========================================================================
-    # PHASE 7: CONTAINER REGISTRY
-    # =========================================================================
-    
-    - name: Create Registry manifest
-      copy:
-        dest: /tmp/registry.yaml
-        content: |
-          ---
-          apiVersion: v1
-          kind: PersistentVolumeClaim
-          metadata:
-            name: registry-pvc
-            namespace: kube-system
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            storageClassName: local-path
-            resources:
-              requests:
-                storage: {{ registry_storage_size }}
-          ---
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: registry
-            namespace: kube-system
-            labels:
-              app: registry
-          spec:
-            replicas: 1
-            selector:
-              matchLabels:
-                app: registry
-            template:
-              metadata:
-                labels:
-                  app: registry
-              spec:
-                containers:
-                  - name: registry
-                    image: registry:2
-                    ports:
-                      - containerPort: 5000
-                    env:
-                      - name: REGISTRY_STORAGE_DELETE_ENABLED
-                        value: "true"
-                    volumeMounts:
-                      - name: registry-data
-                        mountPath: /var/lib/registry
-                    resources:
-                      requests:
-                        memory: "128Mi"
-                        cpu: "100m"
-                      limits:
-                        memory: "512Mi"
-                        cpu: "500m"
-                volumes:
-                  - name: registry-data
-                    persistentVolumeClaim:
-                      claimName: registry-pvc
-          ---
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: registry
-            namespace: kube-system
-            labels:
-              app: registry
-          spec:
-            type: ClusterIP
-            selector:
-              app: registry
-            ports:
-              - port: 5000
-                targetPort: 5000
-      tags: [registry]
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, traefik]
 
     - name: Apply Registry manifests
-      shell: kubectl apply -f /tmp/registry.yaml
+      ansible.builtin.shell: kubectl apply -f /tmp/k8s-manifests/03-registry/
       environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      tags: [registry]
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, registry]
 
-    - name: Wait for Registry to be ready
-      shell: kubectl rollout status deployment/registry -n kube-system --timeout=120s
+    - name: Wait for Registry
+      ansible.builtin.shell: |
+        kubectl rollout status deployment/registry -n registry --timeout=120s
       environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      tags: [registry]
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, registry]
 
-    # =========================================================================
-    # PHASE 7b: CONFIGURE K3S PRIVATE REGISTRY (CRITICAL!)
-    # =========================================================================
-    # Kubelet runs on the host and uses HOST DNS, not cluster DNS.
-    # Without this config, kubelet cannot resolve:
-    #   registry.kube-system.svc.cluster.local:5000
-    # This causes ImagePullBackOff errors when pulling from in-cluster registry.
-    # =========================================================================
-    
-    - name: Get Registry ClusterIP
-      shell: kubectl get svc registry -n kube-system -o jsonpath='{.spec.clusterIP}'
-      environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      register: registry_ip
-      tags: [registry]
+    - name: Configure K3s private registry
+      block:
+        - name: Get Registry ClusterIP
+          ansible.builtin.shell: |
+            kubectl get svc registry -n registry -o jsonpath='{.spec.clusterIP}'
+          environment:
+            KUBECONFIG: "{{ kubeconfig_remote }}"
+          register: registry_ip
 
-    - name: Display Registry ClusterIP
-      debug:
-        msg: "Registry ClusterIP: {{ registry_ip.stdout }}"
-      tags: [registry]
+        - name: Create registries.yaml
+          ansible.builtin.copy:
+            dest: /etc/rancher/k3s/registries.yaml
+            content: |
+              mirrors:
+                "registry.registry.svc.cluster.local:5000":
+                  endpoint:
+                    - "http://{{ registry_ip.stdout }}:5000"
+              configs:
+                "{{ registry_ip.stdout }}:5000":
+                  tls:
+                    insecure_skip_verify: true
+            mode: "0644"
+          notify: Restart k3s
+      tags: [k8s, registry]
 
-    - name: Create K3s registries.yaml for private registry
-      copy:
-        dest: /etc/rancher/k3s/registries.yaml
-        content: |
-          mirrors:
-            "registry.kube-system.svc.cluster.local:5000":
-              endpoint:
-                - "http://{{ registry_ip.stdout }}:5000"
-            "registry:5000":
-              endpoint:
-                - "http://{{ registry_ip.stdout }}:5000"
-          configs:
-            "registry.kube-system.svc.cluster.local:5000":
-              tls:
-                insecure_skip_verify: true
-            "{{ registry_ip.stdout }}:5000":
-              tls:
-                insecure_skip_verify: true
-        mode: '0644'
-      register: registries_config
-      tags: [registry]
+    - name: Flush handlers (restart K3s if needed)
+      ansible.builtin.meta: flush_handlers
+      tags: [k8s, registry]
 
-    - name: Verify registries.yaml was created
-      shell: cat /etc/rancher/k3s/registries.yaml
-      register: registries_content
-      changed_when: false
-      tags: [registry]
-
-    - name: Display registries.yaml content
-      debug:
-        var: registries_content.stdout_lines
-      tags: [registry]
-
-    - name: Restart K3s to apply registry configuration
-      systemd:
-        name: k3s
-        state: restarted
-      tags: [registry]
-
-    - name: Wait for K3s API after restart
-      wait_for:
+    - name: Wait for K3s after restart
+      ansible.builtin.wait_for:
         port: 6443
         host: 127.0.0.1
         delay: 5
         timeout: 120
-      tags: [registry]
+      tags: [k8s, registry]
 
-    - name: Wait for K3s node to be ready after restart
-      shell: kubectl wait --for=condition=Ready node --all --timeout=120s
+    - name: Apply BuildKit manifests
+      ansible.builtin.shell: kubectl apply -f /tmp/k8s-manifests/04-buildkit/
       environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      retries: 5
-      delay: 10
-      register: node_ready_restart
-      until: node_ready_restart.rc == 0
-      tags: [registry]
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, buildkit]
 
-    - name: Wait for kube-system pods after restart
-      shell: |
-        sleep 10
-        kubectl wait --for=condition=Ready pods --all -n kube-system --timeout=120s
+    - name: Apply Code2Cloud platform manifests
+      ansible.builtin.shell: kubectl apply -f /tmp/k8s-manifests/05-code2cloud/
       environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      retries: 3
-      delay: 10
-      register: pods_ready
-      until: pods_ready.rc == 0
-      tags: [registry]
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, code2cloud]
 
     # =========================================================================
-    # PHASE 8: BUILD WORKER IMAGE
+    # PHASE 7: FETCH KUBECONFIG
     # =========================================================================
-    
-    - name: Create Builder Dockerfile ConfigMap
-      copy:
-        dest: /tmp/builder-dockerfile-cm.yaml
-        content: |
-          apiVersion: v1
-          kind: ConfigMap
-          metadata:
-            name: builder-dockerfile
-            namespace: default
-          data:
-            Dockerfile: |
-              FROM ubuntu:24.04
-              
-              ENV DEBIAN_FRONTEND=noninteractive
-              
-              RUN apt-get update && apt-get install -y \
-                  git \
-                  openssh-client \
-                  curl \
-                  ca-certificates \
-                  jq \
-                  && rm -rf /var/lib/apt/lists/*
-              
-              RUN curl -fsSL https://railpack.com/install.sh | sh || true
-              
-              ENV BUILDKIT_VERSION={{ buildkit_version }}
-              RUN ARCH=$(uname -m) && \
-                  if [ "$ARCH" = "aarch64" ]; then ARCH="arm64"; fi && \
-                  if [ "$ARCH" = "x86_64" ]; then ARCH="amd64"; fi && \
-                  curl -fsSL "https://github.com/moby/buildkit/releases/download/v${BUILDKIT_VERSION}/buildkit-v${BUILDKIT_VERSION}.linux-${ARCH}.tar.gz" \
-                  | tar -xz -C /usr/local/bin --strip-components=1 bin/buildctl && \
-                  chmod +x /usr/local/bin/buildctl
-              
-              WORKDIR /workspace
-              CMD ["/bin/bash"]
-      tags: [builder]
-
-    - name: Apply Builder Dockerfile ConfigMap
-      shell: kubectl apply -f /tmp/builder-dockerfile-cm.yaml
-      environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      tags: [builder]
-
-    - name: Delete previous Kaniko build job
-      shell: kubectl delete job build-builder-image --ignore-not-found=true
-      environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      tags: [builder]
-
-    - name: Create Kaniko Build Job
-      copy:
-        dest: /tmp/kaniko-build-job.yaml
-        content: |
-          apiVersion: batch/v1
-          kind: Job
-          metadata:
-            name: build-builder-image
-            namespace: default
-          spec:
-            ttlSecondsAfterFinished: 600
-            backoffLimit: 2
-            template:
-              spec:
-                restartPolicy: Never
-                containers:
-                  - name: kaniko
-                    image: gcr.io/kaniko-project/executor:{{ kaniko_version }}
-                    args:
-                      - "--dockerfile=/dockerfile/Dockerfile"
-                      - "--context=dir:///workspace"
-                      - "--destination=registry.kube-system.svc.cluster.local:5000/builder:latest"
-                      - "--insecure"
-                      - "--cache=true"
-                      - "--cache-repo=registry.kube-system.svc.cluster.local:5000/cache"
-                      - "--verbosity=info"
-                    volumeMounts:
-                      - name: dockerfile
-                        mountPath: /dockerfile
-                      - name: workspace
-                        mountPath: /workspace
-                    resources:
-                      requests:
-                        memory: "512Mi"
-                        cpu: "500m"
-                      limits:
-                        memory: "2Gi"
-                        cpu: "2000m"
-                volumes:
-                  - name: dockerfile
-                    configMap:
-                      name: builder-dockerfile
-                      items:
-                        - key: Dockerfile
-                          path: Dockerfile
-                  - name: workspace
-                    emptyDir: {}
-      tags: [builder]
-
-    - name: Run Kaniko Build Job
-      shell: kubectl apply -f /tmp/kaniko-build-job.yaml
-      environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      tags: [builder]
-
-    - name: Wait for Builder image to be built
-      shell: kubectl wait --for=condition=complete job/build-builder-image --timeout=900s
-      environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      tags: [builder]
-
-    - name: Get Kaniko build logs
-      shell: kubectl logs job/build-builder-image --tail=20
-      environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      register: kaniko_logs
-      changed_when: false
-      tags: [builder]
-
-    - name: Display Kaniko build result
-      debug:
-        var: kaniko_logs.stdout_lines
-      tags: [builder]
-
-    - name: Verify Builder image works
-      shell: |
-        kubectl delete pod builder-verify --ignore-not-found --wait=false
-        kubectl run builder-verify --restart=Never \
-          --image=registry.kube-system.svc.cluster.local:5000/builder:latest \
-          --command -- /bin/bash -c "which buildctl && buildctl --version && echo 'Builder OK'"
-        # Wait for pod to be running or completed
-        for i in {1..30}; do
-          STATUS=$(kubectl get pod builder-verify -o jsonpath='{.status.phase}' 2>/dev/null)
-          if [ "$STATUS" = "Succeeded" ] || [ "$STATUS" = "Failed" ]; then
-            break
-          fi
-          sleep 2
-        done
-        kubectl logs builder-verify
-      environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      register: builder_verify
-      failed_when: false
-      tags: [builder]
-
-    - name: Display Builder verification
-      debug:
-        var: builder_verify.stdout_lines
-      tags: [builder]
-
-    - name: Cleanup builder verification pod
-      shell: kubectl delete pod builder-verify --ignore-not-found --wait=false
-      environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      changed_when: false
-      tags: [builder]
-
-    # =========================================================================
-    # PHASE 9: BUILDKIT DAEMON
-    # =========================================================================
-    
-    - name: Create BuildKit Daemon manifest
-      copy:
-        dest: /tmp/buildkitd.yaml
-        content: |
-          ---
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: buildkitd
-            namespace: default
-            labels:
-              app: buildkitd
-          spec:
-            replicas: 1
-            selector:
-              matchLabels:
-                app: buildkitd
-            template:
-              metadata:
-                labels:
-                  app: buildkitd
-              spec:
-                containers:
-                  - name: buildkitd
-                    image: moby/buildkit:v{{ buildkit_version }}
-                    args:
-                      - "--addr"
-                      - "tcp://0.0.0.0:1234"
-                    ports:
-                      - containerPort: 1234
-                    securityContext:
-                      privileged: true
-                    resources:
-                      requests:
-                        memory: "256Mi"
-                        cpu: "250m"
-                      limits:
-                        memory: "2Gi"
-                        cpu: "2000m"
-                    readinessProbe:
-                      tcpSocket:
-                        port: 1234
-                      initialDelaySeconds: 5
-                      periodSeconds: 10
-                    livenessProbe:
-                      tcpSocket:
-                        port: 1234
-                      initialDelaySeconds: 15
-                      periodSeconds: 20
-          ---
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: buildkitd
-            namespace: default
-          spec:
-            selector:
-              app: buildkitd
-            ports:
-              - port: 1234
-                targetPort: 1234
-      tags: [buildkit]
-
-    - name: Apply BuildKit Daemon
-      shell: kubectl apply -f /tmp/buildkitd.yaml
-      environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      tags: [buildkit]
-
-    - name: Wait for BuildKit daemon to be ready
-      shell: kubectl rollout status deployment/buildkitd --timeout=120s
-      environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      tags: [buildkit]
-
-    - name: Verify BuildKit is running
-      shell: kubectl get pods -l app=buildkitd -o wide
-      environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      register: buildkit_pods
-      changed_when: false
-      tags: [buildkit]
-
-    - name: Display BuildKit pods
-      debug:
-        var: buildkit_pods.stdout_lines
-      tags: [buildkit]
-
-    # =========================================================================
-    # PHASE 10: KUBECONFIG
-    # =========================================================================
-
     - name: Remove stale Kubeconfig on Local Machine
       delegate_to: localhost
       become: False
       file:
-        path: "{{ lookup('env','HOME') }}/kubeconfig"
+        path: "{{ kubeconfig_dir }}"
         state: absent
       tags: [kubeconfig]
 
-    - name: Fetch fresh Kubeconfig to WSL Home (~/)
-      fetch:
-        src: /etc/rancher/k3s/k3s.yaml
-        dest: "{{ lookup('env','HOME') }}/kubeconfig"
-        flat: yes
-      become: True
+    - name: Fetch kubeconfig
+      ansible.builtin.fetch:
+        src: "{{ kubeconfig_remote }}"
+        dest: "{{ kubeconfig_dir }}"
+        flat: true
+      become: true
       tags: [kubeconfig]
 
-    - name: Update Kubeconfig with Public IP
+    - name: Update kubeconfig server URL
       delegate_to: localhost
-      become: False
-      replace:
-        path: "{{ lookup('env','HOME') }}/kubeconfig"
+      become: false
+      ansible.builtin.replace:
+        path: "{{ kubeconfig_dir }}"
         regexp: 'server: https://.*:6443'
-        replace: 'server: https://{{ public_ip }}:6443'
+        replace: 'server: https://{{ ansible_host }}:6443'
       tags: [kubeconfig]
 
-    - name: Copy kubeconfig to Windows home for Powershell using shell
+    - name: Copy kubeconfig to Windows home for Powershell
       delegate_to: localhost
       become: False
-      shell: cp "{{ lookup('env','HOME') }}/kubeconfig" "/mnt/c/Users/Lakshman/.kube/config"
+      shell: cp "{{ kubeconfig_dir }}" "/mnt/c/Users/Lakshman/.kube/config"
       tags: [kubeconfig]
 
     # =========================================================================
-    # PHASE 11: FINAL STATUS
+    # PHASE 8: VERIFICATION
     # =========================================================================
-    
-    - name: Final cluster status
-      shell: |
-        echo "=== Nodes ==="
+    - name: Show cluster status
+      ansible.builtin.shell: |
+        echo "══════════════════════════════════════════════════════════════"
+        echo "NODES:"
         kubectl get nodes -o wide
         echo ""
-        echo "=== All Pods ==="
+        echo "NAMESPACES:"
+        kubectl get ns
+        echo ""
+        echo "ALL PODS:"
         kubectl get pods -A
         echo ""
-        echo "=== Services ==="
+        echo "SERVICES:"
         kubectl get svc -A
+        echo ""
+        echo "INGRESSES:"
+        kubectl get ingress -A
+        echo "══════════════════════════════════════════════════════════════"
       environment:
-        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      register: final_status
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      register: cluster_status
       changed_when: false
       tags: [verify]
 
-    - name: Display final status
-      debug:
-        var: final_status.stdout_lines
+    - name: Display status
+      ansible.builtin.debug:
+        var: cluster_status.stdout_lines
       tags: [verify]
 
     - name: Setup complete
-      debug:
-        msg: >
-          ═══════════════════════════════════════════════════════════════
-                    CODE2CLOUD INFRASTRUCTURE SETUP COMPLETE!
-          ═══════════════════════════════════════════════════════════════
+      ansible.builtin.pause:
+        seconds: 1
+        prompt: |
+          ══════════════════════════════════════════════════════════════
+                    CODE2CLOUD INFRASTRUCTURE READY!
+          ══════════════════════════════════════════════════════════════
           
-          Kubernetes API:  https://{{ public_ip }}:6443
-          Traefik HTTP:    http://{{ public_ip }}:80
-          Traefik HTTPS:   https://{{ public_ip }}:443
+          🌐 Endpoints:
+            Frontend:  https://{{ domain }}
+            API:       https://{{ api_subdomain }}.{{ domain }}
+            User Apps: https://*.{{ deploy_wildcard }}.{{ domain }}
           
-          Kubeconfig:      {{ local_kubeconfig_path }}
+          🔐 Kubernetes API: https://{{ ansible_host }}:6443
+          📁 Kubeconfig:     {{ kubeconfig_local }}
           
-          ═══════════════════════════════════════════════════════════════
-          IMPORTANT: Ensure Oracle VCN Security Lists allow:
-            - 6443/TCP  (Kubernetes API)
-            - 80/TCP    (HTTP)
-            - 443/TCP   (HTTPS)
-          ═══════════════════════════════════════════════════════════════
+          ══════════════════════════════════════════════════════════════
           
-          TEST: kubectl get nodes
-          ═══════════════════════════════════════════════════════════════
+          TEST COMMANDS:
+            export KUBECONFIG={{ kubeconfig_local }}
+            kubectl get nodes
+            kubectl get pods -n code2cloud
+          
+          ══════════════════════════════════════════════════════════════
       tags: [always]

@@ -1,0 +1,167 @@
+# =============================================================================
+# Backend API (NestJS)
+# =============================================================================
+# The NestJS backend handles:
+#   - Authentication
+#   - Project management
+#   - Deployment orchestration
+#   - Git integration
+#
+# Environment variables are configured via ConfigMap and Secrets
+# =============================================================================
+
+---
+# Non-sensitive configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: code2cloud
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  # Redis connection (internal DNS)
+  REDIS_HOST: "redis.code2cloud.svc.cluster.local"
+  REDIS_PORT: "6379"
+  # Registry URL for worker
+  REGISTRY_URL: "registry.registry.svc.cluster.local:5000"
+  # BuildKit URL for worker
+  BUILDKIT_ADDR: "tcp://buildkitd.default.svc.cluster.local:1234"
+  # Domain config
+  DOMAIN: "${DOMAIN}"
+  DEPLOY_DOMAIN: "${DEPLOY_WILDCARD}.${DOMAIN}"
+  NEXT_PUBLIC_APP_URL: "http://${DOMAIN}"
+  NEXT_PUBLIC_API_URL: "http://${API_SUBDOMAIN}.${DOMAIN}"
+
+---
+# Sensitive configuration from inventory.ini
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-secrets
+  namespace: code2cloud
+type: Opaque
+stringData:
+  # Database URL
+  DATABASE_URL: "${DATABASE_URL}"
+  DATABASE_DIRECT_URL: "${DATABASE_DIRECT_URL}"
+  # JWT Secrets
+  JWT_SECRET: "${JWT_SECRET}"
+  JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET}"
+  # Encryption
+  ENCRYPTION_KEY: "${ENCRYPTION_KEY}"
+  # Google OAuth
+  GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
+  GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
+  GOOGLE_CALLBACK_URL: "${GOOGLE_CALLBACK_URL}"
+  # GitHub App Configuration
+  GITHUB_APP_ID: "${GITHUB_APP_ID}"
+  GITHUB_APP_NAME: "${GITHUB_APP_NAME}"
+  GITHUB_PRIVATE_KEY: "${GITHUB_PRIVATE_KEY}"
+  # GitHub OAuth
+  GITHUB_CLIENT_ID: "${GITHUB_CLIENT_ID}"
+  GITHUB_CLIENT_SECRET: "${GITHUB_CLIENT_SECRET}"
+  GITHUB_CALLBACK_URL: "${GITHUB_CALLBACK_URL}"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: code2cloud
+  labels:
+    app: backend
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: code2cloud
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          # Update this to your built image
+          image: registry.registry.svc.cluster.local:5000/code2cloud-backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-secrets
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: code2cloud
+  labels:
+    app: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+    - port: 3000
+      targetPort: 3000
+      name: http
+
+---
+# Ingress for API (api.lakshman.me)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backend-ingress
+  namespace: code2cloud
+  annotations:
+    # Use Let's Encrypt for TLS
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Traefik specific
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - ${API_SUBDOMAIN}.${DOMAIN}
+      secretName: backend-tls
+  rules:
+    - host: ${API_SUBDOMAIN}.${DOMAIN}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 3000

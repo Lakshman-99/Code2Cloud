@@ -1,0 +1,125 @@
+# =============================================================================
+# User Deployment Template
+# =============================================================================
+# This is a TEMPLATE showing what the Go worker creates for each user app
+# The worker programmatically generates these resources in the 'deployments' ns
+#
+# For learning: This shows the structure of resources created dynamically
+# =============================================================================
+
+# Example: User deploys an app called "my-nextjs-app"
+# Generated resources:
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nextjs-app              # Dynamic: from project name
+  namespace: deployments
+  labels:
+    app: my-nextjs-app
+    code2cloud.io/project-id: "abc123"      # Track which project
+    code2cloud.io/deployment-id: "def456"   # Track which deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-nextjs-app
+  template:
+    metadata:
+      labels:
+        app: my-nextjs-app
+    spec:
+      containers:
+        - name: app
+          # Image built by worker and pushed to registry
+          image: registry.registry.svc.cluster.local:5000/abc123:def456
+          ports:
+            - containerPort: 3000   # Detected or configured port
+          env:
+            # Environment variables from user's .env configuration
+            - name: NODE_ENV
+              value: "production"
+            - name: DATABASE_URL
+              valueFrom:
+                secretRef:
+                  name: my-nextjs-app-secrets
+                  key: DATABASE_URL
+          resources:
+            # Constrained by LimitRange in namespace
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-nextjs-app
+  namespace: deployments
+spec:
+  type: ClusterIP
+  selector:
+    app: my-nextjs-app
+  ports:
+    - port: 80
+      targetPort: 3000
+
+---
+# User's secrets (from their env configuration)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-nextjs-app-secrets
+  namespace: deployments
+type: Opaque
+stringData:
+  DATABASE_URL: "user-provided-value"
+
+---
+# Ingress for user's app: my-nextjs-app.deploy.lakshman.me
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-nextjs-app
+  namespace: deployments
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - my-nextjs-app.deploy.lakshman.me
+      secretName: my-nextjs-app-tls
+  rules:
+    - host: my-nextjs-app.deploy.lakshman.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-nextjs-app
+                port:
+                  number: 80
+
+# =============================================================================
+# How the worker creates these:
+# =============================================================================
+# 1. User clicks "Deploy" in UI
+# 2. Backend creates deployment record & queues job
+# 3. Worker picks up job:
+#    a. Clone git repo
+#    b. Build image using BuildKit
+#    c. Push to registry
+#    d. Generate these manifests with user's config
+#    e. Apply to cluster: kubectl apply -f ...
+#    f. Update deployment status in DB
+# 4. cert-manager automatically provisions TLS cert
+# 5. User's app is live at https://my-nextjs-app.deploy.lakshman.me
+# =============================================================================

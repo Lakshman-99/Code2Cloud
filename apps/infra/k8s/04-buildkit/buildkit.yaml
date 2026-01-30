@@ -1,0 +1,111 @@
+# =============================================================================
+# BuildKit Daemon for Building Container Images
+# =============================================================================
+# BuildKit is a modern image builder (successor to docker build)
+#
+# Your Go worker connects to this daemon to build images:
+#   buildctl --addr tcp://buildkitd.default.svc.cluster.local:1234 build ...
+#
+# Benefits:
+#   - Parallel builds
+#   - Efficient caching
+#   - No Docker daemon required
+# =============================================================================
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: buildkitd
+  namespace: default
+  labels:
+    app: buildkitd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: buildkitd
+  template:
+    metadata:
+      labels:
+        app: buildkitd
+    spec:
+      containers:
+        - name: buildkitd
+          image: moby/buildkit:v0.21.0
+          args:
+            - "--addr"
+            - "tcp://0.0.0.0:1234"
+            # Allow insecure registries (our internal registry)
+            - "--allow-insecure-entitlement"
+            - "network.host"
+          ports:
+            - containerPort: 1234
+              name: buildkit
+          securityContext:
+            # Required for building images
+            privileged: true
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          # Configure BuildKit to use our registry
+          env:
+            - name: BUILDKIT_STEP_LOG_MAX_SIZE
+              value: "10485760"  # 10MB log size
+          volumeMounts:
+            - name: buildkit-config
+              mountPath: /etc/buildkit
+          readinessProbe:
+            tcpSocket:
+              port: 1234
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 1234
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - name: buildkit-config
+          configMap:
+            name: buildkit-config
+
+---
+# BuildKit configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: buildkit-config
+  namespace: default
+data:
+  buildkitd.toml: |
+    # BuildKit daemon configuration
+    [worker.oci]
+      max-parallelism = 2
+    
+    # Allow pushing to insecure registry
+    [registry."registry.registry.svc.cluster.local:5000"]
+      http = true
+      insecure = true
+
+---
+# BuildKit Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: buildkitd
+  namespace: default
+  labels:
+    app: buildkitd
+spec:
+  type: ClusterIP
+  selector:
+    app: buildkitd
+  ports:
+    - port: 1234
+      targetPort: 1234
+      name: buildkit

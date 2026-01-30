@@ -1,0 +1,84 @@
+# =============================================================================
+# Kubernetes Namespaces for Code2Cloud
+# =============================================================================
+# Namespace isolation strategy:
+#   - code2cloud:  Platform components (frontend, backend, redis)
+#   - deployments: User-deployed applications (isolated)
+#   - registry:    Container registry
+#   - traefik:     Ingress controller
+#   - cert-manager: TLS certificate management (created by Helm)
+# =============================================================================
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: code2cloud
+  labels:
+    app.kubernetes.io/name: code2cloud
+    app.kubernetes.io/part-of: code2cloud-platform
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: deployments
+  labels:
+    app.kubernetes.io/name: deployments
+    app.kubernetes.io/part-of: code2cloud-platform
+    # This label helps identify user workloads
+    code2cloud.io/type: user-deployments
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: registry
+  labels:
+    app.kubernetes.io/name: registry
+    app.kubernetes.io/part-of: code2cloud-platform
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: traefik
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/part-of: code2cloud-platform
+
+---
+# Resource Quota for deployments namespace (optional but recommended)
+# Prevents user apps from consuming all cluster resources
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: deployments-quota
+  namespace: deployments
+spec:
+  hard:
+    requests.cpu: "2"           # Total CPU requests allowed
+    requests.memory: 8Gi        # Total memory requests allowed
+    limits.cpu: "3"             # Total CPU limits allowed
+    limits.memory: 12Gi         # Total memory limits allowed
+    pods: "20"                  # Max pods in namespace
+    services: "10"              # Max services
+    persistentvolumeclaims: "5" # Max PVCs
+
+---
+# LimitRange for deployments namespace
+# Sets default resource limits for pods without explicit limits
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: deployments-limits
+  namespace: deployments
+spec:
+  limits:
+    - default:
+        cpu: "500m"
+        memory: "512Mi"
+      defaultRequest:
+        cpu: "100m"
+        memory: "128Mi"
+      type: Container
