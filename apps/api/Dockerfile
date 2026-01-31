@@ -1,7 +1,6 @@
 # =============================================================================
 # Code2Cloud API (NestJS) - Multi-stage Build
 # =============================================================================
-
 FROM node:22-alpine AS base
 RUN apk add --no-cache libc6-compat openssl
 RUN npm install -g turbo
@@ -25,7 +24,6 @@ RUN npm install --legacy-peer-deps
 
 # Generate Prisma client
 WORKDIR /app/apps/api
-ENV PRISMA_CLI_BINARY_TARGETS=linux-musl-arm64-openssl-3.0.x
 RUN npx prisma generate
 
 # Build using turbo from root
@@ -43,8 +41,9 @@ RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nestjs
 COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/apps/api/package*.json ./
 COPY --from=builder /app/apps/api/prisma ./prisma
-COPY --from=builder /app/apps/api/generated ./generated
+COPY --from=builder /app/apps/api/generated ./dist/generated
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 USER nestjs
 EXPOSE 3000
