@@ -1,6 +1,6 @@
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
-import cookieParser from 'cookie-parser';
+import cookieParser from "cookie-parser";
 import { AppModule } from "./app.module";
 import { urlConfig } from "lib/url-config";
 
@@ -9,7 +9,7 @@ async function bootstrap() {
 
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,        // strips unknown fields
+      whitelist: true, // strips unknown fields
       forbidNonWhitelisted: true,
       transform: true,
     }),
@@ -21,7 +21,7 @@ async function bootstrap() {
   });
 
   app.use(cookieParser());
-  
+
   await app.listen(3001);
 }
 
