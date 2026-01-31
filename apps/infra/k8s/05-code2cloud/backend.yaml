@@ -21,47 +21,20 @@ data:
   NODE_ENV: "production"
   PORT: "3000"
   # Redis connection (internal DNS)
-  REDIS_HOST: "redis.code2cloud.svc.cluster.local"
-  REDIS_PORT: "6379"
+  REDIS_URL: "redis://redis.code2cloud.svc.cluster.local:6379"
+
   # Registry URL for worker
   REGISTRY_URL: "registry.registry.svc.cluster.local:5000"
   # BuildKit URL for worker
   BUILDKIT_ADDR: "tcp://buildkitd.default.svc.cluster.local:1234"
-  # Domain config
+  # Domain config (replaced by Ansible)
   DOMAIN: "${DOMAIN}"
   DEPLOY_DOMAIN: "${DEPLOY_WILDCARD}.${DOMAIN}"
-  NEXT_PUBLIC_APP_URL: "http://${DOMAIN}"
-  NEXT_PUBLIC_API_URL: "http://${API_SUBDOMAIN}.${DOMAIN}"
+  NEXT_PUBLIC_APP_URL: "https://${DOMAIN}"
+  NEXT_PUBLIC_API_URL: "https://${API_SUBDOMAIN}.${DOMAIN}"
 
----
-# Sensitive configuration from inventory.ini
-apiVersion: v1
-kind: Secret
-metadata:
-  name: backend-secrets
-  namespace: code2cloud
-type: Opaque
-stringData:
-  # Database URL
-  DATABASE_URL: "${DATABASE_URL}"
-  DATABASE_DIRECT_URL: "${DATABASE_DIRECT_URL}"
-  # JWT Secrets
-  JWT_SECRET: "${JWT_SECRET}"
-  JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET}"
-  # Encryption
-  ENCRYPTION_KEY: "${ENCRYPTION_KEY}"
-  # Google OAuth
-  GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
-  GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
-  GOOGLE_CALLBACK_URL: "${GOOGLE_CALLBACK_URL}"
-  # GitHub App Configuration
-  GITHUB_APP_ID: "${GITHUB_APP_ID}"
-  GITHUB_APP_NAME: "${GITHUB_APP_NAME}"
-  GITHUB_PRIVATE_KEY: "${GITHUB_PRIVATE_KEY}"
-  # GitHub OAuth
-  GITHUB_CLIENT_ID: "${GITHUB_CLIENT_ID}"
-  GITHUB_CLIENT_SECRET: "${GITHUB_CLIENT_SECRET}"
-  GITHUB_CALLBACK_URL: "${GITHUB_CALLBACK_URL}"
+# Note: backend-secrets.yaml is generated separately by Ansible template
+# to properly handle multiline GitHub private key
 
 ---
 apiVersion: apps/v1
@@ -85,7 +58,6 @@ spec:
     spec:
       containers:
         - name: backend
-          # Update this to your built image
           image: registry.registry.svc.cluster.local:5000/code2cloud-backend:latest
           imagePullPolicy: Always
           ports:
@@ -105,18 +77,24 @@ spec:
               memory: "1Gi"
           livenessProbe:
             httpGet:
-              path: /health
+              path: /health/live
               port: 3000
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
           readinessProbe:
             httpGet:
-              path: /health
+              path: /health/ready
               port: 3000
             initialDelaySeconds: 10
             periodSeconds: 5
             timeoutSeconds: 3
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: 3000
+            failureThreshold: 30
+            periodSeconds: 5
 
 ---
 apiVersion: v1
@@ -136,16 +114,14 @@ spec:
       name: http
 
 ---
-# Ingress for API (api.lakshman.me)
+# Ingress for API
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: backend-ingress
   namespace: code2cloud
   annotations:
-    # Use Let's Encrypt for TLS
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    # Traefik specific
+    cert-manager.io/cluster-issuer: ${LETSENCRYPT_ISSUER}
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
 spec:

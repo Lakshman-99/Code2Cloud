@@ -1,0 +1,204 @@
+# =============================================================================
+# Code2Cloud Infrastructure Teardown
+# =============================================================================
+# This playbook handles cleanup:
+#   1. Delete Cloudflare DNS records
+#   2. Optionally uninstall K3s and clean up server
+#
+# Usage:
+#   ansible-playbook -i inventory.ini teardown.yml -e @secrets.yml           # DNS only
+#   ansible-playbook -i inventory.ini teardown.yml -e @secrets.yml --tags full
+#   ansible-playbook -i inventory.ini teardown.yml -e @secrets.yml --tags dns
+#   ansible-playbook -i inventory.ini teardown.yml -e @secrets.yml --tags k3s
+# =============================================================================
+
+---
+- name: Code2Cloud Infrastructure Teardown
+  hosts: k3s_server
+  become: true
+  gather_facts: true
+
+  vars:
+    kubeconfig_remote: /etc/rancher/k3s/k3s.yaml
+
+  vars_files:
+    - secrets.yml  # Load Cloudflare credentials
+
+  tasks:
+    # =========================================================================
+    # PHASE 1: CONFIRM TEARDOWN
+    # =========================================================================
+    - name: Confirm teardown
+      ansible.builtin.pause:
+        prompt: |
+          ══════════════════════════════════════════════════════════════
+          ⚠️  WARNING: INFRASTRUCTURE TEARDOWN
+          ══════════════════════════════════════════════════════════════
+          
+          This will DELETE:
+            - DNS records for {{ domain }}
+            - DNS records for {{ api_subdomain }}.{{ domain }}
+            - DNS records for *.{{ deploy_wildcard }}.{{ domain }}
+          
+          If running with --tags full, this will ALSO:
+            - Uninstall K3s
+            - Delete all Kubernetes data
+            - Remove all deployed applications
+          
+          Press ENTER to continue or Ctrl+C to abort
+          ══════════════════════════════════════════════════════════════
+      tags: [always]
+
+    # =========================================================================
+    # PHASE 2: DELETE CLOUDFLARE DNS RECORDS
+    # =========================================================================
+    - name: Delete Cloudflare DNS records
+      block:
+        - name: Get all DNS records for zone
+          ansible.builtin.uri:
+            url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare_zone_id }}/dns_records?per_page=100"
+            method: GET
+            headers:
+              Authorization: "Bearer {{ cloudflare_api_token }}"
+              Content-Type: "application/json"
+          register: dns_records
+          delegate_to: localhost
+          become: false
+
+        - name: Find and delete main domain record ({{ domain }})
+          ansible.builtin.uri:
+            url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare_zone_id }}/dns_records/{{ item.id }}"
+            method: DELETE
+            headers:
+              Authorization: "Bearer {{ cloudflare_api_token }}"
+            status_code: [200, 404]
+          loop: "{{ dns_records.json.result | selectattr('name', 'equalto', domain) | list }}"
+          delegate_to: localhost
+          become: false
+          when: dns_records.json.result | selectattr('name', 'equalto', domain) | list | length > 0
+
+        - name: Find and delete API subdomain record ({{ api_subdomain }}.{{ domain }})
+          ansible.builtin.uri:
+            url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare_zone_id }}/dns_records/{{ item.id }}"
+            method: DELETE
+            headers:
+              Authorization: "Bearer {{ cloudflare_api_token }}"
+            status_code: [200, 404]
+          loop: "{{ dns_records.json.result | selectattr('name', 'equalto', api_subdomain + '.' + domain) | list }}"
+          delegate_to: localhost
+          become: false
+          when: dns_records.json.result | selectattr('name', 'equalto', api_subdomain + '.' + domain) | list | length > 0
+
+        - name: Find and delete wildcard record (*.{{ deploy_wildcard }}.{{ domain }})
+          ansible.builtin.uri:
+            url: "https://api.cloudflare.com/client/v4/zones/{{ cloudflare_zone_id }}/dns_records/{{ item.id }}"
+            method: DELETE
+            headers:
+              Authorization: "Bearer {{ cloudflare_api_token }}"
+            status_code: [200, 404]
+          loop: "{{ dns_records.json.result | selectattr('name', 'equalto', '*.' + deploy_wildcard + '.' + domain) | list }}"
+          delegate_to: localhost
+          become: false
+          when: dns_records.json.result | selectattr('name', 'equalto', '*.' + deploy_wildcard + '.' + domain) | list | length > 0
+
+        - name: DNS records deleted
+          ansible.builtin.debug:
+            msg: |
+              ✅ DNS Records deleted:
+              - {{ domain }}
+              - {{ api_subdomain }}.{{ domain }}
+              - *.{{ deploy_wildcard }}.{{ domain }}
+      tags: [dns, full]
+
+    # =========================================================================
+    # PHASE 3: UNINSTALL K3S (Optional - only with --tags full or k3s)
+    # =========================================================================
+    - name: Uninstall K3s
+      block:
+        - name: Check if K3s uninstall script exists
+          ansible.builtin.stat:
+            path: /usr/local/bin/k3s-uninstall.sh
+          register: k3s_uninstall
+
+        - name: Run K3s uninstall script
+          ansible.builtin.shell: /usr/local/bin/k3s-uninstall.sh
+          when: k3s_uninstall.stat.exists
+          ignore_errors: true
+
+        - name: Remove K3s data directories
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - /etc/rancher
+            - /var/lib/rancher
+            - /var/lib/kubelet
+            - /etc/cni
+            - /var/lib/cni
+
+        - name: Remove Helm
+          ansible.builtin.file:
+            path: /usr/local/bin/helm
+            state: absent
+
+        - name: Remove Railpack
+          ansible.builtin.file:
+            path: /root/.railpack
+            state: absent
+
+        - name: Remove build workspace
+          ansible.builtin.file:
+            path: /tmp/code2cloud-build
+            state: absent
+
+        - name: Remove K8s manifests
+          ansible.builtin.file:
+            path: /tmp/k8s-manifests
+            state: absent
+
+        - name: K3s uninstalled
+          ansible.builtin.debug:
+            msg: "✅ K3s and all related components have been uninstalled"
+      tags: [k3s, full]
+      when: "'k3s' in ansible_run_tags or 'full' in ansible_run_tags"
+
+    # =========================================================================
+    # PHASE 4: CLEANUP LOCAL FILES
+    # =========================================================================
+    - name: Cleanup local kubeconfig
+      block:
+        - name: Remove local kubeconfig
+          ansible.builtin.file:
+            path: "{{ lookup('env', 'HOME') }}/kubeconfig"
+            state: absent
+          delegate_to: localhost
+          become: false
+
+        - name: Remove Windows kubeconfig
+          ansible.builtin.shell: rm -f "/mnt/c/Users/Lakshman/.kube/config"
+          delegate_to: localhost
+          become: false
+          ignore_errors: true
+      tags: [k3s, full]
+      when: "'k3s' in ansible_run_tags or 'full' in ansible_run_tags"
+
+    # =========================================================================
+    # PHASE 5: SUMMARY
+    # =========================================================================
+    - name: Teardown complete
+      ansible.builtin.pause:
+        seconds: 1
+        prompt: |
+          ══════════════════════════════════════════════════════════════
+                    TEARDOWN COMPLETE
+          ══════════════════════════════════════════════════════════════
+          
+          ✅ DNS records deleted from Cloudflare
+          {% if 'k3s' in ansible_run_tags or 'full' in ansible_run_tags %}
+          ✅ K3s uninstalled
+          ✅ All Kubernetes data removed
+          ✅ Local kubeconfig files removed
+          {% endif %}
+          
+          ══════════════════════════════════════════════════════════════
+      tags: [always]

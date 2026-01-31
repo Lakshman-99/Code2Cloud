@@ -13,9 +13,9 @@ metadata:
   namespace: code2cloud
 data:
   NODE_ENV: "production"
-  # API URL (public-facing)
+  # These are baked into the image at build time via Railpack --build-arg
+  # But we keep them here for reference and runtime use
   NEXT_PUBLIC_API_URL: "https://${API_SUBDOMAIN}.${DOMAIN}"
-  # App URL
   NEXT_PUBLIC_APP_URL: "https://${DOMAIN}"
 
 ---
@@ -40,7 +40,6 @@ spec:
     spec:
       containers:
         - name: frontend
-          # Update this to your built image
           image: registry.registry.svc.cluster.local:5000/code2cloud-frontend:latest
           imagePullPolicy: Always
           ports:
@@ -87,14 +86,14 @@ spec:
       name: http
 
 ---
-# Ingress for Frontend (lakshman.me)
+# Ingress for Frontend
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: frontend-ingress
   namespace: code2cloud
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    cert-manager.io/cluster-issuer: ${LETSENCRYPT_ISSUER}
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
 spec:

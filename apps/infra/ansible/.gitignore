@@ -1,11 +1,13 @@
 # Ansible
+*.kubeconfig
 kubeconfig
-inventory.ini
 *.retry
 cmd.txt
 
 # Secrets
 .env
+secrets.yml
+*.secret
 *.pem
 *.key
 id_ed25519
