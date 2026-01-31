@@ -58,11 +58,8 @@ export class HealthService {
    * Used by K8s livenessProbe
    * Should NOT check external dependencies
    */
-  checkLiveness(): { status: "ok"; timestamp: string } {
-    return { 
-      status: "ok",
-      timestamp: new Date().toISOString(),
-    };
+  checkLiveness(): { status: "ok" } {
+    return { status: "ok" };
   }
 
   /**
