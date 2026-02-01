@@ -17,6 +17,7 @@ data:
   # But we keep them here for reference and runtime use
   NEXT_PUBLIC_API_URL: "https://${API_SUBDOMAIN}.${DOMAIN}"
   NEXT_PUBLIC_APP_URL: "https://${DOMAIN}"
+  NODE_TLS_REJECT_UNAUTHORIZED: "${NODE_TLS_REJECT_UNAUTHORIZED}"
 
 ---
 apiVersion: apps/v1

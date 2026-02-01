@@ -26,7 +26,8 @@ export class DeploymentsService {
     const project = await this.prisma.project.findFirst({
       where: { id: projectId, userId },
       include: { 
-        envVars: true
+        envVars: true,
+        domains: true
       }
     });
 
@@ -85,6 +86,7 @@ export class DeploymentsService {
 
     // C. Prepare Environment Variables
     // We must decrypt them so the Build Worker can actually use them
+    const domains = project.domains.map(d => d.name);
     const envVars: Record<string, string> = {};
     const projectEnvVars = project.envVars as {
       key: string;
@@ -118,11 +120,8 @@ export class DeploymentsService {
         buildCommand: project.buildCommand || undefined,
         outputDir: project.outputDirectory || undefined,
       },
-      machineConfig: {
-        cpu: 0.25,
-        memory: 512,
-      },
-      envVars // Sending decrypted vars to the worker
+      domains,
+      envVars
     });
 
     this.logger.log(`Deployment ${deployment.id} queued for project ${project.name}`);

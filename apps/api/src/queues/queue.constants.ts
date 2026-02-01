@@ -16,10 +16,6 @@ export interface BuildJobData {
     outputDir?: string;
     framework: string;
   };
-  machineConfig: {
-    cpu: number;
-    memory: number;
-  };
-  // Environment Variables (Already encrypted!)
+  domains: string[];
   envVars: Record<string, string>;
 }

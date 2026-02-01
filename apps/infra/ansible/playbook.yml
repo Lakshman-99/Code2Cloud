@@ -290,6 +290,7 @@
           -e 's|\${DEPLOY_WILDCARD}|{{ deploy_wildcard }}|g' \
           -e 's|\${LETSENCRYPT_EMAIL}|{{ letsencrypt_email }}|g' \
           -e 's|\${LETSENCRYPT_ISSUER}|{{ letsencrypt_issuer }}|g' \
+          -e 's|\${NODE_TLS_REJECT_UNAUTHORIZED}|{{ node_tls_reject_unauthorized }}|g' \
           -e 's|\${REGISTRY_STORAGE_SIZE}|{{ registry_storage_size }}|g' \
           -e 's|\${REDIS_MEMORY_LIMIT}|{{ redis_memory_limit }}|g' \
           {} \;

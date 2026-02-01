@@ -127,10 +127,7 @@ export class ProjectsService {
           buildCommand: project.buildCommand || undefined,
           outputDir: project.outputDirectory || undefined,
         },
-        machineConfig: {
-          cpu: 0.25,
-          memory: 512,
-        },
+        domains: [deploymentUrl],
         // Decrypt env vars for the builder (it needs raw values)
         envVars: dto.envVars?.reduce((acc, curr) => ({
             ...acc, [curr.key]: curr.value
