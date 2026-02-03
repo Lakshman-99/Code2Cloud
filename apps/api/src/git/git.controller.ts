@@ -37,7 +37,7 @@ export class GitController {
         id: a.id,
         username: a.username,
         avatarUrl: a.avatarUrl,
-        installationId: a.installationId as string | null,
+        installationId: a.installationId,
       })),
     };
   }

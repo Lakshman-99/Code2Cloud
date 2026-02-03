@@ -323,4 +323,22 @@ export class GithubAppService {
       return { sha: 'HEAD', message: 'Initial deployment', author: 'System' };
     }
   }
+
+  // Get Installation Token for Workers
+  async getInstallationToken(installationId: string): Promise<string> {
+    try {
+      const octokit = await this.app.getInstallationOctokit(Number(installationId));
+      
+      // The token is embedded in the octokit instance, but we need to get a fresh one
+      // Using the app's built-in method to get installation access token
+      const { data } = await octokit.rest.apps.createInstallationAccessToken({
+        installation_id: Number(installationId)
+      });
+
+      return data.token;
+    } catch (error) {
+      console.error(`Failed to get installation token for ${installationId}`, error);
+      throw new BadRequestException('Failed to get installation token');
+    }
+  }
 }

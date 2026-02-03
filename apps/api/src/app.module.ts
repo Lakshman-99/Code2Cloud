@@ -10,6 +10,7 @@ import { EnvVarsModule } from "./envs/env-vars.module";
 import { QueuesModule } from "./queues/queues.module";
 import { SettingsModule } from "./settings/settings.module";
 import { HealthModule } from "./health/health.module";
+import { InternalModule } from "./internal/internal.module";
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { HealthModule } from "./health/health.module";
     QueuesModule,
     SettingsModule,
     HealthModule,
+    InternalModule,
   ],
   controllers: [AppController],
   providers: [AppService],
