@@ -35,7 +35,7 @@ func New(url, queueName string, logger *zap.Logger) (*Queue, error) {
 		return nil, fmt.Errorf("redis connection failed: %w", err)
 	}
 
-	logger.Info("✅ Connected to Redis", zap.String("url", url))
+	logger.Info("Connected to Redis", zap.String("url", url))
 
 	return &Queue{
 		client:    client,

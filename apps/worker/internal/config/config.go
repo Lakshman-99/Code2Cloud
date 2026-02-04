@@ -7,12 +7,13 @@ import (
 
 
 type Config struct {
-	Environment string
+	// ─── NestJS API ──────────────────────────────────────────
+	APIBaseURL   string
+	WorkerAPIKey string
+	Environment	 string
+
 	// ─── Redis (Job Queue) ───────────────────────────────────
 	RedisURL     string
-
-	// ─── Database ────────────────────────────────────────────
-	DatabaseURL string
 
 	// ─── BuildKit ────────────────────────────────────────────
 	BuildkitAddr string
@@ -37,8 +38,9 @@ type Config struct {
 func Load() (*Config, error) {
 	cfg := &Config{
 		Environment:     getEnv("GO_ENV", "production"),
+		APIBaseURL:      getEnv("API_BASE_URL", "http://api.code2cloud.lakshman.me"),
+		WorkerAPIKey:    getEnv("WORKER_API_KEY", ""),
 		RedisURL:        getEnv("REDIS_URL", "redis://redis.code2cloud.svc.cluster.local:6379"),
-		DatabaseURL:     getEnv("DATABASE_URL", ""),
 		BuildkitAddr:    getEnv("BUILDKIT_ADDR", "tcp://buildkitd.default.svc.cluster.local:1234"),
 		RegistryURL:     getEnv("REGISTRY_URL", "registry.registry.svc.cluster.local:5000"),
 		RegistryInsecure: getEnv("REGISTRY_INSECURE", "true") == "true",
@@ -50,8 +52,9 @@ func Load() (*Config, error) {
 		WorkspacePath:   getEnv("WORKSPACE_PATH", "/tmp/builds"),
 	}
 
-	if cfg.DatabaseURL == "" {
-		return nil, errors.New("DATABASE_URL is required")
+	// Validate required fields
+	if cfg.WorkerAPIKey == "" {
+		return nil, errors.New("WORKER_API_KEY is required")
 	}
 
 	return cfg, nil

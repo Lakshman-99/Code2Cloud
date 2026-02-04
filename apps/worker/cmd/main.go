@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -41,16 +42,22 @@ func main() {
 	}
 	defer logger.Sync()
 
-	logger.Info("✅ Starting Code2Cloud Worker", 
+	logger.Info("Starting Code2Cloud Worker", 
 		zap.String("env", cfg.Environment),
 	)
 
 	// ─────────────────────────────────────────────────────────────
 	// Step 3: Create Worker Instance
 	// ─────────────────────────────────────────────────────────────
-	w, err := worker.New(cfg, logger)
+	// Create a context for initialization (with timeout)
+	initCtx, initCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer initCancel()
+
+	// NewWorker creates and initializes our worker
+	// It will connect to Redis and verify NestJS API
+	w, err := worker.New(initCtx, cfg, logger)
 	if err != nil {
-		logger.Fatal("❌ Failed to create worker", zap.Error(err))
+		logger.Fatal("Failed to create worker", zap.Error(err))
 	}
 
 	// ─────────────────────────────────────────────────────────────
@@ -58,7 +65,6 @@ func main() {
 	// ─────────────────────────────────────────────────────────────
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
