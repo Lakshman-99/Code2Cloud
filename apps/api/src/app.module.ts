@@ -11,6 +11,7 @@ import { QueuesModule } from "./queues/queues.module";
 import { SettingsModule } from "./settings/settings.module";
 import { HealthModule } from "./health/health.module";
 import { InternalModule } from "./internal/internal.module";
+import { MailModule } from "./mail/mail.module";
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { InternalModule } from "./internal/internal.module";
     SettingsModule,
     HealthModule,
     InternalModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

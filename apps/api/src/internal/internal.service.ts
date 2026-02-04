@@ -1,16 +1,17 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { EncryptionService } from '../common/utils/encryption.service';
-import { GithubAppService } from '../git/git.service';
-import axios from 'axios';
-import { 
-  UpdateDeploymentStatusDto, 
-  CreateLogsDto, 
-  UpdateProjectStatusDto, 
+import { Injectable, NotFoundException, Logger } from "@nestjs/common";
+import { PrismaService } from "../../prisma/prisma.service";
+import { EncryptionService } from "../common/utils/encryption.service";
+import { GithubAppService } from "../git/git.service";
+import { MailService } from "../mail/mail.service";
+import axios from "axios";
+import {
+  UpdateDeploymentStatusDto,
+  CreateLogsDto,
+  UpdateProjectStatusDto,
   UpdateDomainStatusDto,
-  DeploymentNotificationDto 
-} from './dto';
-import { DeploymentStatus, LogSource } from 'generated/prisma/enums';
+  DeploymentNotificationDto,
+} from "./dto";
+import { DeploymentStatus, LogSource } from "generated/prisma/enums";
 
 @Injectable()
 export class InternalService {
@@ -20,11 +21,14 @@ export class InternalService {
     private prisma: PrismaService,
     private gitService: GithubAppService,
     private encryption: EncryptionService,
+    private mailService: MailService,
   ) {}
 
   async updateDeploymentStatus(id: string, dto: UpdateDeploymentStatusDto) {
-    const deployment = await this.prisma.deployment.findUnique({ where: { id } });
-    if (!deployment) throw new NotFoundException('Deployment not found');
+    const deployment = await this.prisma.deployment.findUnique({
+      where: { id },
+    });
+    if (!deployment) throw new NotFoundException("Deployment not found");
 
     const updateData: Record<string, unknown> = { status: dto.status };
 
@@ -39,17 +43,17 @@ export class InternalService {
     }
 
     // Set finishedAt and calculate duration for terminal states
-    if (['READY', 'FAILED', 'CANCELED'].includes(dto.status)) {
+    if (["READY", "FAILED", "CANCELED"].includes(dto.status)) {
       updateData.finishedAt = new Date();
       updateData.duration = Math.floor(
-        (Date.now() - deployment.startedAt.getTime()) / 1000
+        (Date.now() - deployment.startedAt.getTime()) / 1000,
       );
     }
 
     const updated = await this.prisma.deployment.update({
       where: { id },
       data: updateData,
-      include: { project: { select: { name: true } } }
+      include: { project: { select: { name: true } } },
     });
 
     this.logger.log(`Deployment ${id} status updated to ${dto.status}`);
@@ -57,29 +61,31 @@ export class InternalService {
   }
 
   async createLogs(deploymentId: string, dto: CreateLogsDto) {
-    const deployment = await this.prisma.deployment.findUnique({ 
-      where: { id: deploymentId } 
+    const deployment = await this.prisma.deployment.findUnique({
+      where: { id: deploymentId },
     });
-    if (!deployment) throw new NotFoundException('Deployment not found');
+    if (!deployment) throw new NotFoundException("Deployment not found");
 
-    const logsData = dto.logs.map(log => ({
+    const logsData = dto.logs.map((log) => ({
       deploymentId,
       source: log.source,
       message: log.message,
-      timestamp: log.timestamp ? new Date(log.timestamp) : new Date()
+      timestamp: log.timestamp ? new Date(log.timestamp) : new Date(),
     }));
 
     await this.prisma.logEntry.createMany({ data: logsData });
 
-    this.logger.log(`Added ${dto.logs.length} logs to deployment ${deploymentId}`);
+    this.logger.log(
+      `Added ${dto.logs.length} logs to deployment ${deploymentId}`,
+    );
     return { success: true, count: dto.logs.length };
   }
 
   async getLogs(deploymentId: string, source?: LogSource) {
-    const deployment = await this.prisma.deployment.findUnique({ 
-      where: { id: deploymentId } 
+    const deployment = await this.prisma.deployment.findUnique({
+      where: { id: deploymentId },
     });
-    if (!deployment) throw new NotFoundException('Deployment not found');
+    if (!deployment) throw new NotFoundException("Deployment not found");
 
     const whereClause: Record<string, unknown> = { deploymentId };
     if (source) {
@@ -88,30 +94,33 @@ export class InternalService {
 
     return this.prisma.logEntry.findMany({
       where: whereClause,
-      orderBy: { timestamp: 'asc' }
+      orderBy: { timestamp: "asc" },
     });
   }
 
   async getInstallationToken(installationId: string) {
     const token = await this.gitService.getInstallationToken(installationId);
-    return { token, expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString() };
+    return {
+      token,
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    };
   }
 
   async getSettingsByProject(projectId: string) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      select: { userId: true }
+      select: { userId: true },
     });
-    if (!project) throw new NotFoundException('Project not found');
+    if (!project) throw new NotFoundException("Project not found");
 
     const config = await this.prisma.systemConfig.findUnique({
-      where: { userId: project.userId }
+      where: { userId: project.userId },
     });
 
     // Return defaults if no config exists
     if (!config) {
       return {
-        defaultRegion: 'us-east-1',
+        defaultRegion: "us-east-1",
         maxConcurrentBuilds: 1,
         logRetentionDays: 1,
         turboMode: false,
@@ -119,7 +128,7 @@ export class InternalService {
         autoDeploy: true,
         emailDeployFailed: true,
         emailDeploySuccess: true,
-        slackWebhook: null
+        slackWebhook: null,
       };
     }
 
@@ -129,7 +138,9 @@ export class InternalService {
       try {
         slackWebhook = this.encryption.decrypt(config.slackWebhook);
       } catch {
-        this.logger.warn(`Failed to decrypt slack webhook for user ${project.userId}`);
+        this.logger.warn(
+          `Failed to decrypt slack webhook for user ${project.userId}`,
+        );
       }
     }
 
@@ -142,14 +153,14 @@ export class InternalService {
       autoDeploy: config.autoDeploy,
       emailDeployFailed: config.emailDeployFailed,
       emailDeploySuccess: config.emailDeploySuccess,
-      slackWebhook
+      slackWebhook,
     };
   }
 
   async getExpiredDeployments() {
     // Get all configs with their TTL settings
     const configs = await this.prisma.systemConfig.findMany({
-      select: { userId: true, globalTTLMinutes: true }
+      select: { userId: true, globalTTLMinutes: true },
     });
 
     const expiredDeployments: Array<{
@@ -169,10 +180,10 @@ export class InternalService {
       const deployments = await this.prisma.deployment.findMany({
         where: {
           project: { userId: config.userId },
-          status: 'READY',
-          startedAt: { lt: expiryThreshold }
+          status: "READY",
+          startedAt: { lt: expiryThreshold },
         },
-        include: { project: { select: { name: true } } }
+        include: { project: { select: { name: true } } },
       });
 
       for (const d of deployments) {
@@ -183,7 +194,7 @@ export class InternalService {
           containerImage: d.containerImage,
           deploymentUrl: d.deploymentUrl,
           startedAt: d.startedAt,
-          ttlMinutes: config.globalTTLMinutes
+          ttlMinutes: config.globalTTLMinutes,
         });
       }
     }
@@ -192,19 +203,19 @@ export class InternalService {
   }
 
   async deleteDeploymentResources(id: string) {
-    const deployment = await this.prisma.deployment.findUnique({ 
+    const deployment = await this.prisma.deployment.findUnique({
       where: { id },
-      include: { project: { select: { name: true } } }
+      include: { project: { select: { name: true } } },
     });
-    if (!deployment) throw new NotFoundException('Deployment not found');
+    if (!deployment) throw new NotFoundException("Deployment not found");
 
     // Mark deployment as canceled/expired
     await this.prisma.deployment.update({
       where: { id },
       data: {
         status: DeploymentStatus.CANCELED,
-        finishedAt: new Date()
-      }
+        finishedAt: new Date(),
+      },
     });
 
     this.logger.log(`Deployment ${id} resources marked for deletion`);
@@ -213,17 +224,17 @@ export class InternalService {
       success: true,
       deploymentId: id,
       projectName: deployment.project.name,
-      containerImage: deployment.containerImage
+      containerImage: deployment.containerImage,
     };
   }
 
   async updateProjectStatus(id: string, dto: UpdateProjectStatusDto) {
     const project = await this.prisma.project.findUnique({ where: { id } });
-    if (!project) throw new NotFoundException('Project not found');
+    if (!project) throw new NotFoundException("Project not found");
 
     const updated = await this.prisma.project.update({
       where: { id },
-      data: { onlineStatus: dto.onlineStatus }
+      data: { onlineStatus: dto.onlineStatus },
     });
 
     this.logger.log(`Project ${id} status updated to ${dto.onlineStatus}`);
@@ -232,11 +243,11 @@ export class InternalService {
 
   async updateDomainStatus(id: string, dto: UpdateDomainStatusDto) {
     const domain = await this.prisma.domain.findUnique({ where: { id } });
-    if (!domain) throw new NotFoundException('Domain not found');
+    if (!domain) throw new NotFoundException("Domain not found");
 
     const updated = await this.prisma.domain.update({
       where: { id },
-      data: { status: dto.status }
+      data: { status: dto.status },
     });
 
     this.logger.log(`Domain ${id} status updated to ${dto.status}`);
@@ -246,17 +257,17 @@ export class InternalService {
   async sendDeploymentNotification(dto: DeploymentNotificationDto) {
     const deployment = await this.prisma.deployment.findUnique({
       where: { id: dto.deploymentId },
-      include: { 
+      include: {
         project: { select: { name: true, userId: true } },
-        initiator: { select: { email: true, name: true } }
-      }
+        initiator: { select: { email: true, name: true } },
+      },
     });
 
-    if (!deployment) throw new NotFoundException('Deployment not found');
+    if (!deployment) throw new NotFoundException("Deployment not found");
 
     // Get user settings
     const config = await this.prisma.systemConfig.findUnique({
-      where: { userId: deployment.project.userId }
+      where: { userId: deployment.project.userId },
     });
 
     const notifications: Promise<void>[] = [];
@@ -265,15 +276,45 @@ export class InternalService {
     if (config?.slackWebhook) {
       try {
         const webhookUrl = this.encryption.decrypt(config.slackWebhook);
-        notifications.push(this.sendSlackNotification(webhookUrl, deployment, dto));
+        notifications.push(
+          this.sendSlackNotification(webhookUrl, deployment, dto),
+        );
       } catch {
-        this.logger.warn(`Failed to decrypt Slack webhook for deployment ${dto.deploymentId}`);
+        this.logger.warn(
+          `Failed to decrypt Slack webhook for deployment ${dto.deploymentId}`,
+        );
       }
     }
 
-    // TODO: Add email notifications here if needed
-    // if (config?.emailDeployFailed && dto.status === 'FAILED') { ... }
-    // if (config?.emailDeploySuccess && dto.status === 'READY') { ... }
+    // Send Email notification
+    const recipientEmail = deployment.initiator?.email;
+    if (recipientEmail) {
+      const authorName = deployment.initiator?.name ?? undefined;
+      const commitMessage = dto.message;
+
+      if (config?.emailDeploySuccess && dto.status === "READY") {
+        notifications.push(
+          this.mailService.sendDeploymentSuccess(
+            recipientEmail,
+            deployment.project.name,
+            dto.deploymentUrl || "",
+            commitMessage,
+            authorName,
+          ),
+        );
+      }
+
+      if (config?.emailDeployFailed && dto.status === "FAILED") {
+        notifications.push(
+          this.mailService.sendDeploymentFailure(
+            recipientEmail,
+            deployment.project.name,
+            commitMessage,
+            authorName,
+          ),
+        );
+      }
+    }
 
     await Promise.allSettled(notifications);
 
@@ -282,48 +323,53 @@ export class InternalService {
   }
 
   private async sendSlackNotification(
-    webhookUrl: string, 
-    deployment: { project: { name: string }; initiator: { email: string; name: string | null } | null },
-    dto: DeploymentNotificationDto
+    webhookUrl: string,
+    deployment: {
+      project: { name: string };
+      initiator: { email: string; name: string | null } | null;
+    },
+    dto: DeploymentNotificationDto,
   ): Promise<void> {
     const statusEmoji = this.getStatusEmoji(dto.status);
     const statusColor = this.getStatusColor(dto.status);
 
     const message = {
-      attachments: [{
-        color: statusColor,
-        blocks: [
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: `${statusEmoji} *Deployment ${dto.status}*\n*Project:* ${dto.projectName || deployment.project.name}`
-            }
-          },
-          {
-            type: 'section',
-            fields: [
-              {
-                type: 'mrkdwn',
-                text: `*Initiated by:*\n${deployment.initiator?.name || deployment.initiator?.email || 'System'}`
+      attachments: [
+        {
+          color: statusColor,
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `${statusEmoji} *Deployment ${dto.status}*\n*Project:* ${dto.projectName || deployment.project.name}`,
               },
-              {
-                type: 'mrkdwn',
-                text: `*URL:*\n${dto.deploymentUrl || 'N/A'}`
-              }
-            ]
-          }
-        ]
-      }]
+            },
+            {
+              type: "section",
+              fields: [
+                {
+                  type: "mrkdwn",
+                  text: `*Initiated by:*\n${deployment.initiator?.name || deployment.initiator?.email || "System"}`,
+                },
+                {
+                  type: "mrkdwn",
+                  text: `*URL:*\n${dto.deploymentUrl || "N/A"}`,
+                },
+              ],
+            },
+          ],
+        },
+      ],
     };
 
     if (dto.message) {
       message.attachments[0].blocks.push({
-        type: 'section',
+        type: "section",
         text: {
-          type: 'mrkdwn',
-          text: `*Message:* ${dto.message}`
-        }
+          type: "mrkdwn",
+          text: `*Message:* ${dto.message}`,
+        },
       } as never);
     }
 
@@ -332,25 +378,25 @@ export class InternalService {
 
   private getStatusEmoji(status: DeploymentStatus): string {
     const emojis: Record<DeploymentStatus, string> = {
-      QUEUED: '⏳',
-      BUILDING: '🔨',
-      DEPLOYING: '🚀',
-      READY: '✅',
-      FAILED: '❌',
-      CANCELED: '🚫'
+      QUEUED: "⏳",
+      BUILDING: "🔨",
+      DEPLOYING: "🚀",
+      READY: "✅",
+      FAILED: "❌",
+      CANCELED: "🚫",
     };
-    return emojis[status] || '📋';
+    return emojis[status] || "📋";
   }
 
   private getStatusColor(status: DeploymentStatus): string {
     const colors: Record<DeploymentStatus, string> = {
-      QUEUED: '#808080',
-      BUILDING: '#FFA500',
-      DEPLOYING: '#0000FF',
-      READY: '#00FF00',
-      FAILED: '#FF0000',
-      CANCELED: '#808080'
+      QUEUED: "#808080",
+      BUILDING: "#FFA500",
+      DEPLOYING: "#0000FF",
+      READY: "#00FF00",
+      FAILED: "#FF0000",
+      CANCELED: "#808080",
     };
-    return colors[status] || '#808080';
+    return colors[status] || "#808080";
   }
 }
