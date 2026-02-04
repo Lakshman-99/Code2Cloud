@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"code2cloud/worker/internal/config"
+	"code2cloud/worker/internal/git"
 	"code2cloud/worker/internal/worker"
 	"github.com/joho/godotenv"
 )
@@ -44,6 +45,17 @@ func main() {
 
 	logger.Info("Starting Code2Cloud Worker", 
 		zap.String("env", cfg.Environment),
+	)
+
+	// ─────────────────────────────────────────────────────────────
+	// Step 2.5: Verify Git Installation
+	// ─────────────────────────────────────────────────────────────
+	gitResult, err := git.Verify(context.Background(), logger)
+	if err != nil {
+		logger.Fatal("Git verification failed", zap.Error(err))
+	}
+	logger.Info("Git ready",
+		zap.String("version", gitResult.GitVersion),
 	)
 
 	// ─────────────────────────────────────────────────────────────

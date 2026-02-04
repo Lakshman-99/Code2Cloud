@@ -3,11 +3,13 @@ package worker
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 
 	"code2cloud/worker/internal/api"
 	"code2cloud/worker/internal/config"
+	"code2cloud/worker/internal/git"
 	"code2cloud/worker/internal/queue"
 	"code2cloud/worker/internal/types"
 )
@@ -17,6 +19,7 @@ type Worker struct {
 	cfg    *config.Config
 	queue  *queue.Queue
 	api    *api.Client
+	git    *git.Cloner
 	logger *zap.Logger
 }
 
@@ -42,11 +45,17 @@ func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, 
 		return nil, fmt.Errorf("failed to connect to API: %w", err)
 	}
 
+	// ─────────────────────────────────────────────────────────
+	// Initialize Git Cloner
+	// ─────────────────────────────────────────────────────────
+	gitCloner := git.NewCloner(cfg.WorkspacePath, apiClient, logger)
+
 	// Create worker instance
 	w := &Worker{
 		cfg:    cfg,
 		queue:  q,
 		api:    apiClient,
+		git:    gitCloner,
 		logger: logger,
 	}
 
@@ -58,6 +67,7 @@ func (w *Worker) Start(ctx context.Context) error {
 		zap.String("queue", w.cfg.QueueName),
 		zap.String("worker_id", w.cfg.WorkerID),
 		zap.String("api_url", w.cfg.APIBaseURL),
+		zap.String("workspace", w.cfg.WorkspacePath),
 	)
 
 	// Infinite loop - keeps running until shutdown
@@ -107,6 +117,8 @@ func (w *Worker) Start(ctx context.Context) error {
 }
 
 func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID string) error {
+	startTime := time.Now()
+
 	w.logger.Info("Starting job processing",
 		zap.String("deployment", job.DeploymentID),
 		zap.String("project", job.ProjectName),
@@ -122,9 +134,10 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 		return fmt.Errorf("failed to update status to BUILDING: %w", err)
 	}
 
-	// Save initial log
 	w.api.SaveLog(ctx, job.DeploymentID, api.LogSourceBuild,
-		fmt.Sprintf("🚀 Starting build for %s (branch: %s)", job.ProjectName, job.Branch))
+		fmt.Sprintf("🚀 Starting build for %s", job.ProjectName))
+	w.api.SaveLog(ctx, job.DeploymentID, api.LogSourceBuild,
+		fmt.Sprintf("   Branch: %s | Commit: %s", job.Branch, job.CommitHash[:8]))
 
 	// ─────────────────────────────────────────────────────────
 	// Step 2: Get Project Settings (for TTL, notifications)
@@ -140,10 +153,10 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 	)
 
 	// ─────────────────────────────────────────────────────────
-	// Step 3: Get GitHub Installation Token (for cloning)
+	// Step 3: Get GitHub Installation Token
 	// ─────────────────────────────────────────────────────────
 	w.api.SaveLog(ctx, job.DeploymentID, api.LogSourceBuild,
-		fmt.Sprintf("🔑 Getting installation token for installation %d", job.InstallationID))
+		"🔑 Authenticating with GitHub...")
 
 	token, err := w.api.GetInstallationToken(ctx, job.InstallationID)
 	if err != nil {
@@ -158,16 +171,33 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 	// Step 4: Clone repository
 	// ─────────────────────────────────────────────────────────
 	w.api.SaveLog(ctx, job.DeploymentID, api.LogSourceBuild,
-		fmt.Sprintf("📥 Cloning repository: %s", job.GitURL))
+		fmt.Sprintf("📥 Cloning repository..."))
 
-	// TODO: repoPath, err := w.cloneRepository(ctx, job, token.Token)
-	w.logger.Info("Step 4: Would clone repository",
-		zap.String("url", job.GitURL),
-		zap.String("branch", job.Branch),
+	cloneResult, err := w.git.Clone(ctx, git.CloneOptions{
+		RepoURL:        job.GitURL,
+		Branch:         job.Branch,
+		CommitHash:     job.CommitHash,
+		InstallationID: job.InstallationID,
+		Token:          token.Token,
+		DeploymentID:   job.DeploymentID,
+		Shallow:        true, // Fast shallow clone
+		Depth:          1,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to clone repository: %w", err)
+	}
+
+	// Ensure cleanup after we're done
+	defer w.git.Cleanup(cloneResult.Path)
+
+	w.logger.Info("Repository cloned",
+		zap.String("path", cloneResult.Path),
+		zap.String("commit", cloneResult.CommitHash),
+		zap.Duration("duration", cloneResult.Duration),
 	)
 
 	// ─────────────────────────────────────────────────────────
-	// Step 3: Build with Railpack + BuildKit
+	// Step 5: Build with Railpack + BuildKit
 	// ─────────────────────────────────────────────────────────
 	w.api.SaveLog(ctx, job.DeploymentID, api.LogSourceBuild,
 		"🔨 Building container image with Railpack...")
@@ -175,12 +205,13 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 	imageName := fmt.Sprintf("%s/%s:%s",
 		w.cfg.RegistryURL,
 		job.ProjectName,
-		job.CommitHash[:8],
+		cloneResult.CommitHash[:8],
 	)
 
 	// TODO: err = w.buildImage(ctx, job, repoPath, imageName)
 	w.logger.Info("Step 5: Would build image",
 		zap.String("image", imageName),
+		zap.String("repoPath", cloneResult.Path),
 	)
 
 	// Update deployment with image name
@@ -225,18 +256,22 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 	// Update project online status
 	w.api.UpdateProjectStatus(ctx, job.ProjectID, "ACTIVE")
 
+	duration := time.Since(startTime)
+
 	w.api.SaveLog(ctx, job.DeploymentID, api.LogSourceBuild,
-		fmt.Sprintf("✅ Deployment complete! URL: %s", deploymentURL))
+		fmt.Sprintf("✅ Deployment complete in %s!", duration.Round(time.Second)))
+	w.api.SaveLog(ctx, job.DeploymentID, api.LogSourceBuild,
+		fmt.Sprintf("   URL: %s", deploymentURL))
 
 	// ─────────────────────────────────────────────────────────
 	// Step 10: Send success notification
 	// ─────────────────────────────────────────────────────────
-	// Duration would come from actual timing, hardcoded for now
-	w.api.NotifySuccess(ctx, job.DeploymentID, job.ProjectName, deploymentURL, 60)
+	w.api.NotifySuccess(ctx, job.DeploymentID, job.ProjectName, deploymentURL, int(duration.Seconds()))
 
 	w.logger.Info("Job completed successfully! 🎉",
 		zap.String("deployment", job.DeploymentID),
 		zap.String("url", deploymentURL),
+		zap.Duration("duration", duration),
 	)
 
 	return nil
