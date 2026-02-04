@@ -1,31 +1,29 @@
 package git
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"go.uber.org/zap"
 
-	"code2cloud/worker/internal/api"
+	"code2cloud/worker/internal/logging"
 )
 
 type Cloner struct {
 	workspacePath string
-	api           *api.Client
+	logFactory    *logging.Factory
 	logger        *zap.Logger
 }
 
-func NewCloner(workspacePath string, apiClient *api.Client, logger *zap.Logger) *Cloner {
+func NewCloner(workspacePath string, logFactory *logging.Factory, logger *zap.Logger) *Cloner {
 	return &Cloner{
 		workspacePath: workspacePath,
-		api:           apiClient,
+		logFactory:    logFactory,
 		logger:        logger,
 	}
 }
@@ -50,10 +48,13 @@ type CloneResult struct {
 func (c *Cloner) Clone(ctx context.Context, opts CloneOptions) (*CloneResult, error) {
 	startTime := time.Now()
 
+	// Create a logger for this clone operation
+	streamLogger := c.logFactory.CreatePrefixedLogger(opts.DeploymentID, "[git] ", logging.SourceBuild)
+	defer streamLogger.Close()
+
 	// ─────────────────────────────────────────────────────────
 	// Step 1: Create unique directory for this clone
 	// ─────────────────────────────────────────────────────────
-	// Use deployment ID to create unique folder
 	clonePath := filepath.Join(c.workspacePath, opts.DeploymentID)
 
 	// Ensure workspace exists
@@ -98,6 +99,9 @@ func (c *Cloner) Clone(ctx context.Context, opts CloneOptions) (*CloneResult, er
 	// Single branch (faster)
 	args = append(args, "--single-branch")
 
+	// Progress output
+	args = append(args, "--progress")
+
 	// Add URL and destination
 	args = append(args, authURL, clonePath)
 
@@ -111,34 +115,26 @@ func (c *Cloner) Clone(ctx context.Context, opts CloneOptions) (*CloneResult, er
 		"GIT_TERMINAL_PROMPT=0", // Never prompt for credentials
 	)
 
-	// Create log collector
-	logCollector := newLogCollector(c.api, opts.DeploymentID, c.logger)
+	// Use StreamLogger for both stdout and stderr
+	cmd.Stdout = streamLogger
+	cmd.Stderr = streamLogger
 
-	// Capture both stdout and stderr
-	cmd.Stdout = logCollector
-	cmd.Stderr = logCollector
-
-	// Log start (without exposing token!)
+	// Log command (without exposing token!)
 	safeURL := c.sanitizeURL(opts.RepoURL)
-	c.api.SaveLog(ctx, opts.DeploymentID, api.LogSourceBuild,
-		fmt.Sprintf("$ git clone --depth 1 --branch %s %s", opts.Branch, safeURL))
+	streamLogger.Log(fmt.Sprintf("$ git clone --depth 1 --branch %s %s", opts.Branch, safeURL))
 
 	// Run the command
 	if err := cmd.Run(); err != nil {
-		// Flush any remaining logs
-		logCollector.Flush(ctx)
+		streamLogger.Flush()
 		return nil, fmt.Errorf("git clone failed: %w", err)
 	}
-
-	// Flush remaining logs
-	logCollector.Flush(ctx)
 
 	// ─────────────────────────────────────────────────────────
 	// Step 5: Checkout specific commit if provided
 	// ─────────────────────────────────────────────────────────
 	actualCommit := opts.CommitHash
 	if opts.CommitHash != "" && !opts.Shallow {
-		if err := c.checkout(ctx, clonePath, opts.CommitHash, opts.DeploymentID); err != nil {
+		if err := c.checkout(ctx, clonePath, opts.CommitHash, streamLogger); err != nil {
 			c.logger.Warn("Failed to checkout specific commit, using branch HEAD",
 				zap.Error(err),
 			)
@@ -152,8 +148,7 @@ func (c *Cloner) Clone(ctx context.Context, opts CloneOptions) (*CloneResult, er
 
 	duration := time.Since(startTime)
 
-	c.api.SaveLog(ctx, opts.DeploymentID, api.LogSourceBuild,
-		fmt.Sprintf("✓ Cloned successfully in %s (commit: %s)", duration.Round(time.Millisecond), actualCommit[:8]))
+	streamLogger.Log(fmt.Sprintf("✓ Clone completed in %s (commit: %s)", duration.Round(time.Millisecond), actualCommit[:8]))
 
 	c.logger.Info("Clone completed",
 		zap.String("path", clonePath),
@@ -212,19 +207,15 @@ func (c *Cloner) sanitizeURL(url string) string {
 }
 
 // checkout checks out a specific commit
-func (c *Cloner) checkout(ctx context.Context, repoPath, commit, deploymentID string) error {
+func (c *Cloner) checkout(ctx context.Context, repoPath, commit string, streamLogger *logging.StreamLogger) error {
 	cmd := exec.CommandContext(ctx, "git", "checkout", commit)
 	cmd.Dir = repoPath
+	cmd.Stdout = streamLogger
+	cmd.Stderr = streamLogger
 
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("checkout failed: %s: %w", string(output), err)
-	}
+	streamLogger.Log(fmt.Sprintf("$ git checkout %s", commit[:8]))
 
-	c.api.SaveLog(ctx, deploymentID, api.LogSourceBuild,
-		fmt.Sprintf("$ git checkout %s", commit[:8]))
-
-	return nil
+	return cmd.Run()
 }
 
 // getHeadCommit gets the current HEAD commit hash

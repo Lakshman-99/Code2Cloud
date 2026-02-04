@@ -24,11 +24,37 @@ type LogEntry struct {
 }
 
 type SaveLogsRequest struct {
-	Source   LogSource `json:"source"`
-	Messages []string  `json:"messages"`
+	Source   string   `json:"source"`
+	Messages []string `json:"messages"`
 }
 
+// SaveLogs saves multiple log entries for a deployment
 func (c *Client) SaveLogs(ctx context.Context, deploymentID string, source LogSource, messages []string) error {
+	if len(messages) == 0 {
+		return nil
+	}
+
+	path := fmt.Sprintf("/internal/deployments/%s/logs", deploymentID)
+	body := SaveLogsRequest{
+		Source:   string(source),
+		Messages: messages,
+	}
+
+	if err := c.post(ctx, path, body, nil); err != nil {
+		return fmt.Errorf("failed to save logs: %w", err)
+	}
+
+	c.logger.Debug("Saved logs",
+		zap.String("deploymentId", deploymentID),
+		zap.String("source", string(source)),
+		zap.Int("count", len(messages)),
+	)
+
+	return nil
+}
+
+// SaveLogsRaw is a generic version that accepts string source
+func (c *Client) SaveLogsRaw(ctx context.Context, deploymentID string, source string, messages []string) error {
 	if len(messages) == 0 {
 		return nil
 	}
@@ -42,12 +68,6 @@ func (c *Client) SaveLogs(ctx context.Context, deploymentID string, source LogSo
 	if err := c.post(ctx, path, body, nil); err != nil {
 		return fmt.Errorf("failed to save logs: %w", err)
 	}
-
-	c.logger.Debug("Saved logs",
-		zap.String("deploymentId", deploymentID),
-		zap.String("source", string(source)),
-		zap.Int("count", len(messages)),
-	)
 
 	return nil
 }
