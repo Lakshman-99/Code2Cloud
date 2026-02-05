@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"code2cloud/worker/internal/builder"
 	"code2cloud/worker/internal/config"
 	"code2cloud/worker/internal/git"
 	"code2cloud/worker/internal/worker"
@@ -48,32 +49,37 @@ func main() {
 	)
 
 	// ─────────────────────────────────────────────────────────────
-	// Step 2.5: Verify Git Installation
+	// Step 3: Verify Tools (Git, Railpack)
 	// ─────────────────────────────────────────────────────────────
-	gitResult, err := git.Verify(context.Background(), logger)
+	ctx := context.Background()
+
+	// Verify Git
+	gitResult, err := git.Verify(ctx, logger)
 	if err != nil {
 		logger.Fatal("Git verification failed", zap.Error(err))
 	}
-	logger.Info("Git ready",
-		zap.String("version", gitResult.GitVersion),
-	)
+	logger.Info("Git ready", zap.String("version", gitResult.GitVersion))
+
+	// Verify Railpack
+	railpackResult, err := builder.Verify(ctx, cfg.BuildkitAddr, logger)
+	if err != nil {
+		logger.Fatal("Railpack verification failed", zap.Error(err))
+	}
+	logger.Info("Railpack ready", zap.String("version", railpackResult.RailpackVersion))
 
 	// ─────────────────────────────────────────────────────────────
-	// Step 3: Create Worker Instance
+	// Step 4: Create Worker Instance
 	// ─────────────────────────────────────────────────────────────
-	// Create a context for initialization (with timeout)
 	initCtx, initCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer initCancel()
 
-	// NewWorker creates and initializes our worker
-	// It will connect to Redis and verify NestJS API
 	w, err := worker.New(initCtx, cfg, logger)
 	if err != nil {
 		logger.Fatal("Failed to create worker", zap.Error(err))
 	}
 
 	// ─────────────────────────────────────────────────────────────
-	// Step 4: Setup Graceful Shutdown
+	// Step 5: Setup Graceful Shutdown
 	// ─────────────────────────────────────────────────────────────
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -90,7 +96,7 @@ func main() {
 	}()
 
 	// ─────────────────────────────────────────────────────────────
-	// Step 5: Start Worker (Blocking)
+	// Step 6: Start Worker (Blocking)
 	// ─────────────────────────────────────────────────────────────
 	if err := w.Start(ctx); err != nil && err != context.Canceled {
 		logger.Fatal("Worker failed", zap.Error(err))

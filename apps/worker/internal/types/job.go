@@ -3,6 +3,7 @@ package types
 type BuildConfig struct {
 	InstallCommand string `json:"installCommand,omitempty"`
 	BuildCommand   string `json:"buildCommand,omitempty"`
+	RunCommand     string `json:"runCommand,omitempty"`
 	OutputDir      string `json:"outputDir,omitempty"`
 	Framework      string `json:"framework"`
 }

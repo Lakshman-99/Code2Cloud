@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"code2cloud/worker/internal/api"
+	"code2cloud/worker/internal/builder"
 	"code2cloud/worker/internal/config"
 	"code2cloud/worker/internal/git"
 	"code2cloud/worker/internal/logging"
@@ -21,6 +22,7 @@ type Worker struct {
 	queue      *queue.Queue
 	api        *api.Client
 	git        *git.Cloner
+	builder    *builder.Builder
 	logFactory *logging.Factory 
 	logger     *zap.Logger
 }
@@ -54,12 +56,25 @@ func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, 
 	// ─────────────────────────────────────────────────────────
 	gitCloner := git.NewCloner(cfg.WorkspacePath, logFactory, logger)
 
+	// ─────────────────────────────────────────────────────────
+	// Initialize Builder
+	// ─────────────────────────────────────────────────────────
+	builderConfig := builder.Config{
+		BuildkitAddr:     cfg.BuildkitAddr,
+		RegistryURL:      cfg.RegistryURL,
+		InsecureRegistry: cfg.RegistryInsecure,
+		Platform:         cfg.BuildPlatform,
+		Timeout:          cfg.BuildTimeout,
+	}
+	builder := builder.NewBuilder(builderConfig, logFactory, logger)
+
 	// Create worker instance
 	w := &Worker{
 		cfg:        cfg,
 		queue:      q,
 		api:        apiClient,
 		git:        gitCloner,
+		builder:    builder,
 		logFactory: logFactory,
 		logger:     logger,
 	}
@@ -73,6 +88,8 @@ func (w *Worker) Start(ctx context.Context) error {
 		zap.String("worker_id", w.cfg.WorkerID),
 		zap.String("api_url", w.cfg.APIBaseURL),
 		zap.String("workspace", w.cfg.WorkspacePath),
+		zap.String("buildkit_addr", w.cfg.BuildkitAddr),
+		zap.String("registry_url", w.cfg.RegistryURL),
 	)
 
 	for {
@@ -84,7 +101,6 @@ func (w *Worker) Start(ctx context.Context) error {
 			// Continue processing
 		}
 
-		// Wait for and get next job
 		job, jobID, err := w.queue.WaitForJob(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
@@ -94,7 +110,6 @@ func (w *Worker) Start(ctx context.Context) error {
 			continue
 		}
 
-		// Process the job
 		w.logger.Info("Processing job",
 			zap.String("jobId", jobID),
 			zap.String("deploymentId", job.DeploymentID),
@@ -116,9 +131,11 @@ func (w *Worker) Start(ctx context.Context) error {
 	}
 }
 
+// processJob handles a single build job
 func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID string) error {
 	startTime := time.Now()
 
+	// Create a build logger for this deployment
 	buildLog := w.logFactory.CreateBuildLogger(job.DeploymentID)
 	defer buildLog.Close()
 
@@ -136,9 +153,14 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 		return fmt.Errorf("failed to update status to BUILDING: %w", err)
 	}
 
-	buildLog.Log(fmt.Sprintf("🚀 Starting build for %s", job.ProjectName))
-	buildLog.Log(fmt.Sprintf("   Branch: %s | Commit: %s", job.Branch, job.CommitHash[:8]))
-	buildLog.Log(fmt.Sprintf("   Domains: %v", job.Domains))
+	buildLog.Log("═══════════════════════════════════════════════════════════")
+	buildLog.Log(fmt.Sprintf("  🚀 Code2Cloud Build - %s", job.ProjectName))
+	buildLog.Log("═══════════════════════════════════════════════════════════")
+	buildLog.Log(fmt.Sprintf("  Branch:    %s", job.Branch))
+	buildLog.Log(fmt.Sprintf("  Commit:    %s", job.CommitHash[:8]))
+	buildLog.Log(fmt.Sprintf("  Framework: %s", job.BuildConfig.Framework))
+	buildLog.Log(fmt.Sprintf("  Domains:   %v", job.Domains))
+	buildLog.Log("═══════════════════════════════════════════════════════════")
 	buildLog.Log("")
 
 	// ─────────────────────────────────────────────────────────
@@ -157,6 +179,8 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 	// ─────────────────────────────────────────────────────────
 	// Step 3: Get GitHub Installation Token
 	// ─────────────────────────────────────────────────────────
+	buildLog.Log("📦 Phase 1: Source Code")
+	buildLog.Log("─────────────────────────────────────────────────────────────")
 	buildLog.Log("🔑 Authenticating with GitHub...")
 
 	token, err := w.api.GetInstallationToken(ctx, job.InstallationID)
@@ -196,29 +220,56 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 		zap.Duration("duration", cloneResult.Duration),
 	)
 
+	buildLog.Log("")
+
 	// ─────────────────────────────────────────────────────────
 	// Step 5: Build with Railpack + BuildKit
 	// ─────────────────────────────────────────────────────────
-	buildLog.Log("")
-	buildLog.Log("🔨 Building container image...")
+	buildLog.Log("🔨 Phase 2: Build Image")
+	buildLog.Log("─────────────────────────────────────────────────────────────")
 
 	imageName := fmt.Sprintf("%s/%s:%s",
 		w.cfg.RegistryURL,
-		job.ProjectName,
+		sanitizeName(job.ProjectName),
 		cloneResult.CommitHash[:8],
 	)
 
-	// TODO: err = w.buildImage(ctx, job, repoPath, imageName)
-	w.logger.Info("Step 5: Would build image",
-		zap.String("image", imageName),
-		zap.String("repoPath", cloneResult.Path),
+	// Merge environment variables
+	envVars := builder.MergeEnvVars(
+		builder.DefaultBuildEnv(),
+		builder.FrameworkEnv(job.BuildConfig.Framework),
+		job.EnvVars,
 	)
 
-	buildLog.Log(fmt.Sprintf("   Image: %s", imageName))
+	buildResult, err := w.builder.Build(ctx, builder.Options{
+		SourcePath:   cloneResult.Path,
+		ImageName:    imageName,
+		DeploymentID: job.DeploymentID,
+		ProjectName:  job.ProjectName,
+		BuildConfig: builder.BuildConfigOptions{
+			InstallCommand: job.BuildConfig.InstallCommand,
+			BuildCommand:   job.BuildConfig.BuildCommand,
+			RunCommand:     job.BuildConfig.RunCommand,
+			OutputDir:      job.BuildConfig.OutputDir,
+			Framework:      job.BuildConfig.Framework,
+		},
+		EnvVars: envVars,
+	})
+	if err != nil {
+		return fmt.Errorf("build failed: %w", err)
+	}
 
-	if err := w.api.UpdateDeploymentWithImage(ctx, job.DeploymentID, types.StatusBuilding, imageName); err != nil {
+	w.logger.Info("Build completed",
+		zap.String("image", buildResult.ImageName),
+		zap.Duration("duration", buildResult.Duration),
+	)
+
+	// Update deployment with image name
+	if err := w.api.UpdateDeploymentWithImage(ctx, job.DeploymentID, types.StatusBuilding, buildResult.ImageName); err != nil {
 		w.logger.Warn("Failed to update deployment image", zap.Error(err))
 	}
+
+	buildLog.Log("")
 
 	// ─────────────────────────────────────────────────────────
 	// Step 6: Update status to DEPLOYING
@@ -227,23 +278,30 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 		return fmt.Errorf("failed to update status to DEPLOYING: %w", err)
 	}
 
-	buildLog.Log("")
-	buildLog.Log("🚢 Deploying to Kubernetes...")
+	buildLog.Log("🚢 Phase 3: Deploy to Kubernetes")
+	buildLog.Log("─────────────────────────────────────────────────────────────")
 
 	// ─────────────────────────────────────────────────────────
 	// Step 7: Deploy to Kubernetes
 	// ─────────────────────────────────────────────────────────
-	// TODO: err = w.deployToKubernetes(ctx, job, imageName)
+	// TODO: Phase 5 - K8s deployment
+	buildLog.Log("   Creating deployment...")
+	buildLog.Log("   Creating service...")
 	w.logger.Info("Step 7: Would deploy to Kubernetes")
 
 	// ─────────────────────────────────────────────────────────
 	// Step 8: Configure Ingress for domains
 	// ─────────────────────────────────────────────────────────
 	if len(job.Domains) > 0 {
-		buildLog.Log(fmt.Sprintf("🌐 Configuring domains: %v", job.Domains))
+		buildLog.Log("   Configuring ingress...")
+		for _, domain := range job.Domains {
+			buildLog.Log(fmt.Sprintf("   → %s", domain))
+		}
 	}
 
-	deploymentURL := fmt.Sprintf("https://%s.%s", job.ProjectName, w.cfg.BaseDomain)
+	deploymentURL := fmt.Sprintf("https://%s.%s", sanitizeName(job.ProjectName), w.cfg.BaseDomain)
+
+	buildLog.Log("")
 
 	// ─────────────────────────────────────────────────────────
 	// Step 9: Mark as READY
@@ -252,14 +310,17 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 		return fmt.Errorf("failed to complete deployment: %w", err)
 	}
 
-	// Update project online status
 	w.api.UpdateProjectStatus(ctx, job.ProjectID, "ACTIVE")
 
 	duration := time.Since(startTime)
 
-	buildLog.Log("")
-	buildLog.Log(fmt.Sprintf("✅ Deployment complete in %s!", duration.Round(time.Second)))
-	buildLog.Log(fmt.Sprintf("   URL: %s", deploymentURL))
+	buildLog.Log("═══════════════════════════════════════════════════════════")
+	buildLog.Log("  ✅ Deployment Complete!")
+	buildLog.Log("═══════════════════════════════════════════════════════════")
+	buildLog.Log(fmt.Sprintf("  URL:      %s", deploymentURL))
+	buildLog.Log(fmt.Sprintf("  Image:    %s", buildResult.ImageName))
+	buildLog.Log(fmt.Sprintf("  Duration: %s", duration.Round(time.Second)))
+	buildLog.Log("═══════════════════════════════════════════════════════════")
 
 	// ─────────────────────────────────────────────────────────
 	// Step 10: Send success notification
@@ -284,4 +345,20 @@ func (w *Worker) shutdown() error {
 	}
 	
 	return nil
+}
+
+// sanitizeName makes a name safe for K8s/DNS (lowercase, alphanumeric, dashes)
+func sanitizeName(name string) string {
+	result := make([]byte, 0, len(name))
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		if c >= 'A' && c <= 'Z' {
+			result = append(result, c+32) // lowercase
+		} else if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' {
+			result = append(result, c)
+		} else if c == '_' || c == ' ' {
+			result = append(result, '-')
+		}
+	}
+	return string(result)
 }
