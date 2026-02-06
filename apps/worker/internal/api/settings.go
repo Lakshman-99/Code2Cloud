@@ -27,7 +27,34 @@ type ProjectSettings struct {
 	} `json:"user"`
 }
 
-// GetProjectSettings fetches settings for a project
+func (s *ProjectSettings) DefaultCPURequest() string {
+	if s.TurboMode {
+		return "200m"
+	}
+	return "100m"
+}
+
+func (s *ProjectSettings) DefaultCPULimit() string {
+	if s.TurboMode {
+		return "1000m"
+	}
+	return "500m"
+}
+
+func (s *ProjectSettings) DefaultMemoryRequest() string {
+	if s.TurboMode {
+		return "256Mi"
+	}
+	return "128Mi"
+}
+
+func (s *ProjectSettings) DefaultMemoryLimit() string {
+	if s.TurboMode {
+		return "1Gi"
+	}
+	return "512Mi"
+}
+
 func (c *Client) GetProjectSettings(ctx context.Context, projectID string) (*ProjectSettings, error) {
 	path := fmt.Sprintf("/internal/settings/by-project/%s", projectID)
 

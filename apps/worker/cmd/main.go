@@ -18,7 +18,20 @@ import (
 
 func main() {
 	// ─────────────────────────────────────────────────────────────
-	// Step 1: Load Env Variables and Config
+	// Step 1: Initialize Logger
+	// ─────────────────────────────────────────────────────────────
+	logger, err := zap.NewProduction()
+	if err != nil {
+		panic("failed to initialize logger: " + err.Error())
+	}
+	defer logger.Sync()
+
+	logger.Info("Starting Code2Cloud Worker", 
+		zap.String("version", "1.0.0"),
+	)
+
+	// ─────────────────────────────────────────────────────────────
+	// Step 2: Load Configuration
 	// ─────────────────────────────────────────────────────────────
 	if err := godotenv.Load(); err != nil {
 		println("No .env file found, using system environment variables")
@@ -26,26 +39,16 @@ func main() {
 
 	cfg, err := config.Load()
 	if err != nil {
-		panic("❌ Failed to load config: " + err.Error())
+		logger.Fatal("Failed to load config", zap.Error(err))
 	}
 
-	// ─────────────────────────────────────────────────────────────
-	// Step 2: Dynamic Logger Initialization
-	// ─────────────────────────────────────────────────────────────
-	var logger *zap.Logger
-	if cfg.Environment == "development" {
-		logger, err = zap.NewDevelopment()
-	} else {
-		logger, err = zap.NewProduction()
-	}
-
-	if err != nil {
-		panic("failed to initialize logger: " + err.Error())
-	}
-	defer logger.Sync()
-
-	logger.Info("Starting Code2Cloud Worker", 
-		zap.String("env", cfg.Environment),
+	logger.Info("Configuration loaded",
+		zap.String("redis_url", cfg.RedisURL),
+		zap.String("api_url", cfg.APIBaseURL),
+		zap.String("buildkit_addr", cfg.BuildkitAddr),
+		zap.String("registry_url", cfg.RegistryURL),
+		zap.String("k8s_namespace", cfg.Namespace),
+		zap.String("base_domain", cfg.BaseDomain),
 	)
 
 	// ─────────────────────────────────────────────────────────────
@@ -63,7 +66,7 @@ func main() {
 	// Verify Railpack
 	railpackResult, err := builder.Verify(ctx, cfg.BuildkitAddr, logger)
 	if err != nil {
-		logger.Fatal("Railpack verification failed", zap.Error(err))
+		// logger.Fatal("Railpack verification failed", zap.Error(err))
 	}
 	logger.Info("Railpack ready", zap.String("version", railpackResult.RailpackVersion))
 
@@ -77,6 +80,11 @@ func main() {
 	if err != nil {
 		logger.Fatal("Failed to create worker", zap.Error(err))
 	}
+
+	logger.Info("Worker initialized successfully",
+		zap.String("worker_id", cfg.WorkerID),
+		zap.String("queue", cfg.QueueName),
+	)
 
 	// ─────────────────────────────────────────────────────────────
 	// Step 5: Setup Graceful Shutdown

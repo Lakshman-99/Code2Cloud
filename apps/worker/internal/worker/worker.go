@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -11,6 +12,7 @@ import (
 	"code2cloud/worker/internal/builder"
 	"code2cloud/worker/internal/config"
 	"code2cloud/worker/internal/git"
+	"code2cloud/worker/internal/k8s"
 	"code2cloud/worker/internal/logging"
 	"code2cloud/worker/internal/queue"
 	"code2cloud/worker/internal/types"
@@ -23,6 +25,7 @@ type Worker struct {
 	api        *api.Client
 	git        *git.Cloner
 	builder    *builder.Builder
+	k8s        *k8s.Client
 	logFactory *logging.Factory 
 	logger     *zap.Logger
 }
@@ -68,6 +71,18 @@ func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, 
 	}
 	builder := builder.NewBuilder(builderConfig, logFactory, logger)
 
+	// ─────────────────────────────────────────────────────────
+	// Initialize Kubernetes Client
+	// ─────────────────────────────────────────────────────────
+	k8sClient, err := k8s.NewClient(k8s.Config{
+		Namespace:  cfg.Namespace,
+		BaseDomain: cfg.BaseDomain,
+	}, logFactory, logger)
+	if err != nil {
+		q.Close()
+		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
+	}
+
 	// Create worker instance
 	w := &Worker{
 		cfg:        cfg,
@@ -75,6 +90,7 @@ func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, 
 		api:        apiClient,
 		git:        gitCloner,
 		builder:    builder,
+		k8s:        k8sClient,
 		logFactory: logFactory,
 		logger:     logger,
 	}
@@ -90,6 +106,7 @@ func (w *Worker) Start(ctx context.Context) error {
 		zap.String("workspace", w.cfg.WorkspacePath),
 		zap.String("buildkit_addr", w.cfg.BuildkitAddr),
 		zap.String("registry_url", w.cfg.RegistryURL),
+		zap.String("k8s_namespace", w.cfg.Namespace),
 	)
 
 	for {
@@ -284,33 +301,46 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 	// ─────────────────────────────────────────────────────────
 	// Step 7: Deploy to Kubernetes
 	// ─────────────────────────────────────────────────────────
-	// TODO: Phase 5 - K8s deployment
-	buildLog.Log("   Creating deployment...")
-	buildLog.Log("   Creating service...")
-	w.logger.Info("Step 7: Would deploy to Kubernetes")
-
-	// ─────────────────────────────────────────────────────────
-	// Step 8: Configure Ingress for domains
-	// ─────────────────────────────────────────────────────────
-	if len(job.Domains) > 0 {
-		buildLog.Log("   Configuring ingress...")
-		for _, domain := range job.Domains {
-			buildLog.Log(fmt.Sprintf("   → %s", domain))
-		}
+	deployOpts := k8s.DeployOptions{
+		DeploymentID:  job.DeploymentID,
+		ProjectID:     job.ProjectID,
+		ProjectName:   job.ProjectName,
+		ImageName:     buildResult.ImageName,
+		Port:          3000,
+		CPURequest:    settings.DefaultCPURequest(),
+		CPULimit:      settings.DefaultCPULimit(),
+		MemoryRequest: settings.DefaultMemoryRequest(),
+		MemoryLimit:   settings.DefaultMemoryLimit(),
+		Replicas:      1,
+		EnvVars:       job.EnvVars,
+		Domains:       job.Domains,
+		BaseDomain:    w.cfg.BaseDomain,
+		HealthPath:    "/health",
 	}
 
-	deploymentURL := fmt.Sprintf("https://%s.%s", sanitizeName(job.ProjectName), w.cfg.BaseDomain)
+	deployResult, err := w.k8s.Deploy(ctx, deployOpts)
+	if err != nil {
+		return fmt.Errorf("kubernetes deployment failed: %w", err)
+	}
 
 	buildLog.Log("")
 
 	// ─────────────────────────────────────────────────────────
-	// Step 9: Mark as READY
+	// Step 8: Mark as READY
 	// ─────────────────────────────────────────────────────────
+	deploymentURL := deployResult.URLs[0] // Primary URL
+
 	if err := w.api.UpdateDeploymentWithURL(ctx, job.DeploymentID, types.StatusReady, deploymentURL); err != nil {
 		return fmt.Errorf("failed to complete deployment: %w", err)
 	}
 
 	w.api.UpdateProjectStatus(ctx, job.ProjectID, "ACTIVE")
+
+	// Update domain statuses
+	for _, domain := range job.Domains {
+		// Note: You might want to pass domain IDs in the job
+		w.logger.Debug("Domain configured", zap.String("domain", domain))
+	}
 
 	duration := time.Since(startTime)
 
@@ -318,12 +348,15 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 	buildLog.Log("  ✅ Deployment Complete!")
 	buildLog.Log("═══════════════════════════════════════════════════════════")
 	buildLog.Log(fmt.Sprintf("  URL:      %s", deploymentURL))
+	if len(deployResult.URLs) > 1 {
+		buildLog.Log(fmt.Sprintf("  Aliases:  %s", strings.Join(deployResult.URLs[1:], ", ")))
+	}
 	buildLog.Log(fmt.Sprintf("  Image:    %s", buildResult.ImageName))
 	buildLog.Log(fmt.Sprintf("  Duration: %s", duration.Round(time.Second)))
 	buildLog.Log("═══════════════════════════════════════════════════════════")
 
 	// ─────────────────────────────────────────────────────────
-	// Step 10: Send success notification
+	// Step 9: Send success notification
 	// ─────────────────────────────────────────────────────────
 	w.api.NotifySuccess(ctx, job.DeploymentID, job.ProjectName, deploymentURL, int(duration.Seconds()))
 
@@ -347,14 +380,13 @@ func (w *Worker) shutdown() error {
 	return nil
 }
 
-// sanitizeName makes a name safe for K8s/DNS (lowercase, alphanumeric, dashes)
+// sanitizeName makes a name safe for K8s/DNS
 func sanitizeName(name string) string {
+	name = strings.ToLower(name)
 	result := make([]byte, 0, len(name))
 	for i := 0; i < len(name); i++ {
 		c := name[i]
-		if c >= 'A' && c <= 'Z' {
-			result = append(result, c+32) // lowercase
-		} else if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' {
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' {
 			result = append(result, c)
 		} else if c == '_' || c == ' ' {
 			result = append(result, '-')
