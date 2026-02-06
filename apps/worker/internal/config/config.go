@@ -32,6 +32,7 @@ type Config struct {
 	Namespace string
 
 	// ─── Domain ──────────────────────────────────────────────
+	ServerIP string
 	BaseDomain string
 
 	// ─── Worker Settings ─────────────────────────────────────
@@ -53,6 +54,7 @@ func Load() (*Config, error) {
 		BuildTimeout:    getDurationEnv("BUILD_TIMEOUT", 15*time.Minute),
 		BuildPlatform:   getEnv("BUILD_PLATFORM", ""),
 		Namespace:       getEnv("K8S_NAMESPACE", "deployments"),
+		ServerIP:        getEnv("SERVER_IP", ""),
 		BaseDomain:      getEnv("BASE_DOMAIN", "code2cloud.lakshman.me"),
 		QueueName:       getEnv("QUEUE_NAME", "build-queue"),
 		WorkerID:        getEnv("WORKER_ID", "worker-1"),

@@ -18,7 +18,6 @@ import (
 	"code2cloud/worker/internal/types"
 )
 
-
 type Worker struct {
 	cfg        *config.Config
 	queue      *queue.Queue
@@ -29,6 +28,8 @@ type Worker struct {
 	logFactory *logging.Factory 
 	logger     *zap.Logger
 	logStreamer *k8s.LogStreamer
+
+	domainWorker *k8s.DomainWorker
 }
 
 func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, error) {
@@ -86,6 +87,19 @@ func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, 
 
 	logStreamer := k8s.NewLogStreamer(k8sClient, logFactory, logger)
 
+	domainManager := k8s.NewDomainManager(k8sClient, k8s.DomainConfig{
+		ServerIP:   cfg.ServerIP,
+		BaseDomain: cfg.BaseDomain,
+	}, logger)
+
+	domainWorker := k8s.NewDomainWorker(k8s.DomainWorkerConfig{
+		Manager:             domainManager,
+		FetchPendingDomains: apiClient.GetPendingDomains,
+		UpdateDomainStatus:  apiClient.UpdateDomainStatus,
+		CheckInterval:       30 * time.Second,
+		Logger:              logger,
+	})
+
 	// Create worker instance
 	w := &Worker{
 		cfg:         cfg,
@@ -96,7 +110,8 @@ func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, 
 		k8s:         k8sClient,
 		logFactory:  logFactory,
 		logger:      logger,
-		logStreamer:  logStreamer,
+		logStreamer:   logStreamer,
+		domainWorker: domainWorker,
 	}
 
 	return w, nil
@@ -112,6 +127,9 @@ func (w *Worker) Start(ctx context.Context) error {
 		zap.String("registry_url", w.cfg.RegistryURL),
 		zap.String("k8s_namespace", w.cfg.Namespace),
 	)
+
+	// Domain verification background loop, checking pending domains every 30s
+	w.domainWorker.Start(ctx)
 
 	for {
 		select {

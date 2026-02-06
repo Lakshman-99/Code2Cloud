@@ -52,7 +52,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body interf
 
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Worker-Key", c.apiKey) 
+	req.Header.Set("x-worker-api-key", c.apiKey) 
 
 	// Execute request
 	resp, err := c.httpClient.Do(req)

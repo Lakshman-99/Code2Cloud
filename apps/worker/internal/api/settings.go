@@ -89,15 +89,3 @@ func (c *Client) UpdateProjectStatus(ctx context.Context, projectID string, stat
 
 	return nil
 }
-
-// UpdateDomainStatus updates the status of a domain
-func (c *Client) UpdateDomainStatus(ctx context.Context, domainID string, status string) error {
-	path := fmt.Sprintf("/internal/domains/%s/status", domainID)
-	body := map[string]string{"status": status}
-
-	if err := c.patch(ctx, path, body); err != nil {
-		return fmt.Errorf("failed to update domain status: %w", err)
-	}
-
-	return nil
-}
