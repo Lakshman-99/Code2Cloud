@@ -28,6 +28,7 @@ type Worker struct {
 	k8s        *k8s.Client
 	logFactory *logging.Factory 
 	logger     *zap.Logger
+	logStreamer *k8s.LogStreamer
 }
 
 func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, error) {
@@ -69,7 +70,7 @@ func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, 
 		Platform:         cfg.BuildPlatform,
 		Timeout:          cfg.BuildTimeout,
 	}
-	builder := builder.NewBuilder(builderConfig, logFactory, logger)
+	bldr := builder.NewBuilder(builderConfig, logFactory, logger)
 
 	// ─────────────────────────────────────────────────────────
 	// Initialize Kubernetes Client
@@ -83,16 +84,19 @@ func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, 
 		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
+	logStreamer := k8s.NewLogStreamer(k8sClient, logFactory, logger)
+
 	// Create worker instance
 	w := &Worker{
-		cfg:        cfg,
-		queue:      q,
-		api:        apiClient,
-		git:        gitCloner,
-		builder:    builder,
-		k8s:        k8sClient,
-		logFactory: logFactory,
-		logger:     logger,
+		cfg:         cfg,
+		queue:       q,
+		api:         apiClient,
+		git:         gitCloner,
+		builder:     bldr,
+		k8s:         k8sClient,
+		logFactory:  logFactory,
+		logger:      logger,
+		logStreamer:  logStreamer,
 	}
 
 	return w, nil
@@ -141,6 +145,8 @@ func (w *Worker) Start(ctx context.Context) error {
 			w.api.FailDeployment(ctx, job.DeploymentID, err.Error())
 			w.api.NotifyFailure(ctx, job.DeploymentID, job.ProjectName, err.Error())
 			w.queue.FailJob(ctx, jobID, err.Error())
+			w.logStreamer.StopStreaming(job.DeploymentID)
+
 			continue
 		}
 
@@ -360,6 +366,22 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 	// ─────────────────────────────────────────────────────────
 	w.api.NotifySuccess(ctx, job.DeploymentID, job.ProjectName, deploymentURL, int(duration.Seconds()))
 
+	// ─────────────────────────────────────────────────────────
+	// Step 10: Start streaming runtime logs
+	// ─────────────────────────────────────────────────────────
+	if err := w.logStreamer.StartStreaming(ctx, job.DeploymentID, job.ProjectName); err != nil {
+		w.logger.Warn("Failed to start runtime log streaming (non-fatal)",
+			zap.String("deployment", job.DeploymentID),
+			zap.Error(err),
+		)
+		// Don't return error — deployment is already live
+	} else {
+		w.logger.Info("Runtime log streaming started",
+			zap.String("deployment", job.DeploymentID),
+			zap.Int("active_streams", w.logStreamer.ActiveStreams()),
+		)
+	}
+
 	w.logger.Info("Job completed successfully! 🎉",
 		zap.String("deployment", job.DeploymentID),
 		zap.String("url", deploymentURL),
@@ -372,6 +394,13 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 // shutdown cleans up resources
 func (w *Worker) shutdown() error {
 	w.logger.Info("Cleaning up resources...")
+
+	if w.logStreamer != nil {
+		w.logger.Info("Stopping all log streams...",
+			zap.Int("active_streams", w.logStreamer.ActiveStreams()),
+		)
+		w.logStreamer.StopAll()
+	}
 	
 	if w.queue != nil {
 		w.queue.Close()
