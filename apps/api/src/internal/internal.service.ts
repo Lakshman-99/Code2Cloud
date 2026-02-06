@@ -245,13 +245,39 @@ export class InternalService {
     const domain = await this.prisma.domain.findUnique({ where: { id } });
     if (!domain) throw new NotFoundException("Domain not found");
 
+    const updateData: Record<string, unknown> = { status: dto.status };
+
+    // Set or clear error message
+    if (dto.error !== undefined) {
+      updateData.error = dto.error || null;
+    }
+
     const updated = await this.prisma.domain.update({
       where: { id },
-      data: { status: dto.status },
+      data: updateData,
     });
 
     this.logger.log(`Domain ${id} status updated to ${dto.status}`);
     return updated;
+  }
+
+  async getPendingDomains() {
+    const domains = await this.prisma.domain.findMany({
+      where: { status: 'PENDING' },
+      include: {
+        project: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return domains.map((d) => ({
+      id: d.id,
+      domain: d.name,
+      projectId: d.project.id,
+      projectName: d.project.name,
+      status: d.status,
+      createdAt: d.createdAt.toISOString(),
+    }));
   }
 
   async sendDeploymentNotification(dto: DeploymentNotificationDto) {

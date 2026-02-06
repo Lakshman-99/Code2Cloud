@@ -194,6 +194,7 @@ model Domain {
   name       String           @unique
   status     DomainDnsStatus  @default(PENDING)
   type       EnvironmentType  @default(PRODUCTION)
+  error      String?          @db.Text
 
   projectId  String
   project    Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -202,6 +203,7 @@ model Domain {
   updatedAt  DateTime         @updatedAt
 
   @@index([projectId])
+  @@index([status])
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -77,6 +77,11 @@ export class InternalController {
     return this.internalService.updateProjectStatus(id, dto);
   }
 
+  @Get('domains/pending')
+  getPendingDomains() {
+    return this.internalService.getPendingDomains();
+  }
+
   @Patch('domains/:id/status')
   updateDomainStatus(
     @Param('id') id: string,
