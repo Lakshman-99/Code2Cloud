@@ -15,7 +15,7 @@ func (c *Client) CreateOrUpdateIngress(ctx context.Context, opts DeployOptions) 
 
 	hosts := make([]string, 0, len(opts.Domains)+1)
 
-	defaultHost := fmt.Sprintf("%s.%s", name, c.baseDomain)
+	defaultHost := sanitizeHost(fmt.Sprintf("%s.%s", name, c.baseDomain))
 	hosts = append(hosts, defaultHost)
 
 	for _, domain := range opts.Domains {
@@ -151,8 +151,10 @@ func (c *Client) UpdateIngressHosts(ctx context.Context, name string, hosts []st
 	rules := make([]networkingv1.IngressRule, 0, len(hosts))
 
 	for _, host := range hosts {
+		cleanHost := sanitizeHost(host)
+		
 		rules = append(rules, networkingv1.IngressRule{
-			Host: host,
+			Host: cleanHost,
 			IngressRuleValue: networkingv1.IngressRuleValue{
 				HTTP: &networkingv1.HTTPIngressRuleValue{
 					Paths: []networkingv1.HTTPIngressPath{{

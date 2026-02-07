@@ -155,3 +155,10 @@ func sanitizeK8sName(name string) string {
 
 	return string(result)
 }
+
+func sanitizeHost(host string) string {
+	host = strings.TrimPrefix(host, "https://")
+	host = strings.TrimPrefix(host, "http://")
+	host = strings.Split(host, "/")[0]
+	return strings.ToLower(host)
+}
