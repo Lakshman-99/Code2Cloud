@@ -48,10 +48,7 @@ func New(url, queueName string, logger *zap.Logger) (*Queue, error) {
 // Job Processing
 // ─────────────────────────────────────────────────────────────
 func (q *Queue) WaitForJob(ctx context.Context) (*types.BuildJob, string, error) {
-	waitKey := fmt.Sprintf("bull:%s:wait", q.queueName)
-	activeKey := fmt.Sprintf("bull:%s:active", q.queueName)
-
-	q.logger.Debug("Waiting for job...", zap.String("key", waitKey))
+	q.logger.Debug("Waiting for job...", zap.String("key", q.queueName))
 
 	for {
 		select {
@@ -61,79 +58,51 @@ func (q *Queue) WaitForJob(ctx context.Context) (*types.BuildJob, string, error)
 			// Continue processing
 		}
 
-		result, err := q.client.BRPopLPush(ctx, waitKey, activeKey, 5*time.Second).Result()
+		result, err := q.client.BRPop(ctx, 5*time.Second, q.queueName).Result()
 		
 		if err == redis.Nil {
 			continue
 		}
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil, "", ctx.Err()
+			}
 			return nil, "", fmt.Errorf("failed to pop job: %w", err)
 		}
 
-		jobID := result
-		q.logger.Info("Got job", zap.String("jobId", jobID))
+		rawJSON := result[1]
 
-		// Fetch job data from hash
-		job, err := q.getJobData(ctx, jobID)
-		if err != nil {
-			q.logger.Error("Failed to get job data", 
-				zap.String("jobId", jobID),
+		var job types.BuildJob
+		if err := json.Unmarshal([]byte(rawJSON), &job); err != nil {
+			q.logger.Error("Failed to parse job data",
+				zap.String("raw", rawJSON),
 				zap.Error(err),
 			)
-			q.FailJob(ctx, jobID, err.Error())
 			continue
 		}
 
-		return job, jobID, nil
+		// Use deploymentID as the job identifier for logging/tracking
+		jobID := job.DeploymentID
+
+		q.logger.Info("Got job",
+			zap.String("jobId", jobID),
+			zap.String("project", job.ProjectName),
+			zap.String("deployment", job.DeploymentID),
+		)
+
+		return &job, jobID, nil
 	}
-}
-
-// getJobData fetches and parses job data from Redis hash
-func (q *Queue) getJobData(ctx context.Context, jobID string) (*types.BuildJob, error) {
-	key := fmt.Sprintf("bull:%s:%s", q.queueName, jobID)
-
-	data, err := q.client.HGet(ctx, key, "data").Result()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get job data: %w", err)
-	}
-
-	var job types.BuildJob
-	if err := json.Unmarshal([]byte(data), &job); err != nil {
-		return nil, fmt.Errorf("failed to parse job data: %w", err)
-	}
-
-	return &job, nil
 }
 
 // ─────────────────────────────────────────────────────────────
 // Job Completion
 // ─────────────────────────────────────────────────────────────
 func (q *Queue) CompleteJob(ctx context.Context, jobID string) error {
-	activeKey := fmt.Sprintf("bull:%s:active", q.queueName)
-	completedKey := fmt.Sprintf("bull:%s:completed", q.queueName)
-
-	q.client.LRem(ctx, activeKey, 1, jobID)
-
-	q.client.ZAdd(ctx, completedKey, redis.Z{
-		Score:  float64(time.Now().Unix()),
-		Member: jobID,
-	})
-
 	q.logger.Info("Job completed", zap.String("jobId", jobID))
 	return nil
 }
 
 func (q *Queue) FailJob(ctx context.Context, jobID, reason string) error {
-	activeKey := fmt.Sprintf("bull:%s:active", q.queueName)
-	failedKey := fmt.Sprintf("bull:%s:failed", q.queueName)
-
-	q.client.LRem(ctx, activeKey, 1, jobID)
-
-	q.client.ZAdd(ctx, failedKey, redis.Z{
-		Score:  float64(time.Now().Unix()),
-		Member: jobID,
-	})
-
 	q.logger.Error("Job failed", 
 		zap.String("jobId", jobID),
 		zap.String("reason", reason),

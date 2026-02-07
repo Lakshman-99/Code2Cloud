@@ -131,7 +131,7 @@ spec:
             limits:
               cpu: "1000m"
               memory: "512Mi"
-            volumeMounts:
+          volumeMounts:
             - name: tmp
               mountPath: /tmp/builds
       volumes:
