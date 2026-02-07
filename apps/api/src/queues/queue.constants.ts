@@ -13,6 +13,7 @@ export interface BuildJobData {
   buildConfig: {
     installCommand?: string;
     buildCommand?: string;
+    runCommand?: string;
     outputDir?: string;
     framework: string;
   };

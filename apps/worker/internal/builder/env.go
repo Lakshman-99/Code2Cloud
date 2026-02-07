@@ -74,38 +74,74 @@ func FrameworkRuntimePortEnv(framework string, port int32) map[string]string {
 	portStr := fmt.Sprintf("%d", port)
 
 	switch strings.ToLower(framework) {
-		// Node.js / JavaScript frameworks
-		case "nextjs":
-			return map[string]string{"PORT": portStr, "HOSTNAME": "0.0.0.0"}
-		case "vite":
-			return map[string]string{"PORT": portStr, "HOST": "0.0.0.0"}
-		case "nuxt", "nuxtjs":
-			return map[string]string{"PORT": portStr, "HOST": "0.0.0.0", "NUXT_PORT": portStr, "NUXT_HOST": "0.0.0.0"}
-		case "angular":
-			return map[string]string{"PORT": portStr}
-		case "gatsby", "create-react-app", "vue":
-			return map[string]string{"PORT": portStr}
-		case "express", "fastify", "nestjs", "node":
-			return map[string]string{"PORT": portStr}
+	// Node.js / JavaScript frameworks
+	case "nextjs":
+		return map[string]string{"PORT": portStr, "HOSTNAME": "0.0.0.0"}
+	case "vite", "vue", "sveltekit":
+		return map[string]string{"PORT": portStr, "HOST": "0.0.0.0"}
+	case "nuxt", "nuxtjs":
+		return map[string]string{"PORT": portStr, "HOST": "0.0.0.0", "NUXT_PORT": portStr, "NUXT_HOST": "0.0.0.0"}
+	case "angular":
+		return map[string]string{"PORT": portStr}
+	case "gatsby", "create-react-app":
+		return map[string]string{"PORT": portStr}
+	case "express", "fastify", "nestjs", "node":
+		return map[string]string{"PORT": portStr}
+	case "astro":
+		return map[string]string{"PORT": portStr, "HOST": "0.0.0.0"}
 
-		// Python frameworks
-		case "django":
-			return map[string]string{"PORT": portStr}
-		case "flask":
-			return map[string]string{"PORT": portStr, "FLASK_RUN_PORT": portStr, "FLASK_RUN_HOST": "0.0.0.0"}
-		case "fastapi":
-			return map[string]string{"PORT": portStr, "UVICORN_PORT": portStr, "UVICORN_HOST": "0.0.0.0"}
-		case "streamlit":
-			return map[string]string{"PORT": portStr, "STREAMLIT_SERVER_PORT": portStr, "STREAMLIT_SERVER_ADDRESS": "0.0.0.0"}
-		case "python":
-			return map[string]string{"PORT": portStr}
+	// Python frameworks
+	case "django":
+		return map[string]string{"PORT": portStr}
+	case "flask":
+		return map[string]string{"PORT": portStr, "FLASK_RUN_PORT": portStr, "FLASK_RUN_HOST": "0.0.0.0"}
+	case "fastapi":
+		return map[string]string{"PORT": portStr, "UVICORN_PORT": portStr, "UVICORN_HOST": "0.0.0.0"}
+	case "streamlit":
+		return map[string]string{"PORT": portStr, "STREAMLIT_SERVER_PORT": portStr, "STREAMLIT_SERVER_ADDRESS": "0.0.0.0"}
+	case "python":
+		return map[string]string{"PORT": portStr}
 
-		// Go
-		case "golang", "go":
-			return map[string]string{"PORT": portStr}
+	// Go
+	case "golang", "go":
+		return map[string]string{"PORT": portStr}
 
-		default:
-			return map[string]string{"PORT": portStr}
+	default:
+		return map[string]string{"PORT": portStr}
+	}
+}
+
+// FrameworkStartCommand returns the correct start command for a framework
+// that ensures the app listens on the specified port.
+// Some frameworks (like vite preview) ignore the PORT env var entirely
+// and require explicit --port flags.
+func FrameworkStartCommand(framework string, currentCmd string, port int32) string {
+	portStr := fmt.Sprintf("%d", port)
+
+	// If the command already has --port, replace it with the correct one
+	if strings.Contains(currentCmd, "--port") {
+		// Already has a port flag — assume it's set correctly (might use $PORT)
+		return currentCmd
+	}
+
+	switch strings.ToLower(framework) {
+	case "vite", "vue", "sveltekit":
+		// vite preview ignores PORT env — must pass --port explicitly
+		return fmt.Sprintf("npx vite preview --port %s --host 0.0.0.0", portStr)
+	case "astro":
+		return fmt.Sprintf("npx astro preview --port %s --host 0.0.0.0", portStr)
+	case "fastapi":
+		if currentCmd == "" {
+			return fmt.Sprintf("uvicorn main:app --host 0.0.0.0 --port %s", portStr)
+		}
+		return currentCmd
+	case "streamlit":
+		if currentCmd == "" {
+			return fmt.Sprintf("streamlit run app.py --server.port %s --server.address 0.0.0.0", portStr)
+		}
+		return currentCmd
+	default:
+		return currentCmd
 	}
 }
 

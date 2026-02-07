@@ -186,12 +186,12 @@ export class GithubAppService {
           { dependency:'next', framework:'nextjs', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'.next' },
           { dependency:'@nestjs/core', framework:'nestjs', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'dist' },
           { dependency:'@angular/core', framework:'angular', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'dist' },
-          { dependency:'vite', framework:'vite', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run preview', outputDirectory:'dist' },
+          { dependency:'vite', framework:'vite', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx vite preview --port $PORT --host 0.0.0.0', outputDirectory:'dist' },
           { dependency:'react-scripts', framework:'create-react-app', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'build' },
-          { dependency:'vue', framework:'vue', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run preview', outputDirectory:'dist' },
+          { dependency:'vue', framework:'vue', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx vite preview --port $PORT --host 0.0.0.0', outputDirectory:'dist' },
           { dependency:'nuxt', framework:'nuxt', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'.output/public' },
-          { dependency:'@sveltejs/kit', framework:'sveltekit', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run preview', outputDirectory:'build' },
-          { dependency:'astro', framework:'astro', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run preview', outputDirectory:'dist' },
+          { dependency:'@sveltejs/kit', framework:'sveltekit', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx vite preview --port $PORT --host 0.0.0.0', outputDirectory:'build' },
+          { dependency:'astro', framework:'astro', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx astro preview --port $PORT --host 0.0.0.0', outputDirectory:'dist' },
           { dependency:'express', framework:'express', installCommand:'npm install', buildCommand:'', runCommand:'npm start', outputDirectory:'.' },
           { dependency:'fastify', framework:'fastify', installCommand:'npm install', buildCommand:'', runCommand:'npm start', outputDirectory:'.' },
         ];
@@ -235,7 +235,7 @@ export class GithubAppService {
       const contains = (keyword: string) => content.includes(keyword);
 
       if (contains('django')) return { framework: 'django', installCommand: 'pip install -r requirements.txt', buildCommand: 'python manage.py collectstatic --noinput', runCommand: 'gunicorn app.wsgi:application', outputDirectory: 'staticfiles' };
-      if (contains('fastapi')) return { framework: 'fastapi', installCommand: 'pip install -r requirements.txt', buildCommand: '', runCommand: 'uvicorn main:app --host 0.0.0.0 --port 8000', outputDirectory: '.' };
+      if (contains('fastapi')) return { framework: 'fastapi', installCommand: 'pip install -r requirements.txt', buildCommand: '', runCommand: 'uvicorn main:app --host 0.0.0.0 --port $PORT', outputDirectory: '.' };
       if (contains('flask')) return { framework: 'flask', installCommand: 'pip install -r requirements.txt', buildCommand: '', runCommand: 'gunicorn app:app', outputDirectory: '.' };
       if (contains('streamlit')) return { framework: 'streamlit', installCommand: 'pip install -r requirements.txt', buildCommand: '', runCommand: 'streamlit run app.py', outputDirectory: '.' };
 

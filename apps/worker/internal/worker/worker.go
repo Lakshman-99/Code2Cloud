@@ -304,6 +304,13 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 		job.EnvVars,
 	)
 
+	// Resolve the port early so it can inform the start command
+	port := resolvePort(job.EnvVars)
+
+	// Override the run command for frameworks that ignore the PORT env var
+	// (e.g. vite preview uses 4173 by default and ignores PORT)
+	runCmd := builder.FrameworkStartCommand(job.BuildConfig.Framework, job.BuildConfig.RunCommand, port)
+
 	buildResult, err := w.builder.Build(ctx, builder.Options{
 		SourcePath:   cloneResult.Path,
 		ImageName:    imageName,
@@ -312,7 +319,7 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 		BuildConfig: builder.BuildConfigOptions{
 			InstallCommand: job.BuildConfig.InstallCommand,
 			BuildCommand:   job.BuildConfig.BuildCommand,
-			RunCommand:     job.BuildConfig.RunCommand,
+			RunCommand:     runCmd,
 			OutputDir:      job.BuildConfig.OutputDir,
 			Framework:      job.BuildConfig.Framework,
 		},
@@ -347,8 +354,6 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 	// ─────────────────────────────────────────────────────────
 	// Step 7: Deploy to Kubernetes
 	// ─────────────────────────────────────────────────────────
-
-	port := resolvePort(job.EnvVars)
 
 	runtimeEnvVars := builder.MergeEnvVars(
 		job.EnvVars,
