@@ -86,8 +86,49 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	// ─────────────────────────────────────────────────────────
 	// Step 5: Execute build
 	// ─────────────────────────────────────────────────────────
-	buildLog.Log("🔨 Starting Railpack build via BuildKit...")
+	// ─────────────────────────────────────────────────────────
+	// Step 5a: Generate Railpack build plan
+	// ─────────────────────────────────────────────────────────
+	buildLog.Log("📋 Generating Railpack build plan...")
+
+	prepareArgs := []string{"prepare", ".", "--plan-out", "railpack-plan.json"}
+	if opts.BuildConfig.BuildCommand != "" {
+		prepareArgs = append(prepareArgs, "--build-cmd", opts.BuildConfig.BuildCommand)
+	}
+	if opts.BuildConfig.RunCommand != "" {
+		prepareArgs = append(prepareArgs, "--start-cmd", opts.BuildConfig.RunCommand)
+	}
+	for key, value := range opts.EnvVars {
+		prepareArgs = append(prepareArgs, "--env", fmt.Sprintf("%s=%s", key, value))
+	}
+
+	prepareCmd := exec.CommandContext(ctx, "railpack", prepareArgs...)
+	prepareCmd.Dir = opts.SourcePath
+	prepareCmd.Stdout = buildLog
+	prepareCmd.Stderr = buildLog
+	prepareCmd.Env = os.Environ()
+
+	if err := prepareCmd.Run(); err != nil {
+		buildLog.Flush()
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return nil, fmt.Errorf("railpack prepare failed with exit code %d", exitErr.ExitCode())
+		}
+		return nil, fmt.Errorf("railpack prepare failed: %w", err)
+	}
+
 	buildLog.Log("")
+
+	// ─────────────────────────────────────────────────────────
+	// Step 5b: Build with BuildKit using railpack frontend
+	// ─────────────────────────────────────────────────────────
+	buildLog.Log("🔨 Building image with BuildKit...")
+	buildLog.Log("")
+
+	cmd := exec.CommandContext(ctx, "buildctl", args...)
+	cmd.Dir = opts.SourcePath
+	cmd.Env = os.Environ()
+	cmd.Stdout = buildLog
+	cmd.Stderr = buildLog
 
 	if err := cmd.Run(); err != nil {
 		buildLog.Flush()
@@ -129,31 +170,10 @@ func (b *Builder) buildArgs(opts Options) []string {
 		"--addr", b.config.BuildkitAddr,
 		"build",
 		"--frontend", "gateway.v0",
-		"--opt", "source=ghcr.io/railwayapp/railpack:latest",
+		"--opt", "source=ghcr.io/railwayapp/railpack-frontend:latest",
 		"--local", "context=" + opts.SourcePath,
+		"--local", "dockerfile=" + opts.SourcePath,
 		"--progress", "plain",
-	}
-
-	// Build configuration passed as frontend options
-	if opts.BuildConfig.BuildCommand != "" {
-		args = append(args, "--opt", "build-cmd="+opts.BuildConfig.BuildCommand)
-	}
-	if opts.BuildConfig.RunCommand != "" {
-		args = append(args, "--opt", "start-cmd="+opts.BuildConfig.RunCommand)
-	}
-
-	if opts.ProjectName != "" {
-		args = append(args, "--opt", "cache-key="+opts.ProjectName)
-	}
-
-	// Environment variables as frontend options
-	for key, value := range opts.EnvVars {
-		args = append(args, "--opt", fmt.Sprintf("env:%s=%s", key, value))
-	}
-
-	// Platform
-	if b.config.Platform != "" {
-		args = append(args, "--opt", "platform="+b.config.Platform)
 	}
 
 	output := fmt.Sprintf("type=image,name=%s,push=true", opts.ImageName)
