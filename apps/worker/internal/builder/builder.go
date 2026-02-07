@@ -77,6 +77,13 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	cmd.Dir = opts.SourcePath
 	cmd.Env = os.Environ()
 
+	if opts.BuildConfig.InstallCommand != "" {
+		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand)
+		cmd.Env = append(cmd.Env, "RAILPACK_INSTALL_CMD="+installCmd)
+		args = append(args, "--secret", "id=RAILPACK_INSTALL_CMD,env=RAILPACK_INSTALL_CMD")
+		cmd.Args = append(cmd.Args[:1], args...)
+	}
+
 	// ─────────────────────────────────────────────────────────
 	// Step 4: Attach logging
 	// ─────────────────────────────────────────────────────────
@@ -92,21 +99,22 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	buildLog.Log("📋 Generating Railpack build plan...")
 
 	prepareArgs := []string{"prepare", ".", "--plan-out", "railpack-plan.json"}
-	if opts.BuildConfig.InstallCommand != "" {
-    prepareArgs = append(prepareArgs, "--env", fmt.Sprintf("RAILPACK_INSTALL_CMD=%s", opts.BuildConfig.InstallCommand))
-	}
 	if opts.BuildConfig.BuildCommand != "" {
 		prepareArgs = append(prepareArgs, "--build-cmd", opts.BuildConfig.BuildCommand)
 	}
 	if opts.BuildConfig.RunCommand != "" {
 		prepareArgs = append(prepareArgs, "--start-cmd", opts.BuildConfig.RunCommand)
 	}
-
 	prepareCmd := exec.CommandContext(ctx, "railpack", prepareArgs...)
 	prepareCmd.Dir = opts.SourcePath
 	prepareCmd.Stdout = buildLog
 	prepareCmd.Stderr = buildLog
 	prepareCmd.Env = os.Environ()
+
+	if opts.BuildConfig.InstallCommand != "" {
+		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand)
+		prepareCmd.Env = append(prepareCmd.Env, "RAILPACK_INSTALL_CMD="+installCmd)
+	}
 
 	if err := prepareCmd.Run(); err != nil {
 		buildLog.Flush()
@@ -170,10 +178,6 @@ func (b *Builder) buildArgs(opts Options) []string {
 		"--progress", "plain",
 	}
 
-	if opts.BuildConfig.InstallCommand != "" {
-		args = append(args, "--opt", fmt.Sprintf("env:RAILPACK_INSTALL_CMD=%s", opts.BuildConfig.InstallCommand))
-	}
-
 	output := fmt.Sprintf("type=image,name=%s,push=true", opts.ImageName)
 	if b.config.InsecureRegistry {
 		output += ",registry.insecure=true"
@@ -181,6 +185,18 @@ func (b *Builder) buildArgs(opts Options) []string {
 	args = append(args, "--output", output)
 
 	return args
+}
+
+func normalizeInstallCommand(cmd string) string {
+	cmd = strings.TrimSpace(cmd)
+	if cmd == "" {
+		return cmd
+	}
+	// If it starts with "--", it's just flags — prepend "npm install"
+	if strings.HasPrefix(cmd, "--") {
+		return "npm install " + cmd
+	}
+	return cmd
 }
 
 func sanitizeArgs(args []string) []string {
