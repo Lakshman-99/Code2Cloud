@@ -93,7 +93,7 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 
 	prepareArgs := []string{"prepare", ".", "--plan-out", "railpack-plan.json"}
 	if opts.BuildConfig.InstallCommand != "" {
-    prepareArgs = append(prepareArgs, "--install-cmd", opts.BuildConfig.InstallCommand)
+    prepareArgs = append(prepareArgs, "--env", fmt.Sprintf("RAILPACK_INSTALL_CMD=%s", opts.BuildConfig.InstallCommand))
 	}
 	if opts.BuildConfig.BuildCommand != "" {
 		prepareArgs = append(prepareArgs, "--build-cmd", opts.BuildConfig.BuildCommand)
