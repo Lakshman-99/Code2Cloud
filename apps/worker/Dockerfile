@@ -22,15 +22,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-
-RUN ARCH=$(uname -m) && \
+RUN curl -fsSL https://railpack.com/install.sh | bash || { \
+    ARCH=$(uname -m) && \
     case $ARCH in \
-        aarch64|arm64) ARCH="aarch64" ;; \
+        aarch64|arm64) ARCH="arm64" ;; \
         x86_64) ARCH="x86_64" ;; \
     esac && \
-    curl -fsSL "https://github.com/railwayapp/railpack/releases/latest/download/railpack-${ARCH}-unknown-linux-gnu.tar.gz" \
+    curl -fsSL "https://github.com/railwayapp/railpack/releases/latest/download/railpack-${ARCH}-unknown-linux-musl.tar.gz" \
     | tar -xz -C /usr/local/bin && \
-    chmod +x /usr/local/bin/railpack
+    chmod +x /usr/local/bin/railpack; \
+    }
 
 RUN ARCH=$(dpkg --print-architecture) && \
     curl -fsSL "https://github.com/moby/buildkit/releases/download/v0.21.0/buildkit-v0.21.0.linux-${ARCH}.tar.gz" \
