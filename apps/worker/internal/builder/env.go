@@ -92,7 +92,7 @@ func FrameworkRuntimePortEnv(framework string, port int32) map[string]string {
 
 	// Python frameworks
 	case "django":
-		return map[string]string{"PORT": portStr}
+		return map[string]string{"PORT": portStr, "ALLOWED_HOSTS": "*"}
 	case "flask":
 		return map[string]string{"PORT": portStr, "FLASK_RUN_PORT": portStr, "FLASK_RUN_HOST": "0.0.0.0"}
 	case "fastapi":
@@ -112,24 +112,38 @@ func FrameworkRuntimePortEnv(framework string, port int32) map[string]string {
 }
 
 // FrameworkStartCommand returns the correct start command for a framework
-// that ensures the app listens on the specified port.
-// Some frameworks (like vite preview) ignore the PORT env var entirely
-// and require explicit --port flags.
+// that ensures the app listens on the specified port and allows all hosts.
+//
+// Static site frameworks (vite, vue, astro, sveltekit, angular, CRA, gatsby)
+// use the `serve` package instead of their built-in preview servers.
+// Preview servers have host-checking that blocks requests from custom domains.
 func FrameworkStartCommand(framework string, currentCmd string, port int32) string {
 	portStr := fmt.Sprintf("%d", port)
 
-	// If the command already has --port, replace it with the correct one
-	if strings.Contains(currentCmd, "--port") {
-		// Already has a port flag — assume it's set correctly (might use $PORT)
+	// If command already uses `serve`, it's already been fixed
+	if strings.Contains(currentCmd, "serve") && !strings.Contains(currentCmd, "preview") {
 		return currentCmd
 	}
 
 	switch strings.ToLower(framework) {
-	case "vite", "vue", "sveltekit":
-		// vite preview ignores PORT env — must pass --port explicitly
-		return fmt.Sprintf("npx vite preview --port %s --host 0.0.0.0", portStr)
+	// Static site frameworks — replace preview servers with `serve`
+	// to avoid host-checking issues (e.g. vite preview blocks non-localhost)
+	case "vite":
+		return fmt.Sprintf("npx --yes serve -s dist -l tcp://0.0.0.0:%s", portStr)
+	case "vue":
+		return fmt.Sprintf("npx --yes serve -s dist -l tcp://0.0.0.0:%s", portStr)
+	case "sveltekit":
+		return fmt.Sprintf("npx --yes serve -s build -l tcp://0.0.0.0:%s", portStr)
 	case "astro":
-		return fmt.Sprintf("npx astro preview --port %s --host 0.0.0.0", portStr)
+		return fmt.Sprintf("npx --yes serve -s dist -l tcp://0.0.0.0:%s", portStr)
+	case "angular":
+		return fmt.Sprintf("npx --yes serve -s dist -l tcp://0.0.0.0:%s", portStr)
+	case "create-react-app":
+		return fmt.Sprintf("npx --yes serve -s build -l tcp://0.0.0.0:%s", portStr)
+	case "gatsby":
+		return fmt.Sprintf("npx --yes serve -s public -l tcp://0.0.0.0:%s", portStr)
+
+	// Server frameworks — these have proper production servers, no host checking
 	case "fastapi":
 		if currentCmd == "" {
 			return fmt.Sprintf("uvicorn main:app --host 0.0.0.0 --port %s", portStr)

@@ -183,26 +183,33 @@ export class GithubAppService {
         const hasDependency = (dependencyName: string) => Boolean(dependencies[dependencyName]);
 
         const nodeFrameworks = [
+          // SSR / server frameworks — have their own production servers, no host checking
           { dependency:'next', framework:'nextjs', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'.next' },
           { dependency:'@nestjs/core', framework:'nestjs', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'dist' },
-          { dependency:'@angular/core', framework:'angular', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'dist' },
-          { dependency:'vite', framework:'vite', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx vite preview --port $PORT --host 0.0.0.0', outputDirectory:'dist' },
-          { dependency:'react-scripts', framework:'create-react-app', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'build' },
-          { dependency:'vue', framework:'vue', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx vite preview --port $PORT --host 0.0.0.0', outputDirectory:'dist' },
           { dependency:'nuxt', framework:'nuxt', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'.output/public' },
-          { dependency:'@sveltejs/kit', framework:'sveltekit', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx vite preview --port $PORT --host 0.0.0.0', outputDirectory:'build' },
-          { dependency:'astro', framework:'astro', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx astro preview --port $PORT --host 0.0.0.0', outputDirectory:'dist' },
           { dependency:'express', framework:'express', installCommand:'npm install', buildCommand:'', runCommand:'npm start', outputDirectory:'.' },
           { dependency:'fastify', framework:'fastify', installCommand:'npm install', buildCommand:'', runCommand:'npm start', outputDirectory:'.' },
+
+          // Static site frameworks — use `serve` instead of preview servers to avoid
+          { dependency:'vite', framework:'vite', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', outputDirectory:'dist' },
+          { dependency:'@angular/core', framework:'angular', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', outputDirectory:'dist' },
+          { dependency:'react-scripts', framework:'create-react-app', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx --yes serve -s build -l tcp://0.0.0.0:$PORT', outputDirectory:'build' },
+          { dependency:'vue', framework:'vue', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', outputDirectory:'dist' },
+          { dependency:'@sveltejs/kit', framework:'sveltekit', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx --yes serve -s build -l tcp://0.0.0.0:$PORT', outputDirectory:'build' },
+          { dependency:'astro', framework:'astro', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', outputDirectory:'dist' },
+          { dependency:'gatsby', framework:'gatsby', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx --yes serve -s public -l tcp://0.0.0.0:$PORT', outputDirectory:'public' },
         ];
+
+        const staticFrameworks = new Set(['vite', 'vue', 'angular', 'create-react-app', 'sveltekit', 'astro', 'gatsby']);
 
         for (const frameworkEntry of nodeFrameworks) {
           if (hasDependency(frameworkEntry.dependency)) {
+            const useScriptsStart = !staticFrameworks.has(frameworkEntry.framework);
             return {
               framework: frameworkEntry.framework,
               installCommand: scripts.install || frameworkEntry.installCommand,
               buildCommand: scripts.build || frameworkEntry.buildCommand,
-              runCommand: scripts.start || frameworkEntry.runCommand,
+              runCommand: (useScriptsStart && scripts.start) || frameworkEntry.runCommand,
               outputDirectory: frameworkEntry.outputDirectory
             };
           }
