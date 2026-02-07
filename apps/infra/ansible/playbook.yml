@@ -7,7 +7,7 @@
 #   3. K3s installation
 #   4. Helm installation
 #   5. Applying Kubernetes manifests
-#   6. Building and deploying frontend/backend images
+#   6. Building and deploying frontend/backend/worker images
 #
 # Usage:
 #   ansible-playbook -i inventory.ini playbook.yml -e @secrets.yml
@@ -31,7 +31,7 @@
     registry_internal: "registry.registry.svc.cluster.local:5000"
 
   vars_files:
-    - secrets.yml  # Load secrets from separate file
+    - secrets.yml
 
   handlers:
     - name: Save iptables
@@ -73,7 +73,7 @@
               content: "{{ ansible_host }}"
               ttl: 300
               proxied: false
-            status_code: [200, 400]  # 400 if already exists
+            status_code: [200, 400]
           register: dns_main
           delegate_to: localhost
           become: false
@@ -293,17 +293,19 @@
           -e 's|\${NODE_TLS_REJECT_UNAUTHORIZED}|{{ node_tls_reject_unauthorized }}|g' \
           -e 's|\${REGISTRY_STORAGE_SIZE}|{{ registry_storage_size }}|g' \
           -e 's|\${REDIS_MEMORY_LIMIT}|{{ redis_memory_limit }}|g' \
+          -e 's|\${WORKER_API_KEY}|{{ worker_api_key }}|g' \
+          -e 's|\${SERVER_IP}|{{ ansible_host }}|g' \
           {} \;
       tags: [k8s]
 
-    # Generate backend secrets from Jinja2 template (handles multiline private key)
+    # Generate backend secrets from Jinja2 template
     - name: Generate backend secrets from template
       ansible.builtin.template:
         src: templates/backend-secrets.yaml.j2
         dest: /tmp/k8s-manifests/05-code2cloud/backend-secrets.yaml
         mode: "0600"
       tags: [k8s]
-      no_log: true  # Hide secrets from output
+      no_log: true
 
     # Apply in order: namespaces → cert-manager → traefik → registry → apps
     - name: Apply namespaces
@@ -477,10 +479,8 @@
 
         - name: Verify Railpack installation
           ansible.builtin.shell: |
-            # Find where railpack was installed
             RAILPACK_PATH=$(which railpack 2>/dev/null || find /root /usr/local -name "railpack" -type f 2>/dev/null | head -1)
             if [ -z "$RAILPACK_PATH" ]; then
-              # Manual install if script failed
               ARCH=$(uname -m)
               case $ARCH in
                 aarch64|arm64) ARCH="aarch64" ;;
@@ -489,7 +489,6 @@
               curl -fsSL "https://github.com/railwayapp/railpack/releases/latest/download/railpack-${ARCH}-unknown-linux-gnu.tar.gz" | tar -xz -C /usr/local/bin
               chmod +x /usr/local/bin/railpack
             fi
-            # Verify
             railpack --version || /usr/local/bin/railpack --version
           register: railpack_verify
 
@@ -525,7 +524,9 @@
             KUBECONFIG: "{{ kubeconfig_remote }}"
           register: registry_ip_build
 
-        # Build Backend (NestJS) - Using Dockerfile for Turborepo monorepo
+        # =====================================================================
+        # BUILD BACKEND (NestJS)
+        # =====================================================================
         - name: Build and push backend image
           ansible.builtin.shell: |
             cd {{ build_workspace }}/repo
@@ -547,7 +548,9 @@
           ansible.builtin.debug:
             msg: "Backend image built and pushed: {{ registry_ip_build.stdout }}:5000/code2cloud-backend:latest"
 
-        # Build Frontend (Next.js) - Using Dockerfile for Turborepo monorepo
+        # =====================================================================
+        # BUILD FRONTEND (Next.js)
+        # =====================================================================
         - name: Ensure public folder exists for frontend
           ansible.builtin.file:
             path: "{{ build_workspace }}/repo/apps/web/public"
@@ -575,61 +578,31 @@
           ansible.builtin.debug:
             msg: "Frontend image built and pushed: {{ registry_ip_build.stdout }}:5000/code2cloud-frontend:latest"
 
-        - name: Display frontend build result
+        # =====================================================================
+        # BUILD WORKER (Go)
+        # =====================================================================
+        - name: Build and push worker image
+          ansible.builtin.shell: |
+            cd {{ build_workspace }}/repo
+            buildctl --addr tcp://{{ buildkit_ip.stdout }}:1234 build \
+              --frontend dockerfile.v0 \
+              --local context=. \
+              --local dockerfile=apps/worker \
+              --output type=image,name={{ registry_ip_build.stdout }}:5000/code2cloud-worker:latest,push=true,registry.insecure=true
+          environment:
+            PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+          register: worker_build
+          delay: 60
+          retries: 2
+          until: worker_build.rc == 0
+
+        - name: Display worker build result
           ansible.builtin.debug:
-            msg: "Frontend image built and pushed successfully"
+            msg: "Worker image built and pushed: {{ registry_ip_build.stdout }}:5000/code2cloud-worker:latest"
 
-        # Build Worker (Go + Railpack)
-        # - name: Build worker image with Docker/Kaniko
-        #   ansible.builtin.shell: |
-        #     cd {{ build_workspace }}/repo/apps/worker
-            
-        #     # Create a Dockerfile for worker that includes Railpack
-        #     cat > Dockerfile << 'EOF'
-        #     # Build stage
-        #     FROM golang:1.22-alpine AS builder
-        #     WORKDIR /app
-        #     RUN apk add --no-cache git
-        #     COPY go.mod go.sum ./
-        #     RUN go mod download
-        #     COPY . .
-        #     RUN CGO_ENABLED=0 GOOS=linux go build -o /worker ./cmd/main.go
-            
-        #     # Runtime stage
-        #     FROM ubuntu:24.04
-        #     RUN apt-get update && apt-get install -y \
-        #         git openssh-client curl ca-certificates \
-        #         && rm -rf /var/lib/apt/lists/*
-            
-        #     # Install Railpack
-        #     RUN ARCH=$(uname -m) && \
-        #         case $ARCH in aarch64|arm64) ARCH="aarch64" ;; x86_64) ARCH="x86_64" ;; esac && \
-        #         curl -fsSL "https://github.com/railwayapp/railpack/releases/latest/download/railpack-${ARCH}-unknown-linux-gnu.tar.gz" | tar -xz -C /usr/local/bin && \
-        #         chmod +x /usr/local/bin/railpack
-            
-        #     COPY --from=builder /worker /usr/local/bin/worker
-        #     RUN railpack --version && git --version
-        #     ENTRYPOINT ["/usr/local/bin/worker"]
-        #     EOF
-            
-        #     # Build using buildctl directly (since worker needs custom Dockerfile)
-        #     buildctl --addr tcp://{{ buildkit_ip.stdout }}:1234 build \
-        #       --frontend dockerfile.v0 \
-        #       --local context=. \
-        #       --local dockerfile=. \
-        #       --output type=image,name={{ registry_ip_build.stdout }}:5000/code2cloud-worker:latest,push=true,registry.insecure=true
-        #   environment:
-        #     PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
-        #   register: worker_build
-        #   retries: 2
-        #   delay: 30
-        #   until: worker_build.rc == 0
-
-        # - name: Display worker build result
-        #   ansible.builtin.debug:
-        #     msg: "Worker image built and pushed successfully"
-
-        # Restart deployments to pull new images
+        # =====================================================================
+        # RESTART DEPLOYMENTS
+        # =====================================================================
         - name: Restart backend deployment
           ansible.builtin.shell: |
             kubectl rollout restart deployment/backend -n code2cloud
@@ -642,6 +615,12 @@
           environment:
             KUBECONFIG: "{{ kubeconfig_remote }}"
 
+        - name: Restart worker deployment
+          ansible.builtin.shell: |
+            kubectl rollout restart deployment/worker -n code2cloud
+          environment:
+            KUBECONFIG: "{{ kubeconfig_remote }}"
+
         - name: Wait for backend rollout
           ansible.builtin.shell: |
             kubectl rollout status deployment/backend -n code2cloud --timeout=300s
@@ -651,6 +630,12 @@
         - name: Wait for frontend rollout
           ansible.builtin.shell: |
             kubectl rollout status deployment/frontend -n code2cloud --timeout=300s
+          environment:
+            KUBECONFIG: "{{ kubeconfig_remote }}"
+
+        - name: Wait for worker rollout
+          ansible.builtin.shell: |
+            kubectl rollout status deployment/worker -n code2cloud --timeout=300s
           environment:
             KUBECONFIG: "{{ kubeconfig_remote }}"
 
@@ -742,7 +727,7 @@
             API:       https://{{ api_subdomain }}.{{ domain }}
             User Apps: https://*.{{ deploy_wildcard }}.{{ domain }}
           
-          🔐 Kubernetes API: https://{{ ansible_host }}:6443
+          🔑 Kubernetes API: https://{{ ansible_host }}:6443
           📁 Kubeconfig:     {{ kubeconfig_local }}
           
           ══════════════════════════════════════════════════════════════
@@ -751,6 +736,7 @@
             export KUBECONFIG={{ kubeconfig_local }}
             kubectl get nodes
             kubectl get pods -n code2cloud
+            kubectl logs -f deployment/worker -n code2cloud
           
           ══════════════════════════════════════════════════════════════
       tags: [always]
