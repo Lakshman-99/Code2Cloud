@@ -92,27 +92,15 @@ func (c *Client) FailDeployment(ctx context.Context, id string, errorMsg string)
 	return c.patch(ctx, path, body)
 }
 
-// ExpiredDeployment represents a deployment that has exceeded TTL
-type ExpiredDeployment struct {
-	ID             string `json:"id"`
-	ProjectID      string `json:"projectId"`
-	ProjectName    string `json:"projectName"`
-	ContainerImage string `json:"containerImage"`
-	TTLMinutes     int    `json:"ttlMinutes"`
-	ExpiredAt      string `json:"expiredAt"`
-}
-
 // GetExpiredDeployments fetches deployments past their TTL
-func (c *Client) GetExpiredDeployments(ctx context.Context) ([]ExpiredDeployment, error) {
-	var result struct {
-		Deployments []ExpiredDeployment `json:"deployments"`
-	}
+func (c *Client) GetExpiredDeployments(ctx context.Context) ([]types.ExpiredDeployment, error) {
+	var deployments []types.ExpiredDeployment
 
-	if err := c.get(ctx, "/internal/deployments/expired", &result); err != nil {
+	if err := c.get(ctx, "/internal/deployments/expired", &deployments); err != nil {
 		return nil, fmt.Errorf("failed to get expired deployments: %w", err)
 	}
 
-	return result.Deployments, nil
+	return deployments, nil
 }
 
 // NestJS handles DB cleanup, worker handles K8s cleanup

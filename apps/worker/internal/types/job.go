@@ -39,6 +39,7 @@ const (
 	StatusReady     DeploymentStatus = "READY"
 	StatusFailed    DeploymentStatus = "FAILED"
 	StatusCanceled  DeploymentStatus = "CANCELED"
+	StatusExpired   DeploymentStatus = "EXPIRED"
 )
 
 // ─────────────────────────────────────────────────────────────
@@ -56,4 +57,14 @@ type LogEntry struct {
 	DeploymentID string
 	Source       LogSource
 	Message      string
+}
+
+// ExpiredDeployment represents a deployment that has exceeded its TTL
+type ExpiredDeployment struct {
+	ID             string `json:"id"`
+	ProjectID      string `json:"projectId"`
+	ProjectName    string `json:"projectName"`
+	ContainerImage string `json:"containerImage"`
+	TTLMinutes     int    `json:"ttlMinutes"`
+	ExpiredAt      string `json:"expiredAt"`
 }

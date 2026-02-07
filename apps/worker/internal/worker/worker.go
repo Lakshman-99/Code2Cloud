@@ -30,6 +30,8 @@ type Worker struct {
 	logStreamer *k8s.LogStreamer
 
 	domainWorker *k8s.DomainWorker
+
+	cleanupWorker *k8s.CleanupWorker
 }
 
 func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, error) {
@@ -100,6 +102,16 @@ func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, 
 		Logger:              logger,
 	})
 
+	cleanupWorker := k8s.NewCleanupWorker(k8s.CleanupWorkerConfig{
+		Client:                   k8sClient,
+		LogStreamer:              logStreamer,
+		Logger:                   logger,
+		FetchExpiredDeployments:  apiClient.GetExpiredDeployments,
+		UpdateDeploymentStatus:   apiClient.UpdateDeploymentStatus,
+		UpdateProjectStatus:      apiClient.UpdateProjectStatus,
+		CheckInterval:            60 * time.Second,
+	})
+
 	// Create worker instance
 	w := &Worker{
 		cfg:         cfg,
@@ -110,8 +122,9 @@ func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, 
 		k8s:         k8sClient,
 		logFactory:  logFactory,
 		logger:      logger,
-		logStreamer:   logStreamer,
-		domainWorker: domainWorker,
+		logStreamer:    logStreamer,
+		domainWorker:   domainWorker,
+		cleanupWorker:  cleanupWorker,
 	}
 
 	return w, nil
@@ -128,8 +141,9 @@ func (w *Worker) Start(ctx context.Context) error {
 		zap.String("k8s_namespace", w.cfg.Namespace),
 	)
 
-	// Domain verification background loop, checking pending domains every 30s
+	// Domain & cleanup workers (background tasks)
 	w.domainWorker.Start(ctx)
+	w.cleanupWorker.Start(ctx)
 
 	for {
 		select {
@@ -362,7 +376,6 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 
 	// Update domain statuses
 	for _, domain := range job.Domains {
-		// Note: You might want to pass domain IDs in the job
 		w.logger.Debug("Domain configured", zap.String("domain", domain))
 	}
 

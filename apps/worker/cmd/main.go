@@ -17,9 +17,7 @@ import (
 )
 
 func main() {
-	// ─────────────────────────────────────────────────────────────
 	// Step 1: Initialize Logger
-	// ─────────────────────────────────────────────────────────────
 	logger, err := zap.NewProduction()
 	if err != nil {
 		panic("failed to initialize logger: " + err.Error())
@@ -30,9 +28,7 @@ func main() {
 		zap.String("version", "1.0.0"),
 	)
 
-	// ─────────────────────────────────────────────────────────────
 	// Step 2: Load Configuration
-	// ─────────────────────────────────────────────────────────────
 	if err := godotenv.Load(); err != nil {
 		println("No .env file found, using system environment variables")
 	}
@@ -51,9 +47,7 @@ func main() {
 		zap.String("base_domain", cfg.BaseDomain),
 	)
 
-	// ─────────────────────────────────────────────────────────────
 	// Step 3: Verify Tools (Git, Railpack)
-	// ─────────────────────────────────────────────────────────────
 	ctx := context.Background()
 
 	// Verify Git
@@ -66,13 +60,11 @@ func main() {
 	// Verify Railpack
 	railpackResult, err := builder.Verify(ctx, cfg.BuildkitAddr, logger)
 	if err != nil {
-		// logger.Fatal("Railpack verification failed", zap.Error(err))
+		logger.Fatal("Railpack verification failed", zap.Error(err))
 	}
 	logger.Info("Railpack ready", zap.String("version", railpackResult.RailpackVersion))
 
-	// ─────────────────────────────────────────────────────────────
-	// Step 4: Create Worker Instance
-	// ─────────────────────────────────────────────────────────────
+	// Step 4: Initialize Worker
 	initCtx, initCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer initCancel()
 
@@ -86,9 +78,7 @@ func main() {
 		zap.String("queue", cfg.QueueName),
 	)
 
-	// ─────────────────────────────────────────────────────────────
 	// Step 5: Setup Graceful Shutdown
-	// ─────────────────────────────────────────────────────────────
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -103,9 +93,7 @@ func main() {
 		cancel()
 	}()
 
-	// ─────────────────────────────────────────────────────────────
 	// Step 6: Start Worker (Blocking)
-	// ─────────────────────────────────────────────────────────────
 	if err := w.Start(ctx); err != nil && err != context.Canceled {
 		logger.Fatal("Worker failed", zap.Error(err))
 	}
