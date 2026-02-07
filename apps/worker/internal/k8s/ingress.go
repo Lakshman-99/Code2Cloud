@@ -13,14 +13,12 @@ import (
 func (c *Client) CreateOrUpdateIngress(ctx context.Context, opts DeployOptions) ([]string, error) {
 	name := sanitizeK8sName(opts.ProjectName)
 
-	hosts := make([]string, 0, len(opts.Domains)+1)
-
-	defaultHost := sanitizeHost(fmt.Sprintf("%s.%s", name, c.baseDomain))
-	hosts = append(hosts, defaultHost)
+	hosts := make([]string, 0, len(opts.Domains))
 
 	for _, domain := range opts.Domains {
-		if domain != "" && domain != defaultHost {
-			hosts = append(hosts, domain)
+		if domain != "" {
+			cleanDomain := sanitizeHost(domain)
+			hosts = append(hosts, cleanDomain)
 		}
 	}
 
