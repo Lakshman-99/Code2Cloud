@@ -125,48 +125,21 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          # Ensure key ends with newline (GitHub Secrets can strip it)
+          sed -i -e '$a\' ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Deploy to server
+      - name: Test SSH connection
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "echo 'SSH connection successful'"
+
+      - name: Create deploy script on server
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
-          DEPLOY_WEB: ${{ needs.detect-changes.outputs.web }}
-          DEPLOY_API: ${{ needs.detect-changes.outputs.api }}
-          DEPLOY_WORKER: ${{ needs.detect-changes.outputs.worker }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DATABASE_DIRECT_URL: ${{ secrets.DATABASE_DIRECT_URL }}
-          DOMAIN: ${{ secrets.DOMAIN }}
-          API_SUBDOMAIN: ${{ secrets.API_SUBDOMAIN }}
         run: |
-          # Build the deploy command
-          DEPLOY_FLAGS=""
-          if [[ "$DEPLOY_WEB" == "true" ]]; then DEPLOY_FLAGS="$DEPLOY_FLAGS --web"; fi
-          if [[ "$DEPLOY_API" == "true" ]]; then DEPLOY_FLAGS="$DEPLOY_FLAGS --api"; fi
-          if [[ "$DEPLOY_WORKER" == "true" ]]; then DEPLOY_FLAGS="$DEPLOY_FLAGS --worker"; fi
-
-          # For workflow_dispatch with deploy_all
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.deploy_all }}" == "true" ]]; then
-            DEPLOY_FLAGS="--all"
-          fi
-
-          # If no flags set (shouldn't happen but safety check), deploy all
-          if [[ -z "$DEPLOY_FLAGS" ]]; then
-            echo "No changes detected, skipping deploy"
-            exit 0
-          fi
-
-          echo "🚀 Deploying with flags: $DEPLOY_FLAGS"
-
-          # SSH into server and run deploy
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST} bash -s -- \
-            $DEPLOY_FLAGS \
-            --database-url "'${DATABASE_URL}'" \
-            --database-direct-url "'${DATABASE_DIRECT_URL}'" \
-            --domain "${DOMAIN}" \
-            --api-subdomain "${API_SUBDOMAIN}" \
-            << 'DEPLOY_SCRIPT'
-
+          cat > /tmp/deploy-remote.sh << 'DEPLOY_SCRIPT'
           #!/bin/bash
           set -euo pipefail
 
@@ -314,8 +287,52 @@ jobs:
             exit 1
           fi
           echo "══════════════════════════════════════════════════════════════"
-
           DEPLOY_SCRIPT
+
+          # SCP the script to the server
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            /tmp/deploy-remote.sh ${SSH_USER}@${SSH_HOST}:/tmp/deploy-remote.sh
+
+      - name: Deploy to server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_WEB: ${{ needs.detect-changes.outputs.web }}
+          DEPLOY_API: ${{ needs.detect-changes.outputs.api }}
+          DEPLOY_WORKER: ${{ needs.detect-changes.outputs.worker }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_DIRECT_URL: ${{ secrets.DATABASE_DIRECT_URL }}
+          DOMAIN: ${{ secrets.DOMAIN }}
+          API_SUBDOMAIN: ${{ secrets.API_SUBDOMAIN }}
+        run: |
+          # Build the deploy command
+          DEPLOY_FLAGS=""
+          if [[ "$DEPLOY_WEB" == "true" ]]; then DEPLOY_FLAGS="$DEPLOY_FLAGS --web"; fi
+          if [[ "$DEPLOY_API" == "true" ]]; then DEPLOY_FLAGS="$DEPLOY_FLAGS --api"; fi
+          if [[ "$DEPLOY_WORKER" == "true" ]]; then DEPLOY_FLAGS="$DEPLOY_FLAGS --worker"; fi
+
+          # For workflow_dispatch with deploy_all
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.deploy_all }}" == "true" ]]; then
+            DEPLOY_FLAGS="--all"
+          fi
+
+          # If no flags set, skip deploy
+          if [[ -z "$DEPLOY_FLAGS" ]]; then
+            echo "No changes detected, skipping deploy"
+            exit 0
+          fi
+
+          echo "🚀 Deploying with flags: $DEPLOY_FLAGS"
+
+          # Run the deploy script on the server via sudo
+          # (kubectl/buildctl require root access to kubeconfig)
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST} \
+            "sudo bash /tmp/deploy-remote.sh \
+              $DEPLOY_FLAGS \
+              --database-url '${DATABASE_URL}' \
+              --database-direct-url '${DATABASE_DIRECT_URL}' \
+              --domain '${DOMAIN}' \
+              --api-subdomain '${API_SUBDOMAIN}'"
 
       - name: Post deployment summary
         if: always()
