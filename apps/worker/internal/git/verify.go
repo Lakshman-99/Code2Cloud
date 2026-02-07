@@ -52,7 +52,6 @@ func Verify(ctx context.Context, logger *zap.Logger) (*VerifyResult, error) {
 
 // ParseRepoInfo extracts owner and repo name from a git URL
 func ParseRepoInfo(url string) (owner, repo string, err error) {
-	// Remove .git suffix
 	url = strings.TrimSuffix(url, ".git")
 
 	// Handle HTTPS URLs: https://github.com/owner/repo
