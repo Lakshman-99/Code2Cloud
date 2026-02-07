@@ -43,7 +43,7 @@ RUN railpack --version && buildctl --version && git --version
 COPY --from=builder /worker /usr/local/bin/worker
 
 RUN groupadd --system --gid 1001 appgroup && \
-    useradd --system --uid 1001 --gid appgroup worker
+    useradd --system --uid 1001 --gid appgroup --create-home worker
 
 RUN mkdir -p /tmp/builds && chown worker:appgroup /tmp/builds
 

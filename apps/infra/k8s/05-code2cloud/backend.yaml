@@ -32,6 +32,7 @@ data:
   DEPLOY_DOMAIN: "${DEPLOY_WILDCARD}.${DOMAIN}"
   NEXT_PUBLIC_APP_URL: "https://${DOMAIN}"
   NEXT_PUBLIC_API_URL: "https://${API_SUBDOMAIN}.${DOMAIN}"
+  RESEND_FROM_EMAIL: "deployment-notification@code2cloud.lakshman.me"
 
 # Note: backend-secrets.yaml is generated separately by Ansible template
 # to properly handle multiline GitHub private key
