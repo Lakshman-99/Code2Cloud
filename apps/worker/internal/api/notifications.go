@@ -6,20 +6,12 @@ import (
 	"go.uber.org/zap"
 )
 
-type NotificationType string
-
-const (
-	NotificationSuccess NotificationType = "success"
-	NotificationFailed  NotificationType = "failed"
-)
-
 type DeploymentNotification struct {
-	DeploymentID string           `json:"deploymentId"`
-	Type         NotificationType `json:"type"`
-	ProjectName  string           `json:"projectName"`
-	URL          *string          `json:"url,omitempty"`
-	Error        *string          `json:"error,omitempty"`
-	Duration     *int             `json:"duration,omitempty"` // seconds
+	DeploymentID  string  `json:"deploymentId"`
+	Status        string  `json:"status"`
+	ProjectName   string  `json:"projectName"`
+	DeploymentURL *string `json:"deploymentUrl,omitempty"`
+	Message       *string `json:"message,omitempty"`
 }
 
 func (c *Client) SendDeploymentNotification(ctx context.Context, notification DeploymentNotification) error {
@@ -29,7 +21,7 @@ func (c *Client) SendDeploymentNotification(ctx context.Context, notification De
 		// Log but don't fail deployment for notification errors
 		c.logger.Warn("Failed to send notification",
 			zap.String("deploymentId", notification.DeploymentID),
-			zap.String("type", string(notification.Type)),
+			zap.String("status", notification.Status),
 			zap.Error(err),
 		)
 		return nil // Don't propagate error
@@ -37,7 +29,7 @@ func (c *Client) SendDeploymentNotification(ctx context.Context, notification De
 
 	c.logger.Info("Sent deployment notification",
 		zap.String("deploymentId", notification.DeploymentID),
-		zap.String("type", string(notification.Type)),
+		zap.String("status", notification.Status),
 	)
 
 	return nil
@@ -46,11 +38,10 @@ func (c *Client) SendDeploymentNotification(ctx context.Context, notification De
 // NotifySuccess sends a success notification
 func (c *Client) NotifySuccess(ctx context.Context, deploymentID, projectName, url string, duration int) error {
 	return c.SendDeploymentNotification(ctx, DeploymentNotification{
-		DeploymentID: deploymentID,
-		Type:         NotificationSuccess,
-		ProjectName:  projectName,
-		URL:          &url,
-		Duration:     &duration,
+		DeploymentID:  deploymentID,
+		Status:        "READY",
+		ProjectName:   projectName,
+		DeploymentURL: &url,
 	})
 }
 
@@ -58,8 +49,8 @@ func (c *Client) NotifySuccess(ctx context.Context, deploymentID, projectName, u
 func (c *Client) NotifyFailure(ctx context.Context, deploymentID, projectName, errorMsg string) error {
 	return c.SendDeploymentNotification(ctx, DeploymentNotification{
 		DeploymentID: deploymentID,
-		Type:         NotificationFailed,
+		Status:       "FAILED",
 		ProjectName:  projectName,
-		Error:        &errorMsg,
+		Message:      &errorMsg,
 	})
 }

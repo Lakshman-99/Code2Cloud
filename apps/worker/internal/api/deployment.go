@@ -13,7 +13,6 @@ type DeploymentStatusUpdate struct {
 	Status         string  `json:"status"`
 	ContainerImage *string `json:"containerImage,omitempty"`
 	DeploymentURL  *string `json:"deploymentUrl,omitempty"`
-	ErrorMessage   *string `json:"errorMessage,omitempty"`
 }
 
 type Deployment struct {
@@ -85,8 +84,7 @@ func (c *Client) UpdateDeploymentWithURL(ctx context.Context, id string, status 
 func (c *Client) FailDeployment(ctx context.Context, id string, errorMsg string) error {
 	path := fmt.Sprintf("/internal/deployments/%s/status", id)
 	body := DeploymentStatusUpdate{
-		Status:       string(types.StatusFailed),
-		ErrorMessage: &errorMsg,
+		Status: string(types.StatusFailed),
 	}
 
 	return c.patch(ctx, path, body)

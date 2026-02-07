@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -24,8 +25,13 @@ type LogEntry struct {
 }
 
 type SaveLogsRequest struct {
-	Source   string   `json:"source"`
-	Messages []string `json:"messages"`
+	Logs []SaveLogEntry `json:"logs"`
+}
+
+type SaveLogEntry struct {
+	Source    string `json:"source"`
+	Message   string `json:"message"`
+	Timestamp string `json:"timestamp,omitempty"`
 }
 
 // SaveLogs saves multiple log entries for a deployment
@@ -35,10 +41,18 @@ func (c *Client) SaveLogs(ctx context.Context, deploymentID string, source LogSo
 	}
 
 	path := fmt.Sprintf("/internal/deployments/%s/logs", deploymentID)
-	body := SaveLogsRequest{
-		Source:   string(source),
-		Messages: messages,
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	logs := make([]SaveLogEntry, 0, len(messages))
+	for _, msg := range messages {
+		logs = append(logs, SaveLogEntry{
+			Source:    string(source),
+			Message:   msg,
+			Timestamp: now,
+		})
 	}
+
+	body := SaveLogsRequest{Logs: logs}
 
 	if err := c.post(ctx, path, body, nil); err != nil {
 		return fmt.Errorf("failed to save logs: %w", err)
@@ -60,10 +74,18 @@ func (c *Client) SaveLogsRaw(ctx context.Context, deploymentID string, source st
 	}
 
 	path := fmt.Sprintf("/internal/deployments/%s/logs", deploymentID)
-	body := SaveLogsRequest{
-		Source:   source,
-		Messages: messages,
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	logs := make([]SaveLogEntry, 0, len(messages))
+	for _, msg := range messages {
+		logs = append(logs, SaveLogEntry{
+			Source:    source,
+			Message:   msg,
+			Timestamp: now,
+		})
 	}
+
+	body := SaveLogsRequest{Logs: logs}
 
 	if err := c.post(ctx, path, body, nil); err != nil {
 		return fmt.Errorf("failed to save logs: %w", err)
