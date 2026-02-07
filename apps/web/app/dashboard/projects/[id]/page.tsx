@@ -8,15 +8,16 @@ import { DeploymentsTable } from "@/components/project/DeploymentsTable";
 import { TerminalLogs } from "@/components/project/TerminalLogs";
 import { EnvVarsPanel } from "@/components/project/EnvVarsPanel";
 import { StoragePanel } from "@/components/project/StoragePanel";
-import { useMockStore } from "@/stores/useMockStore";
 import { cn } from "@/lib/utils";
 import { ProjectOverview } from "@/components/project/ProjectOverview";
 import { useEffect, useState } from "react";
 import { ProjectNotFoundState } from "@/components/feedback/ProjectNotFoundState";
 import { useProjects } from "@/hooks/use-projects";
 import { useDeployments } from "@/hooks/use-deployments";
+import { useDeploymentLogs } from "@/hooks/use-deployment-logs";
 import { ProjectDetailSkeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { LogSource } from "@/types/project";
 
 const tabs = ["Overview", "Deployments", "Logs", "Storage", "Settings"];
 
@@ -26,18 +27,32 @@ const ProjectDetail = () => {
   const searchParams = useSearchParams();
 
   const projectId = params.id as string;
-  const { getLogsByProject } = useMockStore();
   const { getProjectById, isLoading: isProjectLoading } = useProjects();
-  const { deployments, redeploy, isLoading: isDeploymentsLoading } = useDeployments(projectId);
+  const {
+    deployments,
+    redeploy,
+    isLoading: isDeploymentsLoading,
+  } = useDeployments(projectId);
+
+  const project = getProjectById(projectId);
+
+  // Get the latest deployment ID for runtime log streaming
+  const latestDeploymentId =
+    deployments.length > 0 ? deployments[0].id : undefined;
 
   // Determine active tab
   const [activeTab, setActiveTab] = useState(() => {
     const tabParam = searchParams.get("tab");
-    return tabs.find((t) => t.toLowerCase() === tabParam?.toLowerCase()) || "Overview";
+    return (
+      tabs.find((t) => t.toLowerCase() === tabParam?.toLowerCase()) ||
+      "Overview"
+    );
   });
 
-  const project = getProjectById(projectId);
-  const logs = getLogsByProject(projectId);
+  const { logs: runtimeLogs, isLive, isLoading: isLogsLoading } = useDeploymentLogs(latestDeploymentId, {
+    source: LogSource.RUNTIME,
+    enabled: activeTab === "Logs",
+  });
 
   const handleTabChange = (tab: string) => {
     // A. Update UI immediately
@@ -78,7 +93,15 @@ const ProjectDetail = () => {
       case "Deployments":
         return <DeploymentsTable deployments={deployments} project={project} />;
       case "Logs":
-        return <TerminalLogs logs={logs} projectName={project.name} />;
+        return (
+          <TerminalLogs
+            logs={runtimeLogs}
+            projectName={project.name}
+            isLive={isLive}
+            logSource={LogSource.RUNTIME}
+            isLoading={isLogsLoading}
+          />
+        );
       case "Storage":
         return <StoragePanel />;
       case "Settings":
@@ -119,13 +142,16 @@ const ProjectDetail = () => {
                   <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-amber-200">Configuration Changed</h3>
+                  <h3 className="text-sm font-semibold text-amber-200">
+                    Configuration Changed
+                  </h3>
                   <p className="text-xs text-amber-200/70">
-                    Environment variables or domains have been modified. Redeploy to apply changes.
+                    Environment variables or domains have been modified.
+                    Redeploy to apply changes.
                   </p>
                 </div>
               </div>
-              <Button 
+              <Button
                 onClick={() => redeploy(project.id)}
                 disabled={isDeploymentsLoading}
                 size="sm"
@@ -150,7 +176,7 @@ const ProjectDetail = () => {
       <div className="border-b border-white/5 mb-8">
         <div className="flex gap-1">
           {tabs.map((tab) => (
-            <motion.div 
+            <motion.div
               key={tab}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
