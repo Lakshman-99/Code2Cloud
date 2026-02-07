@@ -101,12 +101,11 @@ func (c *Client) CreateOrUpdateDeployment(ctx context.Context, opts DeployOption
 
 						LivenessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
-								HTTPGet: &corev1.HTTPGetAction{
-									Path: opts.HealthPath,
+								TCPSocket: &corev1.TCPSocketAction{
 									Port: intstr.FromInt32(opts.Port),
 								},
 							},
-							InitialDelaySeconds: 15,
+							InitialDelaySeconds: 10,
 							PeriodSeconds:       30,
 							TimeoutSeconds:      5,
 							FailureThreshold:    3,
@@ -114,8 +113,7 @@ func (c *Client) CreateOrUpdateDeployment(ctx context.Context, opts DeployOption
 
 						ReadinessProbe: &corev1.Probe{
 							ProbeHandler: corev1.ProbeHandler{
-								HTTPGet: &corev1.HTTPGetAction{
-									Path: opts.HealthPath,
+								TCPSocket: &corev1.TCPSocketAction{
 									Port: intstr.FromInt32(opts.Port),
 								},
 							},
