@@ -77,7 +77,7 @@ export const ProjectHeader = ({ project }: ProjectHeaderProps) => {
           </div>
           <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
             <a
-              href={`https://${latestDeployment.deploymentUrl}`}
+              href={`${latestDeployment.deploymentUrl}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 hover:text-foreground transition-colors"
@@ -97,7 +97,7 @@ export const ProjectHeader = ({ project }: ProjectHeaderProps) => {
       <div className="flex items-center gap-3">
         <Button 
           className="gap-2 bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-bold hover:opacity-90 shadow-[0_0_20px_-5px_rgba(52,211,153,0.5)] transition-all border-0"
-          onClick={() => window.open(`https://${latestDeployment.deploymentUrl}`, '_blank')}
+          onClick={() => window.open(`${latestDeployment.deploymentUrl}`, '_blank')}
         >
           <ExternalLink className="w-4 h-4" />
           Visit

@@ -105,16 +105,16 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	if opts.BuildConfig.RunCommand != "" {
 		prepareArgs = append(prepareArgs, "--start-cmd", opts.BuildConfig.RunCommand)
 	}
+	if opts.BuildConfig.InstallCommand != "" {
+		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand)
+		prepareArgs = append(prepareArgs, "--env", "RAILPACK_INSTALL_CMD="+installCmd)
+	}
+
 	prepareCmd := exec.CommandContext(ctx, "railpack", prepareArgs...)
 	prepareCmd.Dir = opts.SourcePath
 	prepareCmd.Stdout = buildLog
 	prepareCmd.Stderr = buildLog
 	prepareCmd.Env = os.Environ()
-
-	if opts.BuildConfig.InstallCommand != "" {
-		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand)
-		prepareCmd.Env = append(prepareCmd.Env, "RAILPACK_INSTALL_CMD="+installCmd)
-	}
 
 	if err := prepareCmd.Run(); err != nil {
 		buildLog.Flush()

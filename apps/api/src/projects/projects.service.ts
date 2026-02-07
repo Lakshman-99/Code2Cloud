@@ -125,6 +125,7 @@ export class ProjectsService {
           framework: project.framework,
           installCommand: project.installCommand || undefined,
           buildCommand: project.buildCommand || undefined,
+          runCommand: project.runCommand || undefined,
           outputDir: project.outputDirectory || undefined,
         },
         domains: [deploymentUrl],
