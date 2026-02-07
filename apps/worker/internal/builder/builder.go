@@ -56,10 +56,10 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	// ─────────────────────────────────────────────────────────
 	// Step 2: Build command arguments
 	// ─────────────────────────────────────────────────────────
-	args := b.buildRailpackArgs(opts)
+	args := b.buildArgs(opts)
 
 	buildLog.Log("")
-	buildLog.Log("$ railpack " + strings.Join(sanitizeArgs(args), " "))
+	buildLog.Log("$ buildctl " + strings.Join(sanitizeArgs(args), " "))
 	buildLog.Log("")
 
 	// ─────────────────────────────────────────────────────────
@@ -73,11 +73,9 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "railpack", args...)
+	cmd := exec.CommandContext(ctx, "buildctl", args...)
 	cmd.Dir = opts.SourcePath
-
-	// Set environment
-	cmd.Env = b.buildEnv(opts)
+	cmd.Env = os.Environ()
 
 	// ─────────────────────────────────────────────────────────
 	// Step 4: Attach logging
@@ -88,13 +86,12 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	// ─────────────────────────────────────────────────────────
 	// Step 5: Execute build
 	// ─────────────────────────────────────────────────────────
-	buildLog.Log("🔨 Starting Railpack build...")
+	buildLog.Log("🔨 Starting Railpack build via BuildKit...")
 	buildLog.Log("")
 
 	if err := cmd.Run(); err != nil {
 		buildLog.Flush()
 
-		// Check for context errors
 		if ctx.Err() == context.DeadlineExceeded {
 			return nil, fmt.Errorf("build timed out after %s", timeout)
 		}
@@ -102,7 +99,6 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 			return nil, fmt.Errorf("build was canceled")
 		}
 
-		// Check exit code
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return nil, fmt.Errorf("build failed with exit code %d", exitErr.ExitCode())
 		}
@@ -128,75 +124,57 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	}, nil
 }
 
-
-func (b *Builder) buildRailpackArgs(opts Options) []string {
-	args := []string{"build", "."}
-
-	args = append(args, "--image", opts.ImageName)
-
-	if b.config.BuildkitAddr != "" {
-		args = append(args, "--buildkit-addr", b.config.BuildkitAddr)
+func (b *Builder) buildArgs(opts Options) []string {
+	args := []string{
+		"--addr", b.config.BuildkitAddr,
+		"build",
+		"--frontend", "gateway.v0",
+		"--opt", "source=ghcr.io/railwayapp/railpack:latest",
+		"--local", "context=" + opts.SourcePath,
+		"--progress", "plain",
 	}
 
-	args = append(args, "--push")
-
-	if b.config.InsecureRegistry {
-		args = append(args, "--insecure-registry")
+	// Build configuration passed as frontend options
+	if opts.BuildConfig.BuildCommand != "" {
+		args = append(args, "--opt", "build-cmd="+opts.BuildConfig.BuildCommand)
 	}
-
-	if b.config.Platform != "" {
-		args = append(args, "--platform", b.config.Platform)
+	if opts.BuildConfig.RunCommand != "" {
+		args = append(args, "--opt", "start-cmd="+opts.BuildConfig.RunCommand)
 	}
 
 	if opts.ProjectName != "" {
-		args = append(args, "--cache-key", opts.ProjectName)
+		args = append(args, "--opt", "cache-key="+opts.ProjectName)
 	}
 
-	if opts.BuildConfig.InstallCommand != "" {
-		args = append(args, "--install-cmd", opts.BuildConfig.InstallCommand)
-	}
-	if opts.BuildConfig.BuildCommand != "" {
-		args = append(args, "--build-cmd", opts.BuildConfig.BuildCommand)
-	}
-	if opts.BuildConfig.RunCommand != "" {
-		args = append(args, "--start-cmd", opts.BuildConfig.RunCommand)
-	}
-
+	// Environment variables as frontend options
 	for key, value := range opts.EnvVars {
-		args = append(args, "--env", fmt.Sprintf("%s=%s", key, value))
+		args = append(args, "--opt", fmt.Sprintf("env:%s=%s", key, value))
 	}
 
-	for key, value := range opts.BuildEnvVars {
-		args = append(args, "--build-env", fmt.Sprintf("%s=%s", key, value))
+	// Platform
+	if b.config.Platform != "" {
+		args = append(args, "--opt", "platform="+b.config.Platform)
 	}
+
+	output := fmt.Sprintf("type=image,name=%s,push=true", opts.ImageName)
+	if b.config.InsecureRegistry {
+		output += ",registry.insecure=true"
+	}
+	args = append(args, "--output", output)
 
 	return args
-}
-
-func (b *Builder) buildEnv(opts Options) []string {
-	env := os.Environ()
-
-	env = append(env,
-		"DOCKER_BUILDKIT=1",
-		"BUILDKIT_PROGRESS=plain",
-	)
-
-	return env
 }
 
 func sanitizeArgs(args []string) []string {
 	sanitized := make([]string, len(args))
 	copy(sanitized, args)
 
-	// Patterns to hide
-	sensitiveFlags := []string{"--env", "--build-env", "-e"}
-
-	for i := 0; i < len(sanitized)-1; i++ {
-		for _, flag := range sensitiveFlags {
-			if sanitized[i] == flag {
-				// Hide the value part after =
-				if idx := strings.Index(sanitized[i+1], "="); idx != -1 {
-					key := sanitized[i+1][:idx]
+	for i := 0; i < len(sanitized); i++ {
+		if sanitized[i] == "--opt" && i+1 < len(sanitized) {
+			opt := sanitized[i+1]
+			if strings.HasPrefix(opt, "env:") {
+				if idx := strings.Index(opt, "="); idx != -1 {
+					key := opt[:idx]
 					sanitized[i+1] = key + "=***"
 				}
 			}

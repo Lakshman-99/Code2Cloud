@@ -26,20 +26,16 @@ var SensitiveEnvKeys = map[string]bool{
 	"MYSQL_PASSWORD":    true,
 }
 
-// IsSensitiveEnvKey checks if an env key should be hidden in logs
 func IsSensitiveEnvKey(key string) bool {
 	upperKey := strings.ToUpper(key)
-
 	if SensitiveEnvKeys[upperKey] {
 		return true
 	}
-
 	for sensitiveWord := range SensitiveEnvKeys {
 		if strings.Contains(upperKey, sensitiveWord) {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -88,19 +84,34 @@ func FilterEnvVars(envVars map[string]string, predicate func(key, value string) 
 
 func DefaultBuildEnv() map[string]string {
 	return map[string]string{
-		"CI":                    "true",
-		"NODE_ENV":              "production",
-		"NPM_CONFIG_PRODUCTION": "false",
-		"NEXT_TELEMETRY_DISABLED": "1",
-		"NUXT_TELEMETRY_DISABLED": "1",
+		"CI":       "true",
+		"NODE_ENV": "production",
 	}
 }
 
 func FrameworkEnv(framework string) map[string]string {
 	switch strings.ToLower(framework) {
+
+	// ── Node.js / JavaScript frameworks ──────────────────
 	case "nextjs":
 		return map[string]string{
 			"NEXT_TELEMETRY_DISABLED": "1",
+		}
+	case "vite":
+		return map[string]string{
+			"NODE_ENV": "production",
+		}
+	case "create-react-app":
+		return map[string]string{
+			"GENERATE_SOURCEMAP": "false",
+		}
+	case "vue":
+		return map[string]string{
+			"NODE_ENV": "production",
+		}
+	case "angular":
+		return map[string]string{
+			"NG_CLI_ANALYTICS": "false",
 		}
 	case "nuxt", "nuxtjs":
 		return map[string]string{
@@ -110,10 +121,47 @@ func FrameworkEnv(framework string) map[string]string {
 		return map[string]string{
 			"GATSBY_TELEMETRY_DISABLED": "1",
 		}
-	case "angular":
+
+	// ── Node.js backend frameworks ───────────────────────
+	case "express", "fastify", "nestjs", "node":
 		return map[string]string{
-			"NG_CLI_ANALYTICS": "false",
+			"NODE_ENV": "production",
 		}
+
+	// ── Python frameworks ────────────────────────────────
+	case "django":
+		return map[string]string{
+			"PYTHONDONTWRITEBYTECODE": "1",
+			"PYTHONUNBUFFERED":        "1",
+		}
+	case "flask":
+		return map[string]string{
+			"FLASK_ENV":               "production",
+			"PYTHONDONTWRITEBYTECODE": "1",
+			"PYTHONUNBUFFERED":        "1",
+		}
+	case "fastapi":
+		return map[string]string{
+			"PYTHONDONTWRITEBYTECODE": "1",
+			"PYTHONUNBUFFERED":        "1",
+		}
+	case "streamlit":
+		return map[string]string{
+			"PYTHONDONTWRITEBYTECODE": "1",
+			"PYTHONUNBUFFERED":        "1",
+		}
+	case "python":
+		return map[string]string{
+			"PYTHONDONTWRITEBYTECODE": "1",
+			"PYTHONUNBUFFERED":        "1",
+		}
+
+	// ── Go ───────────────────────────────────────────────
+	case "golang", "go":
+		return map[string]string{
+			"CGO_ENABLED": "0",
+		}
+
 	default:
 		return map[string]string{}
 	}

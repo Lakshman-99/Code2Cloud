@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -45,11 +46,18 @@ func (c *Client) SaveLogs(ctx context.Context, deploymentID string, source LogSo
 	now := time.Now().UTC().Format(time.RFC3339)
 	logs := make([]SaveLogEntry, 0, len(messages))
 	for _, msg := range messages {
+		if strings.TrimSpace(msg) == "" {
+			continue
+		}
 		logs = append(logs, SaveLogEntry{
 			Source:    string(source),
 			Message:   msg,
 			Timestamp: now,
 		})
+	}
+
+	if len(logs) == 0 {
+		return nil
 	}
 
 	body := SaveLogsRequest{Logs: logs}
@@ -61,7 +69,7 @@ func (c *Client) SaveLogs(ctx context.Context, deploymentID string, source LogSo
 	c.logger.Debug("Saved logs",
 		zap.String("deploymentId", deploymentID),
 		zap.String("source", string(source)),
-		zap.Int("count", len(messages)),
+		zap.Int("count", len(logs)),
 	)
 
 	return nil
@@ -78,11 +86,18 @@ func (c *Client) SaveLogsRaw(ctx context.Context, deploymentID string, source st
 	now := time.Now().UTC().Format(time.RFC3339)
 	logs := make([]SaveLogEntry, 0, len(messages))
 	for _, msg := range messages {
+		if strings.TrimSpace(msg) == "" {
+			continue
+		}
 		logs = append(logs, SaveLogEntry{
 			Source:    source,
 			Message:   msg,
 			Timestamp: now,
 		})
+	}
+
+	if len(logs) == 0 {
+		return nil
 	}
 
 	body := SaveLogsRequest{Logs: logs}
