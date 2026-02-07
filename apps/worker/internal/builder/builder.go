@@ -98,6 +98,11 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	if opts.BuildConfig.RunCommand != "" {
 		prepareArgs = append(prepareArgs, "--start-cmd", opts.BuildConfig.RunCommand)
 	}
+	// Railpack has no --install-cmd flag, but supports the RAILPACK_INSTALL_CMD env var
+	if opts.BuildConfig.InstallCommand != "" {
+		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand)
+		prepareArgs = append(prepareArgs, "--env", "RAILPACK_INSTALL_CMD="+installCmd)
+	}
 
 	prepareCmd := exec.CommandContext(ctx, "railpack", prepareArgs...)
 	prepareCmd.Dir = opts.SourcePath
@@ -174,6 +179,20 @@ func (b *Builder) buildArgs(opts Options) []string {
 	args = append(args, "--output", output)
 
 	return args
+}
+
+// normalizeInstallCommand ensures the install command is a full command.
+// If the user passes just flags (e.g., "--legacy-peer-deps"), prepend "npm install".
+func normalizeInstallCommand(cmd string) string {
+	cmd = strings.TrimSpace(cmd)
+	if cmd == "" {
+		return cmd
+	}
+	// If it starts with "--", it's just flags — prepend "npm install"
+	if strings.HasPrefix(cmd, "--") {
+		return "npm install " + cmd
+	}
+	return cmd
 }
 
 func sanitizeArgs(args []string) []string {

@@ -77,21 +77,26 @@ export const FRAMEWORK_ICONS: Record<string, string> = {
 };
 
 export const FRAMEWORK_PRESETS: Record<string, { install: string; build: string; run: string; output: string }> = {
+  // SSR / server frameworks — have their own production servers
   nextjs: { install: 'npm install', build: 'npm run build', run: 'npm start', output: '.next' },
-  vite: { install: 'npm install', build: 'npm run build', run: 'npm run preview', output: 'dist' },
-  vue: { install: 'npm install', build: 'npm run build', run: 'npm run preview', output: 'dist' },
-  'create-react-app': { install: 'npm install', build: 'npm run build', run: 'npm start', output: 'build' },
   nestjs: { install: 'npm install', build: 'npm run build', run: 'npm run start:prod', output: 'dist' },
-  angular: { install: 'npm install', build: 'npm run build', run: 'npm start', output: 'dist' },
-  astro: { install: 'npm install', build: 'npm run build', run: 'npm run preview', output: 'dist' },
-  sveltekit: { install: 'npm install', build: 'npm run build', run: 'npm run preview', output: 'build' },
   nuxt: { install: 'npm install', build: 'npm run build', run: 'npm run start', output: '.output/public' },
   express: { install: 'npm install', build: '', run: 'node index.js', output: '.' },
   fastify: { install: 'npm install', build: '', run: 'node app.js', output: '.' },
+  node: { install: 'npm install', build: '', run: 'npm start', output: '.' },
+
+  // Static site frameworks — use `serve` for production
+  vite: { install: 'npm install', build: 'npm run build', run: 'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', output: 'dist' },
+  vue: { install: 'npm install', build: 'npm run build', run: 'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', output: 'dist' },
+  'create-react-app': { install: 'npm install', build: 'npm run build', run: 'npx --yes serve -s build -l tcp://0.0.0.0:$PORT', output: 'build' },
+  angular: { install: 'npm install', build: 'npm run build', run: 'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', output: 'dist' },
+  astro: { install: 'npm install', build: 'npm run build', run: 'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', output: 'dist' },
+  sveltekit: { install: 'npm install', build: 'npm run build', run: 'npx --yes serve -s build -l tcp://0.0.0.0:$PORT', output: 'build' },
+
+  // Python frameworks
   django: { install: 'pip install -r requirements.txt', build: 'python manage.py collectstatic --noinput', run: 'gunicorn app.wsgi', output: 'staticfiles' },
   flask: { install: 'pip install -r requirements.txt', build: '', run: 'gunicorn app:app', output: '.' },
-  fastapi: { install: 'pip install -r requirements.txt', build: '', run: 'uvicorn main:app --host 0.0.0.0', output: '.' },
+  fastapi: { install: 'pip install -r requirements.txt', build: '', run: 'uvicorn main:app --host 0.0.0.0 --port $PORT', output: '.' },
   streamlit: { install: 'pip install -r requirements.txt', build: '', run: 'streamlit run app.py', output: '.' },
   python: { install: 'pip install -r requirements.txt', build: '', run: 'python main.py', output: '.' },
-  node: { install: 'npm install', build: '', run: 'npm start', output: '.' },
 };
