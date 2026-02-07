@@ -170,6 +170,10 @@ func (b *Builder) buildArgs(opts Options) []string {
 		"--progress", "plain",
 	}
 
+	if opts.BuildConfig.InstallCommand != "" {
+		args = append(args, "--opt", fmt.Sprintf("env:RAILPACK_INSTALL_CMD=%s", opts.BuildConfig.InstallCommand))
+	}
+
 	output := fmt.Sprintf("type=image,name=%s,push=true", opts.ImageName)
 	if b.config.InsecureRegistry {
 		output += ",registry.insecure=true"
