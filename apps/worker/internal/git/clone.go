@@ -114,10 +114,10 @@ func (c *Cloner) Clone(ctx context.Context, opts CloneOptions) (*CloneResult, er
 	cmd.Env = append(os.Environ(),
 		"GIT_TERMINAL_PROMPT=0", // Never prompt for credentials
 	)
-
-	// Use StreamLogger for both stdout and stderr
-	cmd.Stdout = streamLogger
-	cmd.Stderr = streamLogger
+	
+	filteredWriter := NewProgressFilter(streamLogger)
+	cmd.Stdout = filteredWriter
+	cmd.Stderr = filteredWriter
 
 	// Log command (without exposing token!)
 	safeURL := c.sanitizeURL(opts.RepoURL)
@@ -210,8 +210,9 @@ func (c *Cloner) sanitizeURL(url string) string {
 func (c *Cloner) checkout(ctx context.Context, repoPath, commit string, streamLogger *logging.StreamLogger) error {
 	cmd := exec.CommandContext(ctx, "git", "checkout", commit)
 	cmd.Dir = repoPath
-	cmd.Stdout = streamLogger
-	cmd.Stderr = streamLogger
+	filteredWriter := NewProgressFilter(streamLogger)
+	cmd.Stdout = filteredWriter
+	cmd.Stderr = filteredWriter
 
 	streamLogger.Log(fmt.Sprintf("$ git checkout %s", commit[:8]))
 

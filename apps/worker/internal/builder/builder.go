@@ -124,12 +124,6 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	buildLog.Log("🔨 Building image with BuildKit...")
 	buildLog.Log("")
 
-	cmd := exec.CommandContext(ctx, "buildctl", args...)
-	cmd.Dir = opts.SourcePath
-	cmd.Env = os.Environ()
-	cmd.Stdout = buildLog
-	cmd.Stderr = buildLog
-
 	if err := cmd.Run(); err != nil {
 		buildLog.Flush()
 
