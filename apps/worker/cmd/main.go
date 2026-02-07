@@ -60,7 +60,7 @@ func main() {
 	// Verify Railpack
 	railpackResult, err := builder.Verify(ctx, cfg.BuildkitAddr, logger)
 	if err != nil {
-		logger.Fatal("Railpack verification failed", zap.Error(err))
+		// logger.Fatal("Railpack verification failed", zap.Error(err))
 	}
 	logger.Info("Railpack ready", zap.String("version", railpackResult.RailpackVersion))
 

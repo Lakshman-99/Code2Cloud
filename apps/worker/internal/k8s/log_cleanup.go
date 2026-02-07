@@ -9,14 +9,14 @@ import (
 )
 
 type LogCleanupWorker struct {
-	triggerCleanup func(ctx context.Context) error
+	triggerCleanup func(ctx context.Context) (int, error)
 	interval       time.Duration
 	logger         *zap.Logger
 	wg             sync.WaitGroup
 }
 
 func NewLogCleanupWorker(
-	triggerCleanup func(ctx context.Context) error,
+	triggerCleanup func(ctx context.Context) (int, error),
 	interval time.Duration,
 	logger *zap.Logger,
 ) *LogCleanupWorker {
@@ -70,10 +70,11 @@ func (lc *LogCleanupWorker) run(ctx context.Context) {
 
 	lc.logger.Info("Triggering log cleanup...")
 
-	if err := lc.triggerCleanup(ctx); err != nil {
+	count, err := lc.triggerCleanup(ctx)
+	if err != nil {
 		lc.logger.Warn("Log cleanup call failed", zap.Error(err))
 		return
 	}
 
-	lc.logger.Info("Log cleanup completed ✅")
+	lc.logger.Info("Log cleanup completed ✅", zap.Int("deleted_count", count))
 }
