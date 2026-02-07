@@ -1,6 +1,6 @@
 import { FRAMEWORK_ICONS } from "@/types/git";
 import { DeploymentStatus } from "@/types/project";
-import { Ban, CheckCircle2, Hammer, Hourglass, Rocket, XCircle } from "lucide-react";
+import { Ban, BrushCleaning, CheckCircle2, Hammer, Hourglass, Rocket, XCircle } from "lucide-react";
 import Image from "next/image";
 import { cloneElement, isValidElement, JSX, ReactElement } from "react";
 
@@ -75,6 +75,13 @@ const STATUS_CONFIG: Record<DeploymentStatus, StatusConfig> = {
     glow: "shadow-[0_0_10px_rgba(161,161,170,0.35)]",
     icon: <Ban className="text-zinc-400" />,
   },
+  EXPIRED: {
+    label: "Expired",
+    color: "bg-gray-500",
+    text: "text-gray-500",
+    glow: "shadow-[0_0_10px_rgba(161,161,170,0.35)]",
+    icon: <BrushCleaning className="text-zinc-400" />,
+  }
 };
 
 export const getStatusConfig = (

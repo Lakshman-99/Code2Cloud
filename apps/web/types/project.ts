@@ -6,6 +6,7 @@ export enum DeploymentStatus {
   READY = 'READY',
   FAILED = 'FAILED',
   CANCELED = 'CANCELED',
+  EXPIRED = 'EXPIRED',
 }
 
 export enum DomainDnsStatus {
