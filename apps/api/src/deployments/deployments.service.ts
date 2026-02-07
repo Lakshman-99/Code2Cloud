@@ -5,7 +5,7 @@ import { EncryptionService } from 'src/common/utils/encryption.service';
 import { CreateDeploymentDto } from './dto/create-deployment.dto';
 import { EnvironmentType } from 'generated/prisma/enums';
 import { GithubAppService } from 'src/git/git.service';
-import { urlConfig } from 'lib/url-config';
+import { UrlUtils } from 'src/common/utils/url.utils';
 
 @Injectable()
 export class DeploymentsService {
@@ -56,7 +56,7 @@ export class DeploymentsService {
 
     const deployment = await this.prisma.$transaction(async (tx) => {
       const systemConfig = await tx.systemConfig.findUnique({ where: { userId } });
-      const deploymentUrl = `https://${project.name}.${urlConfig.domain}`;
+      const deploymentUrl = UrlUtils.generateDeploymentUrl(project.name);
             
       const deployment = await tx.deployment.create({
         data: {

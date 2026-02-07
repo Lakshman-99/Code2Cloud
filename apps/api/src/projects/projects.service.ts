@@ -2,11 +2,11 @@ import { Injectable, BadRequestException, NotFoundException, Logger } from '@nes
 import { PrismaService } from 'prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
-import { urlConfig } from 'lib/url-config';
 import { QueuesService } from 'src/queues/queues.service';
 import { EncryptionService } from 'src/common/utils/encryption.service';
 import { GithubAppService } from 'src/git/git.service';
 import { EnvironmentVariable } from 'generated/prisma/client';
+import { UrlUtils } from 'src/common/utils/url.utils';
 
 @Injectable()
 export class ProjectsService {
@@ -87,7 +87,7 @@ export class ProjectsService {
       }
 
       // C. Create Initial Deployment
-      const deploymentUrl = `https://${project.name}.${urlConfig.domain}`.toLowerCase();
+      const deploymentUrl = UrlUtils.generateDeploymentUrl(project.name);
       
       const deployment = await tx.deployment.create({
         data: {
