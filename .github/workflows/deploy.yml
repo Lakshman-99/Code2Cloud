@@ -198,23 +198,33 @@ jobs:
               echo "  Building: ${APP_NAME}"
               echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-              # Base buildctl command
-              local BUILD_CMD="sudo buildctl --addr tcp://${BUILDKIT_IP}:1234 build \
-                --frontend dockerfile.v0 \
-                --local context=. \
-                --local dockerfile=${DOCKERFILE_DIR}"
-
-              # Add build args passed as remaining parameters
+              # Build the build args array
+              local BUILD_ARGS=""
               for arg in "$@"; do
-                BUILD_CMD="${BUILD_CMD} --opt build-arg:${arg}"
+                BUILD_ARGS="${BUILD_ARGS} --opt build-arg:${arg}"
               done
 
-              # Push with both :latest and :commit tags
-              BUILD_CMD="${BUILD_CMD} \
-                --output type=image,\"name=${REGISTRY_IP}:5000/${IMAGE_NAME}:latest,${REGISTRY_IP}:5000/${IMAGE_NAME}:${COMMIT_SHA}\",push=true,registry.insecure=true"
-
               echo "→ Running buildctl..."
-              eval ${BUILD_CMD}
+              sudo buildctl --addr tcp://${BUILDKIT_IP}:1234 build \
+                --frontend dockerfile.v0 \
+                --local context=. \
+                --local dockerfile=${DOCKERFILE_DIR} \
+                ${BUILD_ARGS} \
+                --output type=image,name=${REGISTRY_IP}:5000/${IMAGE_NAME}:latest,push=true,registry.insecure=true
+
+              if [ $? -ne 0 ]; then
+                echo "✗ Build failed for ${APP_NAME}"
+                return 1
+              fi
+
+              echo "→ Tagging with commit SHA: ${COMMIT_SHA}"
+              sudo buildctl --addr tcp://${BUILDKIT_IP}:1234 build \
+                --frontend dockerfile.v0 \
+                --local context=. \
+                --local dockerfile=${DOCKERFILE_DIR} \
+                ${BUILD_ARGS} \
+                --output type=image,name=${REGISTRY_IP}:5000/${IMAGE_NAME}:${COMMIT_SHA},push=true,registry.insecure=true \
+              || echo "→ Warning: SHA tag failed, :latest was pushed successfully"
 
               echo "→ Restarting deployment: ${K8S_DEPLOYMENT}"
               sudo kubectl rollout restart deployment/${K8S_DEPLOYMENT} -n code2cloud

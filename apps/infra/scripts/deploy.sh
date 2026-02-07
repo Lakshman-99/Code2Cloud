@@ -175,23 +175,33 @@ build_and_deploy() {
 
   local START_TIME=$(date +%s)
 
-  # Build buildctl command
-  local BUILD_CMD="buildctl --addr tcp://${BUILDKIT_IP}:1234 build \
-    --frontend dockerfile.v0 \
-    --local context=. \
-    --local dockerfile=${DOCKERFILE_DIR}"
-
-  # Add build args
+  # Build the build args
+  local BUILD_ARGS_STR=""
   for arg in "${BUILD_ARGS[@]}"; do
-    BUILD_CMD="${BUILD_CMD} --opt build-arg:${arg}"
+    BUILD_ARGS_STR="${BUILD_ARGS_STR} --opt build-arg:${arg}"
   done
 
-  # Push with both :latest and :commit tags
-  BUILD_CMD="${BUILD_CMD} \
-    --output type=image,\"name=${REGISTRY_IP}:5000/${IMAGE_NAME}:latest,${REGISTRY_IP}:5000/${IMAGE_NAME}:${COMMIT_SHA}\",push=true,registry.insecure=true"
-
   echo "→ Building image..."
-  eval ${BUILD_CMD}
+  buildctl --addr tcp://${BUILDKIT_IP}:1234 build \
+    --frontend dockerfile.v0 \
+    --local context=. \
+    --local dockerfile=${DOCKERFILE_DIR} \
+    ${BUILD_ARGS_STR} \
+    --output type=image,name=${REGISTRY_IP}:5000/${IMAGE_NAME}:latest,push=true,registry.insecure=true
+
+  if [ $? -ne 0 ]; then
+    echo -e "${RED}✗ Build failed for ${APP_NAME}${NC}"
+    return 1
+  fi
+
+  # Tag with commit SHA (non-fatal if this fails)
+  buildctl --addr tcp://${BUILDKIT_IP}:1234 build \
+    --frontend dockerfile.v0 \
+    --local context=. \
+    --local dockerfile=${DOCKERFILE_DIR} \
+    ${BUILD_ARGS_STR} \
+    --output type=image,name=${REGISTRY_IP}:5000/${IMAGE_NAME}:${COMMIT_SHA},push=true,registry.insecure=true \
+  || echo -e "${YELLOW}→ Warning: SHA tag failed, :latest was pushed successfully${NC}"
 
   local END_TIME=$(date +%s)
   local DURATION=$((END_TIME - START_TIME))
