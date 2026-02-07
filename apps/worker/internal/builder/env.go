@@ -1,6 +1,7 @@
 package builder
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -67,6 +68,45 @@ func MergeEnvVars(maps ...map[string]string) map[string]string {
 	}
 
 	return result
+}
+
+func FrameworkRuntimePortEnv(framework string, port int32) map[string]string {
+	portStr := fmt.Sprintf("%d", port)
+
+	switch strings.ToLower(framework) {
+		// Node.js / JavaScript frameworks
+		case "nextjs":
+			return map[string]string{"PORT": portStr, "HOSTNAME": "0.0.0.0"}
+		case "vite":
+			return map[string]string{"PORT": portStr, "HOST": "0.0.0.0"}
+		case "nuxt", "nuxtjs":
+			return map[string]string{"PORT": portStr, "HOST": "0.0.0.0", "NUXT_PORT": portStr, "NUXT_HOST": "0.0.0.0"}
+		case "angular":
+			return map[string]string{"PORT": portStr}
+		case "gatsby", "create-react-app", "vue":
+			return map[string]string{"PORT": portStr}
+		case "express", "fastify", "nestjs", "node":
+			return map[string]string{"PORT": portStr}
+
+		// Python frameworks
+		case "django":
+			return map[string]string{"PORT": portStr}
+		case "flask":
+			return map[string]string{"PORT": portStr, "FLASK_RUN_PORT": portStr, "FLASK_RUN_HOST": "0.0.0.0"}
+		case "fastapi":
+			return map[string]string{"PORT": portStr, "UVICORN_PORT": portStr, "UVICORN_HOST": "0.0.0.0"}
+		case "streamlit":
+			return map[string]string{"PORT": portStr, "STREAMLIT_SERVER_PORT": portStr, "STREAMLIT_SERVER_ADDRESS": "0.0.0.0"}
+		case "python":
+			return map[string]string{"PORT": portStr}
+
+		// Go
+		case "golang", "go":
+			return map[string]string{"PORT": portStr}
+
+		default:
+			return map[string]string{"PORT": portStr}
+	}
 }
 
 // FilterEnvVars filters env vars by a predicate function

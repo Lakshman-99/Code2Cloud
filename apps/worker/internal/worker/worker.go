@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -346,18 +347,29 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 	// ─────────────────────────────────────────────────────────
 	// Step 7: Deploy to Kubernetes
 	// ─────────────────────────────────────────────────────────
+
+	port := resolvePort(job.EnvVars)
+
+	runtimeEnvVars := builder.MergeEnvVars(
+		job.EnvVars,
+		builder.FrameworkRuntimePortEnv(job.BuildConfig.Framework, port),
+	)
+	runtimeEnvVars["PORT"] = fmt.Sprintf("%d", port)
+
+	buildLog.Log(fmt.Sprintf("Container port: %d", port))
+
 	deployOpts := k8s.DeployOptions{
 		DeploymentID:  job.DeploymentID,
 		ProjectID:     job.ProjectID,
 		ProjectName:   job.ProjectName,
 		ImageName:     buildResult.ImageName,
-		Port:          3000,
+		Port:          port,
 		CPURequest:    settings.DefaultCPURequest(),
 		CPULimit:      settings.DefaultCPULimit(),
 		MemoryRequest: settings.DefaultMemoryRequest(),
 		MemoryLimit:   settings.DefaultMemoryLimit(),
 		Replicas:      1,
-		EnvVars:       job.EnvVars,
+		EnvVars:       runtimeEnvVars,
 		Domains:       job.Domains,
 		BaseDomain:    w.cfg.BaseDomain,
 		HealthPath:    "/health",
@@ -445,6 +457,18 @@ func (w *Worker) shutdown() error {
 	}
 	
 	return nil
+}
+
+// resolvePort determines the container port from user environment variables.
+// If the user specified a PORT env var, that value is used.
+// Otherwise, defaults to 3000 to ensure the app is accessible.
+func resolvePort(envVars map[string]string) int32 {
+	if portStr, ok := envVars["PORT"]; ok {
+		if port, err := strconv.ParseInt(portStr, 10, 32); err == nil && port > 0 && port <= 65535 {
+			return int32(port)
+		}
+	}
+	return 3000
 }
 
 // sanitizeName makes a name safe for K8s/DNS

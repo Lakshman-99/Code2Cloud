@@ -37,12 +37,14 @@ func (c *Client) CreateOrUpdateDeployment(ctx context.Context, opts DeployOption
 	}
 
 	envVars := make([]corev1.EnvVar, 0, len(opts.EnvVars)+2)
-	envVars = append(envVars,
-		corev1.EnvVar{Name: "PORT", Value: fmt.Sprintf("%d", opts.Port)},
-		corev1.EnvVar{Name: "NODE_ENV", Value: "production"},
-	)
 	for key, value := range opts.EnvVars {
 		envVars = append(envVars, corev1.EnvVar{Name: key, Value: value})
+	}
+	if _, hasPort := opts.EnvVars["PORT"]; !hasPort {
+		envVars = append(envVars, corev1.EnvVar{Name: "PORT", Value: fmt.Sprintf("%d", opts.Port)})
+	}
+	if _, hasNodeEnv := opts.EnvVars["NODE_ENV"]; !hasNodeEnv {
+		envVars = append(envVars, corev1.EnvVar{Name: "NODE_ENV", Value: "production"})
 	}
 
 	deployment := &appsv1.Deployment{
