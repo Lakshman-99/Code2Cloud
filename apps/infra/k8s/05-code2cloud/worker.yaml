@@ -21,10 +21,9 @@ metadata:
 ---
 # Role with permissions in 'deployments' namespace
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
-  name: worker-role
-  namespace: deployments
+  name: code2cloud-worker
 rules:
   # Manage deployments
   - apiGroups: ["apps"]
