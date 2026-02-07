@@ -64,6 +64,11 @@ export class InternalController {
     return this.internalService.getExpiredDeployments();
   }
 
+  @Post('logs/cleanup')
+  cleanupLogs() {
+    return this.internalService.cleanupLogs();
+  }
+
   @Delete('deployments/:id/resources')
   deleteDeploymentResources(@Param('id') id: string) {
     return this.internalService.deleteDeploymentResources(id);

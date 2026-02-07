@@ -28,10 +28,9 @@ type Worker struct {
 	logFactory *logging.Factory 
 	logger     *zap.Logger
 	logStreamer *k8s.LogStreamer
-
 	domainWorker *k8s.DomainWorker
-
 	cleanupWorker *k8s.CleanupWorker
+	logCleanupWorker *k8s.LogCleanupWorker
 }
 
 func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, error) {
@@ -112,6 +111,12 @@ func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, 
 		CheckInterval:            60 * time.Second,
 	})
 
+	logCleanupWorker := k8s.NewLogCleanupWorker(
+		apiClient.TriggerLogCleanup,
+		1*time.Hour,
+		logger,
+	)
+
 	// Create worker instance
 	w := &Worker{
 		cfg:         cfg,
@@ -122,9 +127,10 @@ func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, 
 		k8s:         k8sClient,
 		logFactory:  logFactory,
 		logger:      logger,
-		logStreamer:    logStreamer,
-		domainWorker:   domainWorker,
-		cleanupWorker:  cleanupWorker,
+		logStreamer:      logStreamer,
+		domainWorker:     domainWorker,
+		cleanupWorker:    cleanupWorker,
+		logCleanupWorker: logCleanupWorker,
 	}
 
 	return w, nil
@@ -141,9 +147,10 @@ func (w *Worker) Start(ctx context.Context) error {
 		zap.String("k8s_namespace", w.cfg.Namespace),
 	)
 
-	// Domain & cleanup workers (background tasks)
+	// Start workers (background tasks)
 	w.domainWorker.Start(ctx)
 	w.cleanupWorker.Start(ctx)
+	w.logCleanupWorker.Start(ctx)
 
 	for {
 		select {

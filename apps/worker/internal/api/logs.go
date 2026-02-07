@@ -95,3 +95,14 @@ func (c *Client) GetLogs(ctx context.Context, deploymentID string, source *LogSo
 
 	return result.Logs, nil
 }
+
+// triggers the log cleanup process in the backend
+func (c *Client) TriggerLogCleanup(ctx context.Context) error {
+	path := "/internal/logs/cleanup"
+
+	if err := c.post(ctx, path, nil, nil); err != nil {
+		return fmt.Errorf("failed to trigger log cleanup: %w", err)
+	}
+
+	return nil
+}

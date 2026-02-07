@@ -202,6 +202,36 @@ export class InternalService {
     return expiredDeployments;
   }
 
+  async cleanupLogs() {
+    // Get all configurations with logRetentionDays
+    const configs = await this.prisma.systemConfig.findMany({
+      select: { userId: true, logRetentionDays: true },
+    });
+
+    let totalDeleted = 0;
+
+    for (const config of configs) {
+      if (!config.logRetentionDays) continue;
+
+      const retentionMs = config.logRetentionDays * 24 * 60 * 60 * 1000;
+      const expiryThreshold = new Date(Date.now() - retentionMs);
+
+      const result = await this.prisma.logEntry.deleteMany({
+        where: {
+          deployment: {
+            project: { userId: config.userId },
+          },
+          timestamp: { lt: expiryThreshold },
+        },
+      });
+
+      totalDeleted += result.count;
+    }
+
+    this.logger.log(`Cleaned up ${totalDeleted} expired log entries`);
+    return { success: true, count: totalDeleted };
+  }
+
   async deleteDeploymentResources(id: string) {
     const deployment = await this.prisma.deployment.findUnique({
       where: { id },
