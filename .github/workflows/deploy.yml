@@ -1,0 +1,329 @@
+# =============================================================================
+# Code2Cloud CI/CD Pipeline
+# =============================================================================
+# Automatically builds and deploys changed apps to the K8s cluster.
+#
+# How it works:
+#   1. Detects which apps changed based on file paths
+#   2. SSHs into the server
+#   3. Pulls latest code
+#   4. Builds changed apps using BuildKit → pushes to internal registry
+#   5. Restarts only the affected K8s deployments
+#
+# Required GitHub Secrets:
+#   SSH_HOST          - Server IP address
+#   SSH_USER          - SSH username (e.g., ubuntu)
+#   SSH_PRIVATE_KEY   - SSH private key for authentication
+#   DATABASE_URL      - PostgreSQL connection string (for API build)
+#   DATABASE_DIRECT_URL - PostgreSQL direct connection string (for API build)
+#   DOMAIN            - Main domain (e.g., code2cloud.lakshman.me)
+#   API_SUBDOMAIN     - API subdomain (e.g., api)
+# =============================================================================
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - "apps/api/**"
+      - "apps/worker/**"
+      - "packages/**"
+  workflow_dispatch:
+    inputs:
+      deploy_all:
+        description: "Deploy all apps (ignore change detection)"
+        type: boolean
+        default: false
+      deploy_web:
+        description: "Deploy web"
+        type: boolean
+        default: false
+      deploy_api:
+        description: "Deploy api"
+        type: boolean
+        default: false
+      deploy_worker:
+        description: "Deploy worker"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ===========================================================================
+  # Detect which apps have changed
+  # ===========================================================================
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.changes.outputs.web }}
+      api: ${{ steps.changes.outputs.api }}
+      worker: ${{ steps.changes.outputs.worker }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        uses: dorny/paths-filter@v3
+        id: changes
+        if: github.event_name == 'push'
+        with:
+          filters: |
+            web:
+              - 'apps/web/**'
+              - 'packages/**'
+            api:
+              - 'apps/api/**'
+              - 'packages/**'
+            worker:
+              - 'apps/worker/**'
+
+      - name: Override for workflow_dispatch
+        id: dispatch
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [[ "${{ inputs.deploy_all }}" == "true" ]]; then
+            echo "web=true" >> $GITHUB_OUTPUT
+            echo "api=true" >> $GITHUB_OUTPUT
+            echo "worker=true" >> $GITHUB_OUTPUT
+          else
+            echo "web=${{ inputs.deploy_web }}" >> $GITHUB_OUTPUT
+            echo "api=${{ inputs.deploy_api }}" >> $GITHUB_OUTPUT
+            echo "worker=${{ inputs.deploy_worker }}" >> $GITHUB_OUTPUT
+          fi
+
+  # ===========================================================================
+  # Deploy changed apps
+  # ===========================================================================
+  deploy:
+    name: Build & Deploy
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: |
+      needs.detect-changes.outputs.web == 'true' ||
+      needs.detect-changes.outputs.api == 'true' ||
+      needs.detect-changes.outputs.worker == 'true' ||
+      github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Summary of changes
+        run: |
+          echo "## Deployment Triggered" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| App | Changed |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Web | ${{ needs.detect-changes.outputs.web }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API | ${{ needs.detect-changes.outputs.api }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Worker | ${{ needs.detect-changes.outputs.worker }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy to server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_WEB: ${{ needs.detect-changes.outputs.web }}
+          DEPLOY_API: ${{ needs.detect-changes.outputs.api }}
+          DEPLOY_WORKER: ${{ needs.detect-changes.outputs.worker }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_DIRECT_URL: ${{ secrets.DATABASE_DIRECT_URL }}
+          DOMAIN: ${{ secrets.DOMAIN }}
+          API_SUBDOMAIN: ${{ secrets.API_SUBDOMAIN }}
+        run: |
+          # Build the deploy command
+          DEPLOY_FLAGS=""
+          if [[ "$DEPLOY_WEB" == "true" ]]; then DEPLOY_FLAGS="$DEPLOY_FLAGS --web"; fi
+          if [[ "$DEPLOY_API" == "true" ]]; then DEPLOY_FLAGS="$DEPLOY_FLAGS --api"; fi
+          if [[ "$DEPLOY_WORKER" == "true" ]]; then DEPLOY_FLAGS="$DEPLOY_FLAGS --worker"; fi
+
+          # For workflow_dispatch with deploy_all
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.deploy_all }}" == "true" ]]; then
+            DEPLOY_FLAGS="--all"
+          fi
+
+          # If no flags set (shouldn't happen but safety check), deploy all
+          if [[ -z "$DEPLOY_FLAGS" ]]; then
+            echo "No changes detected, skipping deploy"
+            exit 0
+          fi
+
+          echo "🚀 Deploying with flags: $DEPLOY_FLAGS"
+
+          # SSH into server and run deploy
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST} bash -s -- \
+            $DEPLOY_FLAGS \
+            --database-url "'${DATABASE_URL}'" \
+            --database-direct-url "'${DATABASE_DIRECT_URL}'" \
+            --domain "${DOMAIN}" \
+            --api-subdomain "${API_SUBDOMAIN}" \
+            << 'DEPLOY_SCRIPT'
+
+          #!/bin/bash
+          set -euo pipefail
+
+          # =================================================================
+          # Parse arguments
+          # =================================================================
+          DEPLOY_WEB=false
+          DEPLOY_API=false
+          DEPLOY_WORKER=false
+          DATABASE_URL=""
+          DATABASE_DIRECT_URL=""
+          DOMAIN=""
+          API_SUBDOMAIN=""
+
+          while [[ $# -gt 0 ]]; do
+            case $1 in
+              --all)       DEPLOY_WEB=true; DEPLOY_API=true; DEPLOY_WORKER=true ;;
+              --web)       DEPLOY_WEB=true ;;
+              --api)       DEPLOY_API=true ;;
+              --worker)    DEPLOY_WORKER=true ;;
+              --database-url)        DATABASE_URL="$2"; shift ;;
+              --database-direct-url) DATABASE_DIRECT_URL="$2"; shift ;;
+              --domain)              DOMAIN="$2"; shift ;;
+              --api-subdomain)       API_SUBDOMAIN="$2"; shift ;;
+            esac
+            shift
+          done
+
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+          # =================================================================
+          # Configuration
+          # =================================================================
+          REPO_URL="https://github.com/Lakshman-99/Code2Cloud.git"
+          BRANCH="main"
+          BUILD_DIR="/tmp/code2cloud-ci-build"
+          REGISTRY_IP=$(kubectl get svc registry -n registry -o jsonpath='{.spec.clusterIP}')
+          BUILDKIT_IP=$(kubectl get svc buildkitd -n default -o jsonpath='{.spec.clusterIP}')
+
+          echo "══════════════════════════════════════════════════════════════"
+          echo "  Code2Cloud CI/CD Deploy"
+          echo "══════════════════════════════════════════════════════════════"
+          echo "  Registry:  ${REGISTRY_IP}:5000"
+          echo "  BuildKit:  ${BUILDKIT_IP}:1234"
+          echo "  Web:       ${DEPLOY_WEB}"
+          echo "  API:       ${DEPLOY_API}"
+          echo "  Worker:    ${DEPLOY_WORKER}"
+          echo "══════════════════════════════════════════════════════════════"
+
+          # =================================================================
+          # Clone / Update repository
+          # =================================================================
+          if [ -d "${BUILD_DIR}/repo/.git" ]; then
+            echo "→ Updating existing repo..."
+            cd ${BUILD_DIR}/repo
+            git fetch origin
+            git reset --hard origin/${BRANCH}
+            git clean -fdx
+          else
+            echo "→ Cloning repository..."
+            rm -rf ${BUILD_DIR}
+            mkdir -p ${BUILD_DIR}
+            git clone --branch ${BRANCH} --depth 1 ${REPO_URL} ${BUILD_DIR}/repo
+          fi
+
+          cd ${BUILD_DIR}/repo
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          echo "→ Building from commit: ${COMMIT_SHA}"
+
+          # =================================================================
+          # Build and deploy functions
+          # =================================================================
+          build_and_deploy() {
+            local APP_NAME=$1
+            local DOCKERFILE_DIR=$2
+            local IMAGE_NAME=$3
+            local K8S_DEPLOYMENT=$4
+            shift 4
+            local BUILD_ARGS=("$@")
+
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "  Building: ${APP_NAME}"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+            # Build buildctl command
+            BUILD_CMD="buildctl --addr tcp://${BUILDKIT_IP}:1234 build \
+              --frontend dockerfile.v0 \
+              --local context=. \
+              --local dockerfile=${DOCKERFILE_DIR}"
+
+            # Add build args
+            for arg in "${BUILD_ARGS[@]}"; do
+              BUILD_CMD="${BUILD_CMD} --opt build-arg:${arg}"
+            done
+
+            # Push with both :latest and :sha tags
+            BUILD_CMD="${BUILD_CMD} \
+              --output type=image,\"name=${REGISTRY_IP}:5000/${IMAGE_NAME}:latest,${REGISTRY_IP}:5000/${IMAGE_NAME}:${COMMIT_SHA}\",push=true,registry.insecure=true"
+
+            echo "→ Running buildctl..."
+            eval ${BUILD_CMD}
+
+            echo "→ Restarting deployment: ${K8S_DEPLOYMENT}"
+            kubectl rollout restart deployment/${K8S_DEPLOYMENT} -n code2cloud
+            kubectl rollout status deployment/${K8S_DEPLOYMENT} -n code2cloud --timeout=300s
+
+            echo "✓ ${APP_NAME} deployed successfully (${COMMIT_SHA})"
+          }
+
+          # =================================================================
+          # Build changed apps
+          # =================================================================
+          FAILED=()
+
+          if [ "${DEPLOY_API}" = "true" ]; then
+            build_and_deploy "API (NestJS)" "apps/api" "code2cloud-backend" "backend" \
+              "DATABASE_URL=${DATABASE_URL}" \
+              "DATABASE_DIRECT_URL=${DATABASE_DIRECT_URL}" \
+            || FAILED+=("api")
+          fi
+
+          if [ "${DEPLOY_WEB}" = "true" ]; then
+            mkdir -p apps/web/public
+            build_and_deploy "Web (Next.js)" "apps/web" "code2cloud-frontend" "frontend" \
+              "NEXT_PUBLIC_API_URL=https://${API_SUBDOMAIN}.${DOMAIN}" \
+              "NEXT_PUBLIC_APP_URL=https://${DOMAIN}" \
+            || FAILED+=("web")
+          fi
+
+          if [ "${DEPLOY_WORKER}" = "true" ]; then
+            build_and_deploy "Worker (Go)" "apps/worker" "code2cloud-worker" "worker" \
+            || FAILED+=("worker")
+          fi
+
+          # =================================================================
+          # Summary
+          # =================================================================
+          echo ""
+          echo "══════════════════════════════════════════════════════════════"
+          if [ ${#FAILED[@]} -eq 0 ]; then
+            echo "  ✓ All deployments successful!"
+          else
+            echo "  ✗ Failed deployments: ${FAILED[*]}"
+            exit 1
+          fi
+          echo "══════════════════════════════════════════════════════════════"
+
+          DEPLOY_SCRIPT
+
+      - name: Post deployment summary
+        if: always()
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Result" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment completed successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Deployment failed" >> $GITHUB_STEP_SUMMARY
+          fi
