@@ -37,6 +37,9 @@ export function useDeploymentLogs(
   const cursorRef = useRef<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isFetchingRef = useRef(false);
+  const lastFetchConfig = useRef<{ id: string; source?: LogSource } | null>(
+    null,
+  );
 
   const fetchLogs = useCallback(async () => {
     if (!deploymentId || isFetchingRef.current) return;
@@ -73,11 +76,18 @@ export function useDeploymentLogs(
   useEffect(() => {
     if (!deploymentId || !enabled) return;
 
-    // Reset state on deploymentId/source change
-    setLogs([]);
-    setIsLoading(true);
-    setError(null);
-    cursorRef.current = null;
+    const isSameConfig =
+      lastFetchConfig.current?.id === deploymentId &&
+      lastFetchConfig.current?.source === source;
+
+    if (!isSameConfig) {
+      // Reset state on deploymentId/source change
+      setLogs([]);
+      setIsLoading(true);
+      setError(null);
+      cursorRef.current = null;
+      lastFetchConfig.current = { id: deploymentId, source };
+    }
 
     fetchLogs();
   }, [deploymentId, source, enabled, fetchLogs]);

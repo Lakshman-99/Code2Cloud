@@ -98,9 +98,6 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	if opts.BuildConfig.RunCommand != "" {
 		prepareArgs = append(prepareArgs, "--start-cmd", opts.BuildConfig.RunCommand)
 	}
-	for key, value := range opts.EnvVars {
-		prepareArgs = append(prepareArgs, "--env", fmt.Sprintf("%s=%s", key, value))
-	}
 
 	prepareCmd := exec.CommandContext(ctx, "railpack", prepareArgs...)
 	prepareCmd.Dir = opts.SourcePath
