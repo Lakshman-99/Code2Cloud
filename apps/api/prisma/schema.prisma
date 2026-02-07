@@ -130,6 +130,7 @@ enum DeploymentStatus {
   READY
   FAILED
   CANCELED
+  EXPIRED
 }
 
 enum EnvironmentType {
