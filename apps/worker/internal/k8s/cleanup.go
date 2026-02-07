@@ -96,7 +96,7 @@ func (cw *CleanupWorker) cleanupExpired(ctx context.Context) {
 	}
 
 	if len(deployments) == 0 {
-		return // Nothing to clean — common case
+		return
 	}
 
 	cw.logger.Info("Found expired deployments",
