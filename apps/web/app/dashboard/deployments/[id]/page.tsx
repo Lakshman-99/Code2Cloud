@@ -30,6 +30,7 @@ import {
   Activity,
   Terminal as TerminalIcon,
   ImageOff,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { TerminalLogs } from "@/components/project/TerminalLogs";
 import { DeploymentNotFoundState } from "@/components/feedback/DeploymentNotFoundState";
-import { useDeployment } from "@/hooks/use-deployments";
+import { useDeployment, useDeployments } from "@/hooks/use-deployments";
 import { useDeploymentLogs } from "@/hooks/use-deployment-logs";
 import { useProjects } from "@/hooks/use-projects";
 import { getStatusConfig } from "@/components/project/utils";
@@ -135,7 +136,8 @@ export default function DeploymentDetails() {
   const [copied, setCopied] = useState<string | null>(null);
 
   const deploymentId = params.id as string;
-  const { deployment, isLoading: isDeploymentsLoading } = useDeployment(deploymentId);
+  const { redeploy } = useDeployments();
+  const { deployment, isLoading: isDeploymentsLoading, cancelDeployment } = useDeployment(deploymentId);
   const { getProjectById, isLoading: isProjectsLoading } = useProjects();
   const { logs, isLive, isLoading: isLogsLoading } = useDeploymentLogs(deploymentId, {
     source: LogSource.BUILD,
@@ -151,9 +153,16 @@ export default function DeploymentDetails() {
   const isActive =
     deployment.status === DeploymentStatus.BUILDING ||
     deployment.status === DeploymentStatus.DEPLOYING;
+  
+  const canCancel = isActive ||
+    deployment.status === DeploymentStatus.QUEUED;
   const isFrontend = isFrontendFramework(project.framework);
   const commitUrl = `https://github.com/${project.gitRepoOwner}/${project.gitRepoName}/commit/${deployment.commitHash}`;
   const branchUrl = `${project.gitRepoUrl}/tree/${project.gitBranch}`;
+
+  const handleRedeploy = () => {
+    redeploy(project.id);
+  };
 
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -164,7 +173,6 @@ export default function DeploymentDetails() {
 
   return (
     <div className="p-8 max-w-[1920px] mx-auto space-y-8 min-h-screen">
-      {/* ── ORIGINAL HEADER ───────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -251,13 +259,25 @@ export default function DeploymentDetails() {
               Live Preview
             </Button>
           )}
-          <Button
-            variant="outline"
-            className="gap-2 border-white/10 bg-white/5 hover:bg-white/10 text-foreground group"
-          >
-            <RotateCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
-            Redeploy
-          </Button>
+          {canCancel ? (
+            <Button
+              variant="outline"
+              className="gap-2 border-red-400 text-red-400 hover:bg-red-400/10"
+              onClick={cancelDeployment}
+            >
+              <X className="w-4 h-4" />
+              Cancel
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className="gap-2 border-white/10 bg-white/5 hover:bg-white/10 text-foreground group"
+              onClick={handleRedeploy}
+            >
+              <RotateCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+              Redeploy
+            </Button>
+          )}
         </div>
       </motion.div>
 
@@ -356,12 +376,15 @@ export default function DeploymentDetails() {
             <div className="space-y-2">
               <span className="text-xs text-muted-foreground font-medium">Domains</span>
               <div className="space-y-1.5">
-                <DomainRow
-                  url={deployment.deploymentUrl}
-                  primary
-                  isCopied={copied === "main"}
-                  onCopy={() => handleCopy(deployment.deploymentUrl, "main")}
-                />
+                {project.domains && project.domains.map((domain) => (
+                  <DomainRow
+                    key={domain.id}
+                    url={domain.name}
+                    primary={domain.name === deployment.deploymentUrl}
+                    isCopied={copied === domain.name}
+                    onCopy={() => handleCopy(domain.name, domain.name)}
+                  />
+                ))}
               </div>
             </div>
 
@@ -506,19 +529,15 @@ export default function DeploymentDetails() {
           right={<StatusDot status={deployment.status} />}
         >
           <div className="p-5 space-y-2">
-            <DomainRow
-              url={deployment.deploymentUrl}
-              primary
-              isCopied={copied === "domain-main"}
-              onCopy={() => handleCopy(deployment.deploymentUrl, "domain-main")}
-            />
-            <DomainRow
-              url={`${deployment.id.substring(0, 8)}.code2cloud.app`}
-              isCopied={copied === "domain-sub"}
-              onCopy={() =>
-                handleCopy(`${deployment.id.substring(0, 8)}.code2cloud.app`, "domain-sub")
-              }
-            />
+            {project.domains && project.domains.map((domain) => (
+              <DomainRow
+                key={domain.id}
+                url={domain.name}
+                primary={domain.name === deployment.deploymentUrl}
+                isCopied={copied === domain.name}
+                onCopy={() => handleCopy(domain.name, domain.name)}
+              />
+            ))}
             {isReady && (
               <p className="text-[11px] text-emerald-400/60 flex items-center gap-1.5 pt-2">
                 <ShieldCheck className="w-3 h-3" />

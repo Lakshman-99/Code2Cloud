@@ -38,12 +38,6 @@ const ttlOptions = [
   { value: 60, label: "1 Hour", desc: "Workshop Mode" },
 ];
 
-const regions = [
-  { value: "us-east-1", label: "US East (N. Virginia)", flag: "🇺🇸" },
-  { value: "eu-west-1", label: "EU West (Ireland)", flag: "🇪🇺" },
-  { value: "ap-south-1", label: "Asia Pacific (Mumbai)", flag: "🇮🇳" },
-];
-
 export default function Settings() {
   const { settings: serverSettings, updateSettings, isLoading } = useSettings();
   
@@ -163,26 +157,6 @@ export default function Settings() {
                     </h3>
                     
                     <div className="grid gap-6">
-                      {/* Region Selector */}
-                      <div className="space-y-3">
-                        <label className="text-sm font-medium text-white">Default Deployment Region</label>
-                        <Select value={localSettings.defaultRegion} onValueChange={(val) => handleChange("defaultRegion", val)}>
-                          <SelectTrigger className="w-[230px] bg-black/40 border-white/10 h-12">
-                            <SelectValue placeholder="Select Region" />
-                          </SelectTrigger>
-                          <SelectContent position="popper" side="bottom" sideOffset={4} avoidCollisions={false} className="bg-[#0a0a0a] border-white/10">
-                            {regions.map((region) => (
-                              <SelectItem key={region.value} value={region.value}>
-                                <span className="mr-2">{region.flag}</span> {region.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">New projects will default to this region unless specified otherwise.</p>
-                      </div>
-
-                      <div className="h-px bg-white/5" />
-
                       {/* Resource Limits */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-3">

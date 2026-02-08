@@ -120,7 +120,7 @@ export class InternalService {
     // Return defaults if no config exists
     if (!config) {
       return {
-        defaultRegion: "us-east-1",
+        defaultRegion: "us-ashburn-1",
         maxConcurrentBuilds: 1,
         logRetentionDays: 1,
         turboMode: false,

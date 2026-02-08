@@ -2,10 +2,6 @@ import { IsString, IsBoolean, IsInt, IsOptional, Min, Max, IsUrl } from 'class-v
 
 export class UpdateSettingsDto {
   @IsOptional()
-  @IsString()
-  defaultRegion?: string;
-
-  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(10)

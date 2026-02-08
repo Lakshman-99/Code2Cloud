@@ -35,7 +35,7 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
   return (
     <>
       {/* 1. Pipeline Visualizer */}
-      <PipelineVisualizer />
+      <PipelineVisualizer deploymentStatus={latestDeployment.status} />
 
       {/* 2. Quick Actions & Info Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -52,13 +52,32 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
             </h3>
             
             {/* Animated Status Tag */}
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-xs font-medium text-emerald-500">System Online</span>
-            </div>
+            {project.onlineStatus === "ACTIVE" ? (
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-xs font-medium text-emerald-500">System Online</span>
+              </div>
+            ) : project.onlineStatus === "PENDING" ? (
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-500 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+                </span>
+                <span className="text-xs font-medium text-yellow-500">Starting Up</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                </span>
+                <span className="text-xs font-medium text-red-500">System Offline</span>
+              </div>
+            )}
+
           </div>
 
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-6">

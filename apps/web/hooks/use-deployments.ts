@@ -80,10 +80,25 @@ export function useDeployment(deploymentId: string) {
     }
   );
 
+  const cancelDeployment = async () => {
+    const toastId = toast.loading("Cancelling deployment...");
+    try {
+      await api.post(`/deployments/${deploymentId}/cancel`);
+      toast.success("Deployment cancelled", { id: toastId });
+      mutate();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to cancel deployment", { id: toastId });
+    }
+  };
+
   return {
     deployment: data,
     isLoading,
     isError: !!error,
-    mutate
+    mutate,
+    cancelDeployment
   };
 }

@@ -167,7 +167,7 @@ model Deployment {
   // ─── Infrastructure ─────────────────────────────
   containerImage    String?
   deploymentUrl     String?
-  deploymentRegion  String           @default("us-east-1")
+  deploymentRegion  String           @default("us-ashburn-1")
   logs              LogEntry[]       
 
   // ─── Timing ─────────────────────────────────────
@@ -216,7 +216,7 @@ model SystemConfig {
   userId    String   @unique
 
   // --- General ---
-  defaultRegion       String @default("us-east-1")
+  defaultRegion       String @default("us-ashburn-1")
   maxConcurrentBuilds Int    @default(1)
   logRetentionDays    Int    @default(1)
 

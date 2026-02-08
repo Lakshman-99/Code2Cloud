@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -18,6 +19,9 @@ import (
 	"code2cloud/worker/internal/queue"
 	"code2cloud/worker/internal/types"
 )
+
+// errCancelled is a sentinel error returned when a deployment is cancelled by the user.
+var errCancelled = errors.New("deployment cancelled by user")
 
 type Worker struct {
 	cfg        *config.Config
@@ -182,8 +186,18 @@ func (w *Worker) Start(ctx context.Context) error {
 				zap.String("jobId", jobID),
 				zap.Error(err),
 			)
-			w.api.FailDeployment(ctx, job.DeploymentID, err.Error())
-			w.api.NotifyFailure(ctx, job.DeploymentID, job.ProjectName, err.Error())
+
+			if errors.Is(err, errCancelled) {
+				// Cancellation: status already set by the API, just log and clean up the signal
+				w.api.UpdateDeploymentStatus(ctx, job.DeploymentID, types.StatusCanceled)
+				w.api.NotifyFailure(ctx, job.DeploymentID, job.ProjectName, "Deployment cancelled by user")
+				w.cancelCleanup(ctx, job)
+				w.queue.ClearCancelSignal(ctx, job.DeploymentID)
+			} else {
+				w.api.FailDeployment(ctx, job.DeploymentID, err.Error())
+				w.api.NotifyFailure(ctx, job.DeploymentID, job.ProjectName, err.Error())
+			}
+
 			w.queue.FailJob(ctx, jobID, err.Error())
 			w.logStreamer.StopStreaming(job.DeploymentID)
 
@@ -209,9 +223,15 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 		zap.String("commit", job.CommitHash),
 	)
 
+	// ── Cancel check: job may have been cancelled while queued ──
+	if err := w.checkCancelled(ctx, job.DeploymentID, buildLog); err != nil {
+		return err
+	}
+
 	// ─────────────────────────────────────────────────────────
 	// Step 1: Update deployment status to BUILDING
 	// ─────────────────────────────────────────────────────────
+	w.api.UpdateProjectStatus(ctx, job.ProjectID, "PENDING")
 	if err := w.api.UpdateDeploymentStatus(ctx, job.DeploymentID, types.StatusBuilding); err != nil {
 		return fmt.Errorf("failed to update status to BUILDING: %w", err)
 	}
@@ -225,6 +245,11 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 	buildLog.Log(fmt.Sprintf("  Domains:   %v", job.Domains))
 	buildLog.Log("═══════════════════════════════════════════════════════════")
 	buildLog.Log("")
+
+	// ── Cancel check: before fetching settings ──
+	if err := w.checkCancelled(ctx, job.DeploymentID, buildLog); err != nil {
+		return err
+	}
 
 	// ─────────────────────────────────────────────────────────
 	// Step 2: Get Project Settings
@@ -255,6 +280,11 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 		zap.String("expiresAt", token.ExpiresAt),
 	)
 
+	// ── Cancel check: before cloning ──
+	if err := w.checkCancelled(ctx, job.DeploymentID, buildLog); err != nil {
+		return err
+	}
+
 	// ─────────────────────────────────────────────────────────
 	// Step 4: Clone repository
 	// ─────────────────────────────────────────────────────────
@@ -284,6 +314,12 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 	)
 
 	buildLog.Log("")
+
+	// ── Cancel check: before building ──
+	if err := w.checkCancelled(ctx, job.DeploymentID, buildLog); err != nil {
+		w.git.Cleanup(cloneResult.Path)
+		return err
+	}
 
 	// ─────────────────────────────────────────────────────────
 	// Step 5: Build with Railpack + BuildKit
@@ -340,6 +376,11 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 	}
 
 	buildLog.Log("")
+
+	// ── Cancel check: before deploying to Kubernetes ──
+	if err := w.checkCancelled(ctx, job.DeploymentID, buildLog); err != nil {
+		return err
+	}
 
 	// ─────────────────────────────────────────────────────────
 	// Step 6: Update status to DEPLOYING
@@ -462,6 +503,50 @@ func (w *Worker) shutdown() error {
 	}
 	
 	return nil
+}
+
+// checkCancelled polls Redis to see if the deployment has been cancelled by the user.
+// Returns errCancelled if a cancel signal is found, nil otherwise.
+func (w *Worker) checkCancelled(ctx context.Context, deploymentID string, buildLog interface{ Log(string) }) error {
+	if w.queue.IsCancelled(ctx, deploymentID) {
+		w.logger.Info("Deployment cancelled by user",
+			zap.String("deployment", deploymentID),
+		)
+		buildLog.Log("")
+		buildLog.Log("═══════════════════════════════════════════════════════════")
+		buildLog.Log("  🚫 Deployment Cancelled")
+		buildLog.Log("═══════════════════════════════════════════════════════════")
+		buildLog.Log("  The deployment was cancelled by the user.")
+		buildLog.Log("═══════════════════════════════════════════════════════════")
+
+		return errCancelled
+	}
+	return nil
+}
+
+// cancelCleanup removes any Kubernetes resources and stops log streaming
+// for a cancelled deployment.
+func (w *Worker) cancelCleanup(ctx context.Context, job *types.BuildJob) {
+	// Stop log streaming if active
+	w.logStreamer.StopStreaming(job.DeploymentID)
+
+	// Try to clean up K8s resources (Deployment/Service/Ingress).
+	// This is best-effort — resources may not exist yet if cancelled early.
+	cleanupErr := w.k8s.Cleanup(ctx, k8s.CleanupOptions{
+		DeploymentID: job.DeploymentID,
+		ProjectName:  job.ProjectName,
+	})
+	if cleanupErr != nil {
+		w.logger.Warn("K8s cleanup on cancel (may be expected if resources were not yet created)",
+			zap.String("deployment", job.DeploymentID),
+			zap.Error(cleanupErr),
+		)
+	}
+
+	// Notify the API to mark resources as cleaned up
+	w.api.CleanupDeployment(ctx, job.DeploymentID)
+
+	w.api.UpdateProjectStatus(ctx, job.ProjectID, "INACTIVE")
 }
 
 // resolvePort determines the container port from user environment variables.

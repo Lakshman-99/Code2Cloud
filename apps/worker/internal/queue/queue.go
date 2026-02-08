@@ -110,6 +110,23 @@ func (q *Queue) FailJob(ctx context.Context, jobID, reason string) error {
 	return nil
 }
 
+// IsCancelled checks if a cancel signal exists for the given deployment.
+// The NestJS API sets a Redis key "cancel:<deploymentId>" when the user cancels.
+func (q *Queue) IsCancelled(ctx context.Context, deploymentID string) bool {
+	key := "cancel:" + deploymentID
+	val, err := q.client.Get(ctx, key).Result()
+	if err != nil {
+		return false
+	}
+	return val == "1"
+}
+
+// ClearCancelSignal removes the cancel key after it has been consumed.
+func (q *Queue) ClearCancelSignal(ctx context.Context, deploymentID string) {
+	key := "cancel:" + deploymentID
+	q.client.Del(ctx, key)
+}
+
 func (q *Queue) Close() error {
 	return q.client.Close()
 }

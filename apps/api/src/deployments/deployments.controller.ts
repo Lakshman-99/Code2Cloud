@@ -6,12 +6,14 @@ import {
   Param,
   Query,
   UseGuards,
+  Put,
+  HttpCode,
 } from "@nestjs/common";
 import { DeploymentsService } from "./deployments.service";
 import { CreateDeploymentDto } from "./dto/create-deployment.dto";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { GetCurrentUserId } from "../common/decorators/get-current-user-id.decorator";
-import { LogSource } from "generated/prisma/enums";
+import { DeploymentStatus, LogSource } from "generated/prisma/enums";
 
 @Controller("deployments")
 @UseGuards(JwtAuthGuard)
@@ -54,5 +56,20 @@ export class DeploymentsController {
   @Get(":id")
   findOne(@GetCurrentUserId() userId: string, @Param("id") id: string) {
     return this.deploymentsService.findOne(userId, id);
+  }
+
+  @Put(":id/status")
+  updateStatus(
+    @GetCurrentUserId() userId: string,
+    @Param("id") id: string,
+    @Body("status") status: DeploymentStatus,
+  ) {
+    return this.deploymentsService.updateStatus(userId, id, status);
+  }
+
+  @Post(":id/cancel")
+  @HttpCode(200)
+  cancel(@GetCurrentUserId() userId: string, @Param("id") id: string) {
+    return this.deploymentsService.cancel(userId, id);
   }
 }

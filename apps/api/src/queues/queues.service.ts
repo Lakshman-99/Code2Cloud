@@ -47,6 +47,17 @@ export class QueuesService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Signal cancellation for a deployment.
+   * Sets a Redis key that the Go worker polls between build steps.
+   */
+  async publishCancelSignal(deploymentId: string) {
+    const key = `cancel:${deploymentId}`;
+    // Set with 1-hour TTL so it auto-expires even if never consumed
+    await this.redis.set(key, '1', 'EX', 3600);
+    this.logger.log(`[Queue] 🚫 Cancel signal published for deployment ${deploymentId}`);
+  }
+
+  /**
    * Check queue health (Raw Redis version)
    */
   async getQueueStatus() {

@@ -8,7 +8,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { QueuesService } from "../queues/queues.service";
 import { EncryptionService } from "src/common/utils/encryption.service";
 import { CreateDeploymentDto } from "./dto/create-deployment.dto";
-import { EnvironmentType } from "generated/prisma/enums";
+import { DeploymentStatus, EnvironmentType } from "generated/prisma/enums";
 import { GithubAppService } from "src/git/git.service";
 import { UrlUtils } from "src/common/utils/url.utils";
 
@@ -44,6 +44,15 @@ export class DeploymentsService {
 
     if (gitAccounts.length === 0) {
       throw new BadRequestException("No linked GitHub accounts found.");
+    }
+
+    // Check if the latest deployment already in progress/queued
+    const latestDeployment = await this.prisma.deployment.findFirst({
+      where: { projectId },
+      orderBy: { startedAt: "desc" },
+    });
+    if (latestDeployment && ["QUEUED", "BUILDING", "DEPLOYING"].includes(latestDeployment.status)) {
+      throw new BadRequestException("A deployment is already in progress for this project.");
     }
 
     // Try to match owner, otherwise pick the first (likely correct for single-user scenarios)
@@ -82,7 +91,7 @@ export class DeploymentsService {
           commitHash: commitData.sha,
           commitMessage: commitData.message,
           commitAuthor: commitData.author,
-          deploymentRegion: systemConfig?.defaultRegion || "us-east-1",
+          deploymentRegion: systemConfig?.defaultRegion || "us-ashburn-1",
         },
       });
 
@@ -229,5 +238,62 @@ export class DeploymentsService {
       status: deployment.status,
       isLive: isBuilding,
     };
+  }
+
+  async updateStatus(
+    userId: string,
+    deploymentId: string,
+    status: DeploymentStatus,
+  ) {
+    const deployment = await this.prisma.deployment.findFirst({
+      where: { id: deploymentId, project: { userId } },
+    });
+    if (!deployment) throw new NotFoundException("Deployment not found");
+
+    return this.prisma.deployment.update({
+      where: { id: deploymentId },
+      data: { status },
+    });
+  }
+
+  async cancel(userId: string, deploymentId: string) {
+    const deployment = await this.prisma.deployment.findFirst({
+      where: { id: deploymentId, project: { userId } },
+      include: { project: { select: { name: true } } },
+    });
+    if (!deployment) throw new NotFoundException("Deployment not found");
+
+    // Only in-progress deployments can be cancelled
+    const cancellableStatuses: DeploymentStatus[] = [
+      "QUEUED",
+      "BUILDING",
+      "DEPLOYING",
+    ];
+    if (!cancellableStatuses.includes(deployment.status)) {
+      throw new BadRequestException(
+        `Deployment cannot be cancelled in status: ${deployment.status}`,
+      );
+    }
+
+    // 1. Update DB status to CANCELED
+    const updated = await this.prisma.deployment.update({
+      where: { id: deploymentId },
+      data: {
+        status: "CANCELED",
+        finishedAt: new Date(),
+        duration: Math.floor(
+          (Date.now() - deployment.startedAt.getTime()) / 1000,
+        ),
+      },
+    });
+
+    // 2. Publish cancel signal to Redis so the worker picks it up
+    await this.queueService.publishCancelSignal(deploymentId);
+
+    this.logger.log(
+      `Deployment ${deploymentId} cancelled for project ${deployment.project.name}`,
+    );
+
+    return updated;
   }
 }

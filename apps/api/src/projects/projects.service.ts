@@ -100,7 +100,7 @@ export class ProjectsService {
           commitHash: commitData.sha, 
           commitMessage: commitData.message,
           commitAuthor: commitData.author,
-          deploymentRegion: systemConfig?.defaultRegion || 'us-east-1',
+          deploymentRegion: systemConfig?.defaultRegion || 'us-ashburn-1',
         },
       });
 
