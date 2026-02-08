@@ -214,7 +214,7 @@ func (b *Builder) buildArgs(opts Options) []string {
 	cacheRef := b.cacheRef(opts.ProjectName)
 	if cacheRef != "" {
 		args = append(args, "--import-cache", fmt.Sprintf("type=registry,ref=%s", cacheRef))
-		args = append(args, "--export-cache", fmt.Sprintf("type=registry,ref=%s,mode=max", cacheRef))
+		args = append(args, "--export-cache", fmt.Sprintf("type=registry,ref=%s,mode=min", cacheRef))
 	}
 
 	return args
