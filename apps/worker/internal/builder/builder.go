@@ -81,8 +81,14 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand)
 		cmd.Env = append(cmd.Env, "RAILPACK_INSTALL_CMD="+installCmd)
 		args = append(args, "--secret", "id=RAILPACK_INSTALL_CMD,env=RAILPACK_INSTALL_CMD")
-		cmd.Args = append(cmd.Args[:1], args...)
 	}
+
+	for key, value := range opts.EnvVars {
+		cmd.Env = append(cmd.Env, key+"="+value)
+		args = append(args, "--secret", "id="+key+",env="+key)
+	}
+
+	cmd.Args = append(cmd.Args[:1], args...)
 
 	// ─────────────────────────────────────────────────────────
 	// Step 4: Attach logging
