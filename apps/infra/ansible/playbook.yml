@@ -449,18 +449,26 @@
 
     - name: Pre-pull Railpack base images to BuildKit cache
       ansible.builtin.shell: |
-        kubectl run -n default --rm -i --restart=Never --image=moby/buildkit:v0.21.0 \
-          buildkit-prepull-{{ ansible_date_time.epoch }} -- \
-          buildctl --addr tcp://buildkitd.default.svc.cluster.local:1234 \
+        # Create a one-time job instead of run --rm
+        kubectl create job -n default buildkit-prepull-{{ ansible_date_time.epoch }} \
+          --image=moby/buildkit:v0.21.0 \
+          -- buildctl --addr tcp://buildkitd.default.svc.cluster.local:1234 \
           build \
           --frontend gateway.v0 \
           --opt source=ghcr.io/railwayapp/railpack-frontend:latest \
-          --opt context=empty \
-          --no-cache || true
+          --opt context=empty
+        
+        # Wait for job with timeout (max 2 minutes)
+        kubectl wait --for=condition=complete --timeout=120s \
+          job/buildkit-prepull-{{ ansible_date_time.epoch }} -n default || true
+        
+        # Cleanup job (ignore errors)
+        kubectl delete job buildkit-prepull-{{ ansible_date_time.epoch }} -n default || true
       environment:
         KUBECONFIG: "{{ kubeconfig_remote }}"
       tags: [k8s, buildkit, prepull]
-      ignore_errors: true
+      async: 150
+      poll: 5
 
     - name: Apply Code2Cloud platform manifests
       ansible.builtin.shell: kubectl apply -f /tmp/k8s-manifests/05-code2cloud/
