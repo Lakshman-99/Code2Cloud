@@ -184,20 +184,20 @@ export class GithubAppService {
 
         const nodeFrameworks = [
           // SSR / server frameworks — have their own production servers, no host checking
-          { dependency:'next', framework:'nextjs', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'.next' },
-          { dependency:'@nestjs/core', framework:'nestjs', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'dist' },
-          { dependency:'nuxt', framework:'nuxt', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'.output/public' },
-          { dependency:'express', framework:'express', installCommand:'npm install', buildCommand:'', runCommand:'npm start', outputDirectory:'.' },
-          { dependency:'fastify', framework:'fastify', installCommand:'npm install', buildCommand:'', runCommand:'npm start', outputDirectory:'.' },
+          { dependency:'next', framework:'nextjs', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'.next' },
+          { dependency:'@nestjs/core', framework:'nestjs', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'dist' },
+          { dependency:'nuxt', framework:'nuxt', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'.output/public' },
+          { dependency:'express', framework:'express', installCommand:'npm ci', buildCommand:'', runCommand:'npm start', outputDirectory:'.' },
+          { dependency:'fastify', framework:'fastify', installCommand:'npm ci', buildCommand:'', runCommand:'npm start', outputDirectory:'.' },
 
           // Static site frameworks — use `serve` instead of preview servers to avoid
-          { dependency:'vite', framework:'vite', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', outputDirectory:'dist' },
-          { dependency:'@angular/core', framework:'angular', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', outputDirectory:'dist' },
-          { dependency:'react-scripts', framework:'create-react-app', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx --yes serve -s build -l tcp://0.0.0.0:$PORT', outputDirectory:'build' },
-          { dependency:'vue', framework:'vue', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', outputDirectory:'dist' },
-          { dependency:'@sveltejs/kit', framework:'sveltekit', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx --yes serve -s build -l tcp://0.0.0.0:$PORT', outputDirectory:'build' },
-          { dependency:'astro', framework:'astro', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', outputDirectory:'dist' },
-          { dependency:'gatsby', framework:'gatsby', installCommand:'npm install', buildCommand:'npm run build', runCommand:'npx --yes serve -s public -l tcp://0.0.0.0:$PORT', outputDirectory:'public' },
+          { dependency:'vite', framework:'vite', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', outputDirectory:'dist' },
+          { dependency:'@angular/core', framework:'angular', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', outputDirectory:'dist' },
+          { dependency:'react-scripts', framework:'create-react-app', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npx --yes serve -s build -l tcp://0.0.0.0:$PORT', outputDirectory:'build' },
+          { dependency:'vue', framework:'vue', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', outputDirectory:'dist' },
+          { dependency:'@sveltejs/kit', framework:'sveltekit', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npx --yes serve -s build -l tcp://0.0.0.0:$PORT', outputDirectory:'build' },
+          { dependency:'astro', framework:'astro', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', outputDirectory:'dist' },
+          { dependency:'gatsby', framework:'gatsby', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npx --yes serve -s public -l tcp://0.0.0.0:$PORT', outputDirectory:'public' },
         ];
 
         const staticFrameworks = new Set(['vite', 'vue', 'angular', 'create-react-app', 'sveltekit', 'astro', 'gatsby']);
@@ -218,7 +218,7 @@ export class GithubAppService {
         if (hasDependency('express') || hasDependency('fastify') || hasDependency('koa')) {
           return {
             framework: 'node-server',
-            installCommand: 'npm install',
+            installCommand: 'npm ci',
             buildCommand: '',
             runCommand: scripts.start || 'node index.js',
             outputDirectory: '.'
@@ -227,7 +227,7 @@ export class GithubAppService {
 
         return {
           framework: 'node',
-          installCommand: 'npm install',
+          installCommand: 'npm ci',
           buildCommand: scripts.build ? 'npm run build' : '',
           runCommand: scripts.start || 'npm run start',
           outputDirectory: '.'
