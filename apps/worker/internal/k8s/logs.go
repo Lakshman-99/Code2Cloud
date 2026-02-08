@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -66,19 +67,20 @@ func (ls *LogStreamer) StartStreaming(ctx context.Context, deploymentID, project
 
 	for _, pod := range pods.Items {
 		podName := pod.Name
-		go func(pName string) {
-			ls.streamPodLogs(streamCtx, deploymentID, name, pName)
-		}(podName)
+		shortName := shortPodName(podName)
+		go func(pName, sName string) {
+			ls.streamPodLogs(streamCtx, deploymentID, name, pName, sName)
+		}(podName, shortName)
 	}
 
 	return nil
 }
 
 
-func (ls *LogStreamer) streamPodLogs(ctx context.Context, deploymentID, appName, podName string) {
+func (ls *LogStreamer) streamPodLogs(ctx context.Context, deploymentID, appName, podName, shortName string) {
 	logWriter := ls.logFactory.CreatePrefixedLogger(
 		deploymentID,
-		fmt.Sprintf("[%s] ", podName),
+		fmt.Sprintf("[%s] ", shortName),
 		logging.SourceRuntime,
 	)
 	defer logWriter.Close()
@@ -152,6 +154,9 @@ func (ls *LogStreamer) streamOnce(
 			continue
 		}
 
+		// Strip the K8s RFC3339 timestamp prefix (e.g. "2026-02-08T00:54:51.145175868Z ")
+		line = stripK8sTimestamp(line)
+
 		logWriter.Log(line)
 	}
 
@@ -199,4 +204,27 @@ func (ls *LogStreamer) ActiveStreams() int {
 	ls.mu.Lock()
 	defer ls.mu.Unlock()
 	return len(ls.activeStreams)
+}
+
+// stripK8sTimestamp removes the RFC3339Nano timestamp that Kubernetes prepends
+// to log lines when Timestamps is enabled (e.g. "2026-02-08T00:54:51.145175868Z ").
+func stripK8sTimestamp(line string) string {
+	// K8s timestamps are always at the start and end with "Z "
+	if idx := strings.Index(line, "Z "); idx > 0 && idx <= 35 {
+		// Verify the prefix looks like a timestamp (starts with a digit)
+		if len(line) > 0 && line[0] >= '0' && line[0] <= '9' {
+			return line[idx+2:]
+		}
+	}
+	return line
+}
+
+// shortPodName extracts a short identifier from a full pod name.
+// e.g. "portfolio-v2-6d64886bbb-5q8tk" -> "5q8tk"
+func shortPodName(name string) string {
+	parts := strings.Split(name, "-")
+	if len(parts) >= 2 {
+		return parts[len(parts)-1]
+	}
+	return name
 }
