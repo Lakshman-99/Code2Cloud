@@ -559,19 +559,19 @@ export default function DeploymentDetails() {
           icon={TerminalIcon}
           title="Runtime Logs"
           description="View and debug runtime logs & errors"
-          href={`/dashboard/deployments/${deploymentId}/logs?source=runtime`}
+          href={`/dashboard/projects/${deployment.projectId}?tab=logs`}
         />
         <QuickLink
           icon={Activity}
           title="Monitoring"
           description="Monitor app health & uptime"
-          href={`/dashboard/deployments/${deploymentId}/monitoring`}
+          href={`/dashboard/projects/${deployment.projectId}?tab=monitoring`}
         />
         <QuickLink
           icon={Settings2}
           title="Project Settings"
           description="Configure build, env vars & domains"
-          href={`/dashboard/projects/${deployment.projectId}/settings`}
+          href={`/dashboard/projects/${deployment.projectId}?tab=settings`}
         />
       </motion.div>
     </div>
