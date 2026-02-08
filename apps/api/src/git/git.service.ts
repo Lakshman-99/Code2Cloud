@@ -207,9 +207,9 @@ export class GithubAppService {
             const useScriptsStart = !staticFrameworks.has(frameworkEntry.framework);
             return {
               framework: frameworkEntry.framework,
-              installCommand: scripts.install || frameworkEntry.installCommand,
-              buildCommand: scripts.build || frameworkEntry.buildCommand,
-              runCommand: (useScriptsStart && scripts.start) || frameworkEntry.runCommand,
+              installCommand: frameworkEntry.installCommand || scripts.install,
+              buildCommand: frameworkEntry.buildCommand || scripts.build,
+              runCommand: frameworkEntry.runCommand || (useScriptsStart && scripts.start),
               outputDirectory: frameworkEntry.outputDirectory
             };
           }
