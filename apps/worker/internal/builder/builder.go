@@ -179,12 +179,11 @@ func (b *Builder) buildArgs(opts Options) []string {
 		"--local", "context=" + opts.SourcePath,
 		"--local", "dockerfile=" + opts.SourcePath,
 		"--progress", "plain",
+		"--export-cache", "type=inline",
+		"--import-cache", "type=registry,ref=" + opts.ImageName,
 	}
 
-	// Use fast gzip (level 1) for image layers — ~3x faster compression
-	// than default level 6, with only marginally larger output.
-	// Net win when pushing to a local in-cluster registry.
-	output := fmt.Sprintf("type=image,name=%s,push=true,compression=gzip,compression-level=1", opts.ImageName)
+	output := fmt.Sprintf("type=image,name=%s,push=true,compression=uncompressed", opts.ImageName)
 	if b.config.InsecureRegistry {
 		output += ",registry.insecure=true"
 	}

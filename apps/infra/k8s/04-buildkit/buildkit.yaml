@@ -59,7 +59,7 @@ spec:
           volumeMounts:
             - name: buildkit-config
               mountPath: /etc/buildkit
-            - name: buildkit-data
+            - name: buildkit-cache
               mountPath: /var/lib/buildkit
           readinessProbe:
             tcpSocket:
@@ -75,10 +75,23 @@ spec:
         - name: buildkit-config
           configMap:
             name: buildkit-config
-        - name: buildkit-data
-          hostPath:
-            path: /var/lib/buildkit
-            type: DirectoryOrCreate
+        - name: buildkit-cache
+          persistentVolumeClaim:
+            claimName: buildkit-cache
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: buildkit-cache
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: local-path  # K3s default storage class
 
 ---
 # BuildKit configuration
@@ -91,18 +104,19 @@ data:
   buildkitd.toml: |
     # BuildKit daemon configuration
     [worker.oci]
-      max-parallelism = 2
+      # 🚀 OPTIMIZATION: Increase parallelism for faster builds
+      max-parallelism = 4
       gc = true
-      gckeepstorage = 5368709120  # 5 GiB
+      gckeepstorage = 10737418240  # 10 GiB (increased for cache)
 
     # Garbage collection: keep recent cache, prune old layers
     [[worker.oci.gcpolicy]]
-      keepBytes = 5368709120      # 5 GiB
-      keepDuration = 604800       # 7 days (seconds)
+      keepBytes = 10737418240      # 10 GiB
+      keepDuration = 1209600       # 14 days (doubled)
       all = true
 
     [[worker.oci.gcpolicy]]
-      keepBytes = 2147483648      # 2 GiB  — hard floor
+      keepBytes = 5368709120       # 5 GiB hard floor
       all = true
 
     # Allow pushing to insecure registry
