@@ -81,14 +81,8 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand)
 		cmd.Env = append(cmd.Env, "RAILPACK_INSTALL_CMD="+installCmd)
 		args = append(args, "--secret", "id=RAILPACK_INSTALL_CMD,env=RAILPACK_INSTALL_CMD")
+		cmd.Args = append(cmd.Args[:1], args...)
 	}
-
-	for key, value := range opts.EnvVars {
-		cmd.Env = append(cmd.Env, key+"="+value)
-		args = append(args, "--secret", "id="+key+",env="+key)
-	}
-
-	cmd.Args = append(cmd.Args[:1], args...)
 
 	// ─────────────────────────────────────────────────────────
 	// Step 4: Attach logging
@@ -103,7 +97,6 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	// Step 5a: Generate Railpack build plan
 	// ─────────────────────────────────────────────────────────
 	buildLog.Log("📋 Generating Railpack build plan...")
-	prepareStart := time.Now()
 
 	prepareArgs := []string{"prepare", ".", "--plan-out", "railpack-plan.json"}
 	if opts.BuildConfig.BuildCommand != "" {
@@ -115,11 +108,6 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	if opts.BuildConfig.InstallCommand != "" {
 		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand)
 		prepareArgs = append(prepareArgs, "--env", "RAILPACK_INSTALL_CMD="+installCmd)
-	}
-
-	// Pass build-time environment variables to railpack
-	for key, value := range opts.EnvVars {
-		prepareArgs = append(prepareArgs, "--env", fmt.Sprintf("%s=%s", key, value))
 	}
 
 	prepareCmd := exec.CommandContext(ctx, "railpack", prepareArgs...)
@@ -136,22 +124,16 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 		return nil, fmt.Errorf("railpack prepare failed: %w", err)
 	}
 
-	prepareDuration := time.Since(prepareStart)
-	buildLog.Log(fmt.Sprintf("✓ Plan generated in %s", prepareDuration.Round(time.Millisecond)))
 	buildLog.Log("")
 
 	// ─────────────────────────────────────────────────────────
 	// Step 5b: Build with BuildKit using railpack frontend
 	// ─────────────────────────────────────────────────────────
-	cacheRef := b.cacheRef(opts.ProjectName)
-	if cacheRef != "" {
-		buildLog.Log(fmt.Sprintf("🔨 Building image with BuildKit (cache: %s)...", cacheRef))
-	} else {
-		buildLog.Log("🔨 Building image with BuildKit (no cache)...")
-	}
-	buildLog.Log("")
+	// Exclude .git from context transfer to reduce size sent to BuildKit
+	b.writeDockerIgnore(opts.SourcePath)
 
-	buildStart := time.Now()
+	buildLog.Log("🔨 Building image with BuildKit...")
+	buildLog.Log("")
 
 	if err := cmd.Run(); err != nil {
 		buildLog.Flush()
@@ -170,27 +152,21 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 		return nil, fmt.Errorf("build failed: %w", err)
 	}
 
-	buildDuration := time.Since(buildStart)
-	totalDuration := time.Since(startTime)
+	duration := time.Since(startTime)
 
 	buildLog.Log("")
-	buildLog.Log(fmt.Sprintf("✓ Plan:  %s", prepareDuration.Round(time.Second)))
-	buildLog.Log(fmt.Sprintf("✓ Build: %s (includes push to registry)", buildDuration.Round(time.Second)))
-	buildLog.Log(fmt.Sprintf("✓ Total: %s", totalDuration.Round(time.Second)))
+	buildLog.Log(fmt.Sprintf("✓ Build completed in %s", duration.Round(time.Second)))
 	buildLog.Log(fmt.Sprintf("✓ Image pushed: %s", opts.ImageName))
 
 	b.logger.Info("Build completed",
 		zap.String("image", opts.ImageName),
-		zap.Duration("total", totalDuration),
-		zap.Duration("prepare", prepareDuration),
-		zap.Duration("build_and_push", buildDuration),
+		zap.Duration("duration", duration),
 	)
 
 	return &Result{
 		ImageName: opts.ImageName,
-		Duration:  totalDuration,
+		Duration:  duration,
 		Framework: opts.BuildConfig.Framework,
-		CacheUsed: cacheRef != "",
 	}, nil
 }
 
@@ -205,46 +181,33 @@ func (b *Builder) buildArgs(opts Options) []string {
 		"--progress", "plain",
 	}
 
-	output := fmt.Sprintf("type=image,name=%s,push=true", opts.ImageName)
+	// Use fast gzip (level 1) for image layers — ~3x faster compression
+	// than default level 6, with only marginally larger output.
+	// Net win when pushing to a local in-cluster registry.
+	output := fmt.Sprintf("type=image,name=%s,push=true,compression=gzip,compression-level=1", opts.ImageName)
 	if b.config.InsecureRegistry {
 		output += ",registry.insecure=true"
 	}
 	args = append(args, "--output", output)
 
-	cacheRef := b.cacheRef(opts.ProjectName)
-	if cacheRef != "" {
-		args = append(args, "--import-cache", fmt.Sprintf("type=registry,ref=%s", cacheRef))
-		args = append(args, "--export-cache", fmt.Sprintf("type=registry,ref=%s,mode=min", cacheRef))
-	}
-
 	return args
 }
 
-// cacheRef builds the registry reference used for layer caching.
-// Each project gets its own cache tag so layers are reused across deploys.
-func (b *Builder) cacheRef(projectName string) string {
-	if b.config.RegistryURL == "" || projectName == "" {
-		return ""
-	}
-	name := sanitizeProjectName(projectName)
-	if name == "" {
-		return ""
-	}
-	return fmt.Sprintf("%s/%s:buildcache", b.config.RegistryURL, name)
-}
-
-func sanitizeProjectName(name string) string {
-	name = strings.ToLower(name)
-	result := make([]byte, 0, len(name))
-	for i := 0; i < len(name); i++ {
-		c := name[i]
-		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' {
-			result = append(result, c)
-		} else if c == '_' || c == ' ' {
-			result = append(result, '-')
+// writeDockerIgnore creates or appends to .dockerignore in the source directory
+// to exclude .git/ from the BuildKit context transfer, reducing context size.
+func (b *Builder) writeDockerIgnore(sourcePath string) {
+	ignorePath := sourcePath + "/.dockerignore"
+	if data, err := os.ReadFile(ignorePath); err == nil {
+		if strings.Contains(string(data), ".git") {
+			return
 		}
+		if f, err := os.OpenFile(ignorePath, os.O_APPEND|os.O_WRONLY, 0644); err == nil {
+			f.WriteString("\n.git\n")
+			f.Close()
+		}
+		return
 	}
-	return string(result)
+	os.WriteFile(ignorePath, []byte(".git\n"), 0644)
 }
 
 func normalizeInstallCommand(cmd string) string {
