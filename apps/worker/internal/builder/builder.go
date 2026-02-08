@@ -199,28 +199,16 @@ func (b *Builder) buildArgs(opts Options) []string {
 		"--progress", "plain",
 	}
 
-	// Pass environment variables to the railpack frontend
-	for key, value := range opts.EnvVars {
-		args = append(args, "--opt", fmt.Sprintf("env:%s=%s", key, value))
-	}
-
 	output := fmt.Sprintf("type=image,name=%s,push=true", opts.ImageName)
 	if b.config.InsecureRegistry {
 		output += ",registry.insecure=true"
 	}
 	args = append(args, "--output", output)
 
-	// Registry-based cache: reuse layers across builds of the same project
 	cacheRef := b.cacheRef(opts.ProjectName)
 	if cacheRef != "" {
-		importCache := fmt.Sprintf("type=registry,ref=%s", cacheRef)
-		exportCache := fmt.Sprintf("type=registry,ref=%s,mode=max", cacheRef)
-		if b.config.InsecureRegistry {
-			importCache += ",registry.insecure=true"
-			exportCache += ",registry.insecure=true"
-		}
-		args = append(args, "--import-cache", importCache)
-		args = append(args, "--export-cache", exportCache)
+		args = append(args, "--import-cache", fmt.Sprintf("type=registry,ref=%s", cacheRef))
+		args = append(args, "--export-cache", fmt.Sprintf("type=registry,ref=%s,mode=max", cacheRef))
 	}
 
 	return args
