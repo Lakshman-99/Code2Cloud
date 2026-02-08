@@ -124,7 +124,7 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
               </dt>
               <dd className="flex items-center gap-2 group">
                 <a 
-                  href={`https://${latestDeployment.deploymentUrl}`} 
+                  href={`${latestDeployment.deploymentUrl}`} 
                   target="_blank"
                   rel="noreferrer"
                   className="text-sm font-medium text-primary hover:text-primary/80 hover:underline flex items-center gap-1 transition-colors"
@@ -219,7 +219,7 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
                 icon: Globe, 
                 color: "text-blue-400", 
                 bg: "group-hover:bg-blue-500/10",
-                href: `https://${latestDeployment.deploymentUrl}`
+                href: `${latestDeployment.deploymentUrl}`
               },
               { 
                 label: "View Source Code", 

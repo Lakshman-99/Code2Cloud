@@ -55,10 +55,12 @@ spec:
           # Configure BuildKit to use our registry
           env:
             - name: BUILDKIT_STEP_LOG_MAX_SIZE
-              value: "10485760"  # 10MB log size
+              value: "10485760" # 10MB log size
           volumeMounts:
             - name: buildkit-config
               mountPath: /etc/buildkit
+            - name: buildkit-data
+              mountPath: /var/lib/buildkit
           readinessProbe:
             tcpSocket:
               port: 1234
@@ -73,6 +75,10 @@ spec:
         - name: buildkit-config
           configMap:
             name: buildkit-config
+        - name: buildkit-data
+          hostPath:
+            path: /var/lib/buildkit
+            type: DirectoryOrCreate
 
 ---
 # BuildKit configuration
@@ -86,7 +92,19 @@ data:
     # BuildKit daemon configuration
     [worker.oci]
       max-parallelism = 2
-    
+      gc = true
+      gckeepstorage = 5368709120  # 5 GiB
+
+    # Garbage collection: keep recent cache, prune old layers
+    [[worker.oci.gcpolicy]]
+      keepBytes = 5368709120      # 5 GiB
+      keepDuration = 604800       # 7 days (seconds)
+      all = true
+
+    [[worker.oci.gcpolicy]]
+      keepBytes = 2147483648      # 2 GiB  — hard floor
+      all = true
+
     # Allow pushing to insecure registry
     [registry."registry.registry.svc.cluster.local:5000"]
       http = true

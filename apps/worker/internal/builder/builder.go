@@ -97,6 +97,7 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	// Step 5a: Generate Railpack build plan
 	// ─────────────────────────────────────────────────────────
 	buildLog.Log("📋 Generating Railpack build plan...")
+	prepareStart := time.Now()
 
 	prepareArgs := []string{"prepare", ".", "--plan-out", "railpack-plan.json"}
 	if opts.BuildConfig.BuildCommand != "" {
@@ -108,6 +109,11 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	if opts.BuildConfig.InstallCommand != "" {
 		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand)
 		prepareArgs = append(prepareArgs, "--env", "RAILPACK_INSTALL_CMD="+installCmd)
+	}
+
+	// Pass build-time environment variables to railpack
+	for key, value := range opts.EnvVars {
+		prepareArgs = append(prepareArgs, "--env", fmt.Sprintf("%s=%s", key, value))
 	}
 
 	prepareCmd := exec.CommandContext(ctx, "railpack", prepareArgs...)
@@ -124,13 +130,22 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 		return nil, fmt.Errorf("railpack prepare failed: %w", err)
 	}
 
+	prepareDuration := time.Since(prepareStart)
+	buildLog.Log(fmt.Sprintf("✓ Plan generated in %s", prepareDuration.Round(time.Millisecond)))
 	buildLog.Log("")
 
 	// ─────────────────────────────────────────────────────────
 	// Step 5b: Build with BuildKit using railpack frontend
 	// ─────────────────────────────────────────────────────────
-	buildLog.Log("🔨 Building image with BuildKit...")
+	cacheRef := b.cacheRef(opts.ProjectName)
+	if cacheRef != "" {
+		buildLog.Log(fmt.Sprintf("🔨 Building image with BuildKit (cache: %s)...", cacheRef))
+	} else {
+		buildLog.Log("🔨 Building image with BuildKit (no cache)...")
+	}
 	buildLog.Log("")
+
+	buildStart := time.Now()
 
 	if err := cmd.Run(); err != nil {
 		buildLog.Flush()
@@ -149,21 +164,27 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 		return nil, fmt.Errorf("build failed: %w", err)
 	}
 
-	duration := time.Since(startTime)
+	buildDuration := time.Since(buildStart)
+	totalDuration := time.Since(startTime)
 
 	buildLog.Log("")
-	buildLog.Log(fmt.Sprintf("✓ Build completed in %s", duration.Round(time.Second)))
+	buildLog.Log(fmt.Sprintf("✓ Plan:  %s", prepareDuration.Round(time.Second)))
+	buildLog.Log(fmt.Sprintf("✓ Build: %s (includes push to registry)", buildDuration.Round(time.Second)))
+	buildLog.Log(fmt.Sprintf("✓ Total: %s", totalDuration.Round(time.Second)))
 	buildLog.Log(fmt.Sprintf("✓ Image pushed: %s", opts.ImageName))
 
 	b.logger.Info("Build completed",
 		zap.String("image", opts.ImageName),
-		zap.Duration("duration", duration),
+		zap.Duration("total", totalDuration),
+		zap.Duration("prepare", prepareDuration),
+		zap.Duration("build_and_push", buildDuration),
 	)
 
 	return &Result{
 		ImageName: opts.ImageName,
-		Duration:  duration,
+		Duration:  totalDuration,
 		Framework: opts.BuildConfig.Framework,
+		CacheUsed: cacheRef != "",
 	}, nil
 }
 
@@ -178,13 +199,58 @@ func (b *Builder) buildArgs(opts Options) []string {
 		"--progress", "plain",
 	}
 
+	// Pass environment variables to the railpack frontend
+	for key, value := range opts.EnvVars {
+		args = append(args, "--opt", fmt.Sprintf("env:%s=%s", key, value))
+	}
+
 	output := fmt.Sprintf("type=image,name=%s,push=true", opts.ImageName)
 	if b.config.InsecureRegistry {
 		output += ",registry.insecure=true"
 	}
 	args = append(args, "--output", output)
 
+	// Registry-based cache: reuse layers across builds of the same project
+	cacheRef := b.cacheRef(opts.ProjectName)
+	if cacheRef != "" {
+		importCache := fmt.Sprintf("type=registry,ref=%s", cacheRef)
+		exportCache := fmt.Sprintf("type=registry,ref=%s,mode=max", cacheRef)
+		if b.config.InsecureRegistry {
+			importCache += ",registry.insecure=true"
+			exportCache += ",registry.insecure=true"
+		}
+		args = append(args, "--import-cache", importCache)
+		args = append(args, "--export-cache", exportCache)
+	}
+
 	return args
+}
+
+// cacheRef builds the registry reference used for layer caching.
+// Each project gets its own cache tag so layers are reused across deploys.
+func (b *Builder) cacheRef(projectName string) string {
+	if b.config.RegistryURL == "" || projectName == "" {
+		return ""
+	}
+	name := sanitizeProjectName(projectName)
+	if name == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s/%s:buildcache", b.config.RegistryURL, name)
+}
+
+func sanitizeProjectName(name string) string {
+	name = strings.ToLower(name)
+	result := make([]byte, 0, len(name))
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' {
+			result = append(result, c)
+		} else if c == '_' || c == ' ' {
+			result = append(result, '-')
+		}
+	}
+	return string(result)
 }
 
 func normalizeInstallCommand(cmd string) string {
