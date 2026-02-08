@@ -90,9 +90,9 @@ export const TerminalLogs = ({
 
   const enrichedLogs = useMemo(() => {
     return logs.map((l) => ({
-      ...l,
-      type: getLogType(l.source, l.message),
-      formattedTime: formatTimestamp(l.timestamp),
+        ...l,
+        type: getLogType(l.source, l.message),
+        formattedTime: formatTimestamp(l.timestamp),
     }));
   }, [logs]);
 
@@ -227,9 +227,7 @@ export const TerminalLogs = ({
           ref={bodyRef}
           className={cn(
             "bg-zinc-950 p-4 font-mono text-sm overflow-y-auto",
-            isFullscreen
-              ? "h-[calc(100vh)]" // fullscreen mode
-              : "h-[491px]", // normal mode fixed size
+            isFullscreen ? "h-[calc(100vh)]" : "h-[491px]",
           )}
         >
           {isLoading && logs.length === 0 ? (
@@ -244,12 +242,12 @@ export const TerminalLogs = ({
               No output
             </div>
           ) : (
-            filteredLogs.map((log, index) => (
+            filteredLogs.map((log) => (
               <motion.div
                 key={log.id}
-                initial={{ opacity: 0, x: -6 }}
+                initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.01 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
                 className="flex gap-3 py-1"
               >
                 <span className="text-muted-foreground shrink-0">

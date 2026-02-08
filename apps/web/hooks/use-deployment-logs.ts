@@ -1,5 +1,4 @@
 "use client";
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api-client";
 import { LogEntry, LogSource, DeploymentStatus } from "@/types/project";
@@ -13,19 +12,22 @@ interface LogsResponse {
 }
 
 interface UseDeploymentLogsOptions {
-  /** Which log source to fetch (BUILD, RUNTIME). Omit for all. */
   source?: LogSource;
-  /** Polling interval in ms for live deployments. Default: 2000 */
   pollInterval?: number;
-  /** Whether polling is enabled. Default: true */
   enabled?: boolean;
+  dripInterval?: number;
 }
 
 export function useDeploymentLogs(
   deploymentId: string | undefined,
   options: UseDeploymentLogsOptions = {},
 ) {
-  const { source, pollInterval = 2000, enabled = true } = options;
+  const {
+    source,
+    pollInterval = 2000,
+    enabled = true,
+    dripInterval = 60,
+  } = options;
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLive, setIsLive] = useState(false);
@@ -33,12 +35,50 @@ export function useDeploymentLogs(
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  // Cursor tracks the last log ID we've seen — subsequent fetches only get new logs
+  const bufferRef = useRef<LogEntry[]>([]);
+  const dripTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isDrippingRef = useRef(false);
+
   const cursorRef = useRef<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isFetchingRef = useRef(false);
   const lastFetchConfig = useRef<{ id: string; source?: LogSource } | null>(
     null,
+  );
+  const isFirstBatchRef = useRef(true);
+
+  const startDrip = useCallback(() => {
+    if (isDrippingRef.current) return;
+    isDrippingRef.current = true;
+
+    const drip = () => {
+      if (bufferRef.current.length === 0) {
+        isDrippingRef.current = false;
+        return;
+      }
+
+      const next = bufferRef.current.shift()!;
+      setLogs((prev) => [...prev, next]);
+
+      dripTimerRef.current = setTimeout(drip, dripInterval);
+    };
+
+    drip();
+  }, [dripInterval]);
+
+  const enqueueLogs = useCallback(
+    (incoming: LogEntry[], immediate = false) => {
+      if (incoming.length === 0) return;
+
+      if (immediate || dripInterval === 0) {
+        setLogs((prev) => [...prev, ...incoming]);
+        return;
+      }
+
+      bufferRef.current.push(...incoming);
+      startDrip();
+    },
+    [dripInterval, startDrip],
   );
 
   const fetchLogs = useCallback(async () => {
@@ -53,11 +93,15 @@ export function useDeploymentLogs(
 
       const qs = params.toString();
       const url = `/deployments/${deploymentId}/logs${qs ? `?${qs}` : ""}`;
-
       const data = await api.get<LogsResponse>(url);
 
       if (data.logs.length > 0) {
-        setLogs((prev) => [...prev, ...data.logs]);
+        if (isFirstBatchRef.current) {
+          enqueueLogs(data.logs, true);
+          isFirstBatchRef.current = false;
+        } else {
+          enqueueLogs(data.logs);
+        }
         cursorRef.current = data.nextCursor;
       }
 
@@ -70,9 +114,8 @@ export function useDeploymentLogs(
       setIsLoading(false);
       isFetchingRef.current = false;
     }
-  }, [deploymentId, source]);
+  }, [deploymentId, source, enqueueLogs]);
 
-  // Initial fetch
   useEffect(() => {
     if (!deploymentId || !enabled) return;
 
@@ -81,22 +124,26 @@ export function useDeploymentLogs(
       lastFetchConfig.current?.source === source;
 
     if (!isSameConfig) {
-      // Reset state on deploymentId/source change
       setLogs([]);
       setIsLoading(true);
       setError(null);
       cursorRef.current = null;
+      bufferRef.current = [];
+      isFirstBatchRef.current = true;
+      isDrippingRef.current = false;
+      if (dripTimerRef.current) {
+        clearTimeout(dripTimerRef.current);
+        dripTimerRef.current = null;
+      }
       lastFetchConfig.current = { id: deploymentId, source };
     }
 
     fetchLogs();
   }, [deploymentId, source, enabled, fetchLogs]);
 
-  // Live polling
   useEffect(() => {
     if (!enabled || !deploymentId) return;
 
-    // Always poll — stop when backend says isLive=false and we've done at least one fetch
     intervalRef.current = setInterval(() => {
       fetchLogs();
     }, pollInterval);
@@ -109,10 +156,8 @@ export function useDeploymentLogs(
     };
   }, [deploymentId, enabled, pollInterval, fetchLogs]);
 
-  // Stop polling when deployment is no longer live (terminal state)
   useEffect(() => {
     if (!isLive && !isLoading && intervalRef.current) {
-      // Do one final fetch to catch remaining logs, then stop
       fetchLogs().then(() => {
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
@@ -122,9 +167,23 @@ export function useDeploymentLogs(
     }
   }, [isLive, isLoading, fetchLogs]);
 
+  useEffect(() => {
+    return () => {
+      if (dripTimerRef.current) clearTimeout(dripTimerRef.current);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
   const clear = useCallback(() => {
     setLogs([]);
+    bufferRef.current = [];
     cursorRef.current = null;
+    isFirstBatchRef.current = true;
+    if (dripTimerRef.current) {
+      clearTimeout(dripTimerRef.current);
+      dripTimerRef.current = null;
+    }
+    isDrippingRef.current = false;
   }, []);
 
   return {
@@ -134,5 +193,6 @@ export function useDeploymentLogs(
     status,
     error,
     clear,
+    buffered: bufferRef.current.length,
   };
 }

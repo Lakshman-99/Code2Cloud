@@ -394,139 +394,183 @@ export function SettingsSkeleton() {
 export function DeploymentDetailsSkeleton() {
   return (
     <div className="p-8 max-w-[1920px] mx-auto space-y-8 min-h-screen">
-      
-      {/* --- 1. HEADER SKELETON --- */}
+      {/* ── HEADER (unchanged) ────────────────────────── */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
         <div className="flex flex-col gap-4">
-          {/* Back Button */}
           <Skeleton className="h-4 w-32 rounded" />
-
           <div className="flex items-center gap-4">
-            {/* Status Icon Box */}
             <Skeleton className="w-14 h-14 rounded-2xl" />
-            
             <div className="space-y-2">
-              {/* Project Name / ID */}
               <Skeleton className="h-8 w-64 rounded-lg" />
-              {/* Metadata Badges */}
               <div className="flex items-center gap-3">
                 <Skeleton className="h-6 w-24 rounded-full" />
                 <Skeleton className="h-4 w-4 rounded-full" />
                 <Skeleton className="h-4 w-32 rounded" />
                 <Skeleton className="h-4 w-4 rounded-full" />
                 <Skeleton className="h-4 w-24 rounded" />
+                <Skeleton className="h-4 w-4 rounded-full" />
+                <Skeleton className="h-4 w-28 rounded" />
               </div>
             </div>
           </div>
         </div>
-
-        {/* Action Buttons */}
         <div className="flex gap-3">
           <Skeleton className="h-10 w-32 rounded-md" />
           <Skeleton className="h-10 w-28 rounded-md" />
         </div>
       </div>
 
-      {/* --- 2. STAT CARDS SKELETON --- */}
-      <div className="col-span-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="p-5 rounded-xl border border-white/5 bg-white/5 h-40 flex flex-col justify-between">
-            <div className="flex items-center gap-3">
-              <Skeleton className="w-8 h-8 rounded-lg" />
-              <Skeleton className="w-16 h-3 rounded" />
-            </div>
-            <div>
-              <Skeleton className="w-24 h-8 mb-2 rounded" />
-              <Skeleton className="w-20 h-3 rounded" />
+      {/* ── TOP CARD: PREVIEW + META ──────────────────── */}
+      <div className="border border-white/[0.06] rounded-xl bg-white/[0.02] overflow-hidden">
+        <div className="flex flex-col lg:flex-row">
+          {/* Preview placeholder */}
+          <div className="lg:w-[360px] shrink-0 border-b lg:border-b-0 lg:border-r border-white/[0.06] bg-[#050505]">
+            <div className="aspect-[4/3] lg:aspect-auto lg:min-h-[240px] flex items-center justify-center">
+              <Skeleton className="w-10 h-10 rounded-full" />
             </div>
           </div>
-        ))}
-      </div>
 
-      {/* --- 3. MAIN GRID SKELETON --- */}
-      <div className="grid grid-cols-12 gap-8">
-        
-        {/* LEFT COLUMN (Terminal & Configs) */}
-        <div className="col-span-12 lg:col-span-8 space-y-6">
-          
-          {/* Terminal Skeleton */}
-          <div className="h-[600px] flex flex-col rounded-xl border border-white/10 bg-white/5 overflow-hidden">
-            {/* Terminal Header */}
-            <div className="h-12 border-b border-white/5 flex items-center px-4 gap-3">
-              <Skeleton className="w-32 h-4 rounded" />
-            </div>
-            {/* Terminal Filters */}
-            <div className="h-12 border-b border-white/5 flex items-center px-4 gap-2">
-              <Skeleton className="w-full h-8 rounded" />
-            </div>
-            {/* Terminal Body */}
-            <div className="flex-1 p-4 space-y-3">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <Skeleton key={i} className="h-4 w-full rounded opacity-30" />
+          {/* Meta grid */}
+          <div className="flex-1 p-5 space-y-5">
+            {/* Row 1: 4-col meta */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-3 w-16 rounded" />
+                  <Skeleton className="h-5 w-24 rounded" />
+                </div>
               ))}
             </div>
-          </div>
 
-          {/* Config Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Source Control Card */}
-            <div className="p-5 rounded-xl border border-white/10 bg-white/5 space-y-4">
-              <Skeleton className="w-32 h-4 rounded" />
-              <Skeleton className="w-full h-16 rounded-lg opacity-50" />
-              <div className="space-y-3">
-                <Skeleton className="w-full h-4 rounded" />
-                <Skeleton className="w-full h-4 rounded" />
-                <Skeleton className="w-full h-4 rounded" />
-              </div>
+            <div className="border-t border-white/[0.06]" />
+
+            {/* Domains */}
+            <div className="space-y-2.5">
+              <Skeleton className="h-3 w-16 rounded" />
+              <Skeleton className="h-4 w-72 rounded" />
+              <Skeleton className="h-4 w-64 rounded" />
             </div>
-            
-            {/* Build Config Card */}
-            <div className="p-5 rounded-xl border border-white/10 bg-white/5 space-y-4">
-              <Skeleton className="w-32 h-4 rounded" />
-              <div className="space-y-3">
-                <div className="flex justify-between"><Skeleton className="w-20 h-4" /><Skeleton className="w-24 h-4" /></div>
-                <div className="border-t border-white/5 pt-3 space-y-3">
-                    <Skeleton className="w-full h-8 rounded opacity-50" />
-                    <Skeleton className="w-full h-8 rounded opacity-50" />
-                    <Skeleton className="w-full h-8 rounded opacity-50" />
+
+            <div className="border-t border-white/[0.06]" />
+
+            {/* Source */}
+            <div className="space-y-2.5">
+              <Skeleton className="h-3 w-14 rounded" />
+              <Skeleton className="h-4 w-24 rounded" />
+              <Skeleton className="h-4 w-80 rounded" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── COLLAPSIBLE SECTIONS ──────────────────────── */}
+      <div className="space-y-3">
+        {/* Deployment Settings */}
+        <div className="border border-white/[0.06] rounded-xl bg-white/[0.02]">
+          <div className="flex items-center justify-between px-5 py-4">
+            <div className="flex items-center gap-2.5">
+              <Skeleton className="w-4 h-4 rounded" />
+              <Skeleton className="h-4 w-40 rounded" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-4 w-16 rounded" />
+              <Skeleton className="h-5 w-20 rounded-full" />
+            </div>
+          </div>
+        </div>
+
+        {/* Build Logs (open by default) */}
+        <div className="border border-white/[0.06] rounded-xl bg-white/[0.02] overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4">
+            <div className="flex items-center gap-2.5">
+              <Skeleton className="w-4 h-4 rounded" />
+              <Skeleton className="h-4 w-24 rounded" />
+            </div>
+            <div className="flex items-center gap-2.5">
+              <Skeleton className="h-4 w-14 rounded" />
+              <Skeleton className="w-[18px] h-[18px] rounded-full" />
+            </div>
+          </div>
+          <div className="border-t border-white/[0.06]">
+            <div className="h-[500px] flex flex-col bg-zinc-950">
+              {/* Terminal header */}
+              <div className="h-12 border-b border-white/5 flex items-center px-4 gap-3">
+                <div className="flex gap-1.5">
+                  <Skeleton className="w-3 h-3 rounded-full" />
+                  <Skeleton className="w-3 h-3 rounded-full" />
+                  <Skeleton className="w-3 h-3 rounded-full" />
                 </div>
+                <Skeleton className="w-40 h-4 rounded" />
+              </div>
+              {/* Terminal filter bar */}
+              <div className="h-11 border-b border-white/5 flex items-center px-4 gap-2">
+                <Skeleton className="flex-1 h-7 rounded-md" />
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-7 w-14 rounded-md" />
+                ))}
+                <Skeleton className="h-7 w-20 rounded-md" />
+              </div>
+              {/* Terminal lines */}
+              <div className="flex-1 p-4 space-y-2.5">
+                {[100, 95, 80, 100, 70, 90, 60, 85, 75, 95, 65, 88].map(
+                  (w, i) => (
+                    <Skeleton
+                      key={i}
+                      className="h-4 rounded"
+                      style={{ width: `${w}%`, opacity: 0.15 + (i % 3) * 0.08 }}
+                    />
+                  ),
+                )}
+              </div>
+              {/* Terminal footer */}
+              <div className="h-9 border-t border-white/5 flex items-center justify-between px-4">
+                <Skeleton className="h-3 w-28 rounded" />
+                <Skeleton className="h-3 w-20 rounded" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* RIGHT COLUMN (Preview & Infra) */}
-        <div className="col-span-12 lg:col-span-4 space-y-6">
-          
-          {/* Preview Box Skeleton */}
-          <div className="rounded-[21px] p-[1px] border border-white/5">
-            <div className="rounded-2xl overflow-hidden bg-white/5">
-              {/* Browser Bar */}
-              <div className="h-10 border-b border-white/5 flex items-center px-3 gap-2">
-                  <Skeleton className="w-40 h-5 rounded" />
-              </div>
-              {/* Viewport */}
-              <div className="aspect-[16/10] flex items-center justify-center">
-                  <Skeleton className="w-12 h-12 rounded-full" />
-              </div>
+        {/* Deployment Summary */}
+        <div className="border border-white/[0.06] rounded-xl bg-white/[0.02]">
+          <div className="flex items-center justify-between px-5 py-4">
+            <div className="flex items-center gap-2.5">
+              <Skeleton className="w-4 h-4 rounded" />
+              <Skeleton className="h-4 w-44 rounded" />
+            </div>
+            <div className="flex items-center gap-2.5">
+              <Skeleton className="h-4 w-24 rounded" />
+              <Skeleton className="w-[18px] h-[18px] rounded-full" />
             </div>
           </div>
-
-          {/* Infrastructure Card */}
-          <div className="p-5 rounded-xl border border-white/10 bg-white/5 space-y-6">
-            <div className="space-y-3">
-              <Skeleton className="w-40 h-4 rounded" />
-              <Skeleton className="w-full h-10 rounded-lg" />
-              <Skeleton className="w-full h-10 rounded-lg" />
-            </div>
-            <div className="pt-6 border-t border-white/5 space-y-3">
-              <Skeleton className="w-24 h-4 rounded" />
-              <Skeleton className="w-full h-5 rounded" />
-              <Skeleton className="w-full h-5 rounded" />
-            </div>
-          </div>
-
         </div>
+
+        {/* Assigning Domains */}
+        <div className="border border-white/[0.06] rounded-xl bg-white/[0.02]">
+          <div className="flex items-center justify-between px-5 py-4">
+            <div className="flex items-center gap-2.5">
+              <Skeleton className="w-4 h-4 rounded" />
+              <Skeleton className="h-4 w-40 rounded" />
+            </div>
+            <Skeleton className="w-[18px] h-[18px] rounded-full" />
+          </div>
+        </div>
+      </div>
+
+      {/* ── BOTTOM QUICK LINKS ────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pb-8">
+        {[1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="p-4 rounded-xl border border-white/[0.06] bg-white/[0.02] space-y-2"
+          >
+            <div className="flex items-center gap-2">
+              <Skeleton className="w-4 h-4 rounded" />
+              <Skeleton className="h-4 w-28 rounded" />
+            </div>
+            <Skeleton className="h-3 w-48 rounded" />
+          </div>
+        ))}
       </div>
     </div>
   );
