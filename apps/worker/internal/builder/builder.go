@@ -226,7 +226,6 @@ func normalizeInstallCommand(cmd string) string {
 	if cmd == "npm ci" {
 		return "npm ci || npm install"
 	}
-	// If it starts with "--", it's just flags — prepend "npm install"
 	if strings.HasPrefix(cmd, "--") {
 		return "npm install " + cmd
 	}
