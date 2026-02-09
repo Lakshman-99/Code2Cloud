@@ -241,12 +241,12 @@ export class GithubAppService {
       const content = requirementsTxtString.toLowerCase();
       const contains = (keyword: string) => content.includes(keyword);
 
-      if (contains('django')) return { framework: 'django', installCommand: 'pip install -r requirements.txt', buildCommand: 'python manage.py collectstatic --noinput', runCommand: 'gunicorn app.wsgi:application', outputDirectory: 'staticfiles' };
-      if (contains('fastapi')) return { framework: 'fastapi', installCommand: 'pip install -r requirements.txt', buildCommand: '', runCommand: 'uvicorn main:app --host 0.0.0.0 --port $PORT', outputDirectory: '.' };
-      if (contains('flask')) return { framework: 'flask', installCommand: 'pip install -r requirements.txt', buildCommand: '', runCommand: 'gunicorn app:app', outputDirectory: '.' };
-      if (contains('streamlit')) return { framework: 'streamlit', installCommand: 'pip install -r requirements.txt', buildCommand: '', runCommand: 'streamlit run app.py', outputDirectory: '.' };
+      if (contains('django')) return { framework: 'django', installCommand: '', buildCommand: 'python manage.py collectstatic --noinput', runCommand: 'gunicorn app.wsgi:application', outputDirectory: 'staticfiles' };
+      if (contains('fastapi')) return { framework: 'fastapi', installCommand: '', buildCommand: '', runCommand: 'uvicorn main:app --host 0.0.0.0 --port $PORT', outputDirectory: '.' };
+      if (contains('flask')) return { framework: 'flask', installCommand: '', buildCommand: '', runCommand: 'gunicorn app:app', outputDirectory: '.' };
+      if (contains('streamlit')) return { framework: 'streamlit', installCommand: '', buildCommand: '', runCommand: 'streamlit run app.py', outputDirectory: '.' };
 
-      return { framework: 'python', installCommand: 'pip install -r requirements.txt', buildCommand: '', runCommand: 'python main.py', outputDirectory: '.' };
+      return { framework: 'python', installCommand: '', buildCommand: '', runCommand: 'python main.py', outputDirectory: '.' };
     }
 
     return { framework: 'unknown', installCommand: '', buildCommand: '', runCommand: '', outputDirectory: '' };

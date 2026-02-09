@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -78,18 +77,9 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	cmd.Dir = opts.SourcePath
 	cmd.Env = os.Environ()
 
-	effectiveInstallCmd := ""
 	if opts.BuildConfig.InstallCommand != "" {
-		effectiveInstallCmd = normalizeInstallCommand(opts.BuildConfig.InstallCommand)
-	} else if pipCmd := pythonPipInstallCommand(opts.SourcePath, opts.BuildConfig.Framework); pipCmd != "" {
-		effectiveInstallCmd = pipCmd
-		b.logger.Info("Using Python venv install command for pip project",
-			zap.String("framework", opts.BuildConfig.Framework),
-		)
-	}
-
-	if effectiveInstallCmd != "" {
-		cmd.Env = append(cmd.Env, "RAILPACK_INSTALL_CMD="+effectiveInstallCmd)
+		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand)
+		cmd.Env = append(cmd.Env, "RAILPACK_INSTALL_CMD="+installCmd)
 		args = append(args, "--secret", "id=RAILPACK_INSTALL_CMD,env=RAILPACK_INSTALL_CMD")
 		cmd.Args = append(cmd.Args[:1], args...)
 	}
@@ -115,8 +105,9 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	if opts.BuildConfig.RunCommand != "" {
 		prepareArgs = append(prepareArgs, "--start-cmd", opts.BuildConfig.RunCommand)
 	}
-	if effectiveInstallCmd != "" {
-		prepareArgs = append(prepareArgs, "--env", "RAILPACK_INSTALL_CMD="+effectiveInstallCmd)
+	if opts.BuildConfig.InstallCommand != "" {
+		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand)
+		prepareArgs = append(prepareArgs, "--env", "RAILPACK_INSTALL_CMD="+installCmd)
 	}
 
 	prepareCmd := exec.CommandContext(ctx, "railpack", prepareArgs...)
@@ -251,29 +242,3 @@ func sanitizeArgs(args []string) []string {
 	return sanitized
 }
 
-func isPythonFramework(framework string) bool {
-	switch strings.ToLower(framework) {
-	case "flask", "django", "fastapi", "streamlit", "python":
-		return true
-	}
-	return false
-}
-
-func pythonPipInstallCommand(sourcePath, framework string) string {
-	if !isPythonFramework(framework) {
-		return ""
-	}
-
-	reqPath := filepath.Join(sourcePath, "requirements.txt")
-	if _, err := os.Stat(reqPath); err != nil {
-		return ""
-	}
-
-	for _, lockFile := range []string{"poetry.lock", "uv.lock", "pdm.lock", "Pipfile"} {
-		if _, err := os.Stat(filepath.Join(sourcePath, lockFile)); err == nil {
-			return ""
-		}
-	}
-
-	return "python -m venv /app/.venv && /app/.venv/bin/pip install -r requirements.txt"
-}
