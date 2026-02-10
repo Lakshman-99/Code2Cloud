@@ -139,7 +139,7 @@ export const Sidebar = () => {
               
               {/* Tagline: Whitish with a hint of Emerald */}
               <span className="text-[9.5px] text-emerald-100/70 uppercase tracking-widest font-medium pl-0.5 leading-none mt-0.5">
-                Cloud Orchestrator
+                Deployment Platform
               </span>
             </motion.div>
         </div>

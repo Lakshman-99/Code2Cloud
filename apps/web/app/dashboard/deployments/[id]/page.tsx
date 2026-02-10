@@ -162,6 +162,7 @@ export default function DeploymentDetails() {
 
   const handleRedeploy = () => {
     redeploy(project.id);
+    router.push(`/dashboard/deployments/${project.deployments?.[0].id}`);
   };
 
   const handleCopy = (text: string, key: string) => {

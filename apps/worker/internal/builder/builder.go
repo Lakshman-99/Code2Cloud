@@ -126,6 +126,12 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 		prepareArgs = append(prepareArgs, "--env", "PORT=3000")
 	}
 
+	for key, val := range opts.EnvVars {
+		if strings.HasPrefix(key, "RAILPACK_") && val != "" {
+			prepareArgs = append(prepareArgs, "--env", key+"="+val)
+		}
+	}
+
 	prepareCmd := exec.CommandContext(ctx, "railpack", prepareArgs...)
 	prepareCmd.Dir = opts.SourcePath
 	prepareCmd.Stdout = buildLog
