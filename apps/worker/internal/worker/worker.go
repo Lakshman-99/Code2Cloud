@@ -453,7 +453,6 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 	if len(deployResult.URLs) > 1 {
 		buildLog.Log(fmt.Sprintf("  Aliases:  %s", strings.Join(deployResult.URLs[1:], ", ")))
 	}
-	buildLog.Log(fmt.Sprintf("  Image:    %s", buildResult.ImageName))
 	buildLog.Log(fmt.Sprintf("  Duration: %s", duration.Round(time.Second)))
 	buildLog.Log("═══════════════════════════════════════════════════════════")
 

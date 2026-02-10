@@ -66,6 +66,7 @@ export class ProjectsService {
           buildCommand: dto.buildCommand,
           runCommand: dto.runCommand,
           outputDirectory: dto.outputDirectory,
+          pythonVersion: dto.pythonVersion,
           gitRepoOwner: dto.gitRepoOwner,
           gitRepoName: dto.gitRepoName,
           gitRepoId: dto.gitRepoId,
@@ -130,9 +131,12 @@ export class ProjectsService {
         },
         domains: [deploymentUrl],
         // Decrypt env vars for the builder (it needs raw values)
-        envVars: dto.envVars?.reduce((acc, curr) => ({
-            ...acc, [curr.key]: curr.value
-        }), {}) || {}
+        envVars: {
+          ...(dto.envVars?.reduce((acc, curr) => ({
+              ...acc, [curr.key]: curr.value
+          }), {}) || {}),
+          ...(dto.pythonVersion ? { RAILPACK_PYTHON_VERSION: dto.pythonVersion } : {}),
+        }
       });
 
       this.logger.log(`[Queue] Triggered build for deployment ${deployment.id}`);

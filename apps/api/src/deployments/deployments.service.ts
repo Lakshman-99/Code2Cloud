@@ -146,7 +146,10 @@ export class DeploymentsService {
         outputDir: project.outputDirectory || undefined,
       },
       domains,
-      envVars,
+      envVars: {
+        ...envVars,
+        ...(project.pythonVersion ? { RAILPACK_PYTHON_VERSION: String(project.pythonVersion) } : {}),
+      },
     });
 
     this.logger.log(

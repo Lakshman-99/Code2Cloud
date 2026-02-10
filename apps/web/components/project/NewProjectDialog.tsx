@@ -16,7 +16,7 @@ import { Input } from '../ui/input';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { Label } from '../ui/label';
-import { FRAMEWORK_ICONS, FRAMEWORK_PRESETS, GitRepository } from '@/types/git';
+import { FRAMEWORK_ICONS, FRAMEWORK_PRESETS, PYTHON_FRAMEWORKS, PYTHON_VERSIONS, GitRepository } from '@/types/git';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { cn } from '@/lib/utils';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
@@ -60,6 +60,7 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
       outputDirectory: "",
       installCommand: "",
       runCommand: "",
+      pythonVersion: "",
       envVars: [],
     },
   });
@@ -76,10 +77,19 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
     const preset = FRAMEWORK_PRESETS[value];
     
     if (preset) {
-      form.setValue("installCommand", preset.install, { shouldDirty: true });
-      form.setValue("buildCommand", preset.build, { shouldDirty: true });
-      form.setValue("runCommand", preset.run, { shouldDirty: true });
+      // Only set output directory — let Railpack handle install/build/run natively
+      form.setValue("installCommand", "", { shouldDirty: true });
+      form.setValue("buildCommand", "", { shouldDirty: true });
+      form.setValue("runCommand", "", { shouldDirty: true });
       form.setValue("outputDirectory", preset.output, { shouldDirty: true });
+
+      // Reset python version when switching frameworks
+      form.setValue("pythonVersion", "", { shouldDirty: true });
+      
+      // Auto-expand build settings for Python frameworks so version picker is visible
+      if (PYTHON_FRAMEWORKS.has(value)) {
+        setShowBuildSettings(true);
+      }
       
       if (showToast) 
         toast.info(`Applied build defaults for ${value}`, { 
@@ -181,6 +191,7 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
       installCommand: repo.installCommand || "",
       runCommand: repo.runCommand || "",
       outputDirectory: repo.outputDirectory || "",
+      pythonVersion: "",
       envVars: [{
         key: "",
         value: ""
@@ -213,6 +224,7 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
         buildCommand: data.buildCommand,
         runCommand: data.runCommand,
         outputDirectory: data.outputDirectory,
+        pythonVersion: data.pythonVersion || undefined,
         
         // Git Metadata (From the selectedRepo object)
         gitRepoId: selectedRepo.id,
@@ -523,21 +535,41 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
                       </button>
                       {showBuildSettings && (
                         <div className="p-4 border-t border-white/10 space-y-4 bg-black/20">
+                            {PYTHON_FRAMEWORKS.has(framework) && (
+                              <div className="grid gap-2">
+                                <Label className="text-xs text-white/50">Python Version</Label>
+                                <Select
+                                  value={form.watch("pythonVersion") || ""}
+                                  onValueChange={(value) => form.setValue("pythonVersion", value === "__auto__" ? "" : value, { shouldDirty: true })}
+                                >
+                                  <SelectTrigger className="bg-black border-white/10 h-9 text-xs w-full px-3 rounded-md border border-white/10 bg-black border-white/10 text-sm text-white/70">
+                                    <SelectValue placeholder="Auto (latest)" />
+                                  </SelectTrigger>
+                                  <SelectContent position="popper" side="bottom" >
+                                    {PYTHON_VERSIONS.map((v) => (
+                                      <SelectItem key={v.value || "__auto__"} value={v.value || "__auto__"} className="text-sm">
+                                        {v.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
                             <div className="grid gap-2">
                               <Label className="text-xs text-white/50">Install Command</Label>
-                              <Input {...form.register("installCommand")} className="bg-black border-white/10 h-9 font-mono text-xs" />
+                              <Input {...form.register("installCommand")} placeholder={FRAMEWORK_PRESETS[framework]?.install || 'auto-detected by Railpack'} className="bg-black border-white/10 h-9 font-mono text-xs" />
                             </div>
                             <div className="grid gap-2">
                               <Label className="text-xs text-white/50">Build Command</Label>
-                              <Input {...form.register("buildCommand")} className="bg-black border-white/10 h-9 font-mono text-xs" />
+                              <Input {...form.register("buildCommand")} placeholder={FRAMEWORK_PRESETS[framework]?.build || 'auto-detected by Railpack'} className="bg-black border-white/10 h-9 font-mono text-xs" />
                             </div>
                             <div className="grid gap-2">
                               <Label className="text-xs text-white/50">Run Command</Label>
-                              <Input {...form.register("runCommand")} className="bg-black border-white/10 h-9 font-mono text-xs" />
+                              <Input {...form.register("runCommand")} placeholder={FRAMEWORK_PRESETS[framework]?.run || 'auto-detected by Railpack'} className="bg-black border-white/10 h-9 font-mono text-xs" />
                             </div>
                             <div className="grid gap-2">
                               <Label className="text-xs text-white/50">Output Directory</Label>
-                              <Input {...form.register("outputDirectory")} className="bg-black border-white/10 h-9 font-mono text-xs" />
+                              <Input {...form.register("outputDirectory")} placeholder={FRAMEWORK_PRESETS[framework]?.output || 'auto-detected by Railpack'} className="bg-black border-white/10 h-9 font-mono text-xs" />
                             </div>
                         </div>
                       )}

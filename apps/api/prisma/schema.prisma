@@ -75,6 +75,7 @@ model Project {
   buildCommand     String?
   runCommand       String?
   outputDirectory  String?
+  pythonVersion    String?
 
   // ─── Git Source Info ────────────────────────────
   gitRepoOwner     String

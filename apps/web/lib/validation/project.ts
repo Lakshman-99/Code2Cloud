@@ -8,6 +8,7 @@ export const projectSchema = z.object({
   outputDirectory: z.string().optional(),
   installCommand: z.string().optional(),
   runCommand: z.string().optional(),
+  pythonVersion: z.string().optional(),
   envVars: z.array(z.object({
     key: z.string(),
     value: z.string()

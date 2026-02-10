@@ -92,6 +92,7 @@ export interface Project {
   buildCommand?: string;
   runCommand?: string;
   outputDirectory?: string;
+  pythonVersion?: string;
   autoDeploy: boolean;
   configChanged: boolean;
   onlineStatus: DomainDnsStatus;
@@ -129,6 +130,7 @@ export interface CreateProjectPayload {
   buildCommand?: string;
   runCommand?: string;
   outputDirectory?: string;
+  pythonVersion?: string;
   
   // Git Source
   gitRepoOwner: string;

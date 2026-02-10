@@ -110,6 +110,13 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 		prepareArgs = append(prepareArgs, "--env", "RAILPACK_INSTALL_CMD="+installCmd)
 	}
 
+	// Always tell Railpack which port the app will listen on
+	if port, ok := opts.EnvVars["PORT"]; ok && port != "" {
+		prepareArgs = append(prepareArgs, "--env", "PORT="+port)
+	} else {
+		prepareArgs = append(prepareArgs, "--env", "PORT=3000")
+	}
+
 	prepareCmd := exec.CommandContext(ctx, "railpack", prepareArgs...)
 	prepareCmd.Dir = opts.SourcePath
 	prepareCmd.Stdout = buildLog

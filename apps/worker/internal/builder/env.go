@@ -143,17 +143,6 @@ func FrameworkStartCommand(framework string, currentCmd string, port int32) stri
 	case "gatsby":
 		return fmt.Sprintf("npx --yes serve -s public -l tcp://0.0.0.0:%s", portStr)
 
-	// Server frameworks — these have proper production servers, no host checking
-	case "fastapi":
-		if currentCmd == "" {
-			return fmt.Sprintf("uvicorn main:app --host 0.0.0.0 --port %s", portStr)
-		}
-		return currentCmd
-	case "streamlit":
-		if currentCmd == "" {
-			return fmt.Sprintf("streamlit run app.py --server.port %s --server.address 0.0.0.0", portStr)
-		}
-		return currentCmd
 	default:
 		return currentCmd
 	}

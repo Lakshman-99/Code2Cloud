@@ -58,4 +58,8 @@ export class BaseProjectDto {
   @IsString()
   @IsOptional()
   outputDirectory?: string;
+
+  @IsString()
+  @IsOptional()
+  pythonVersion?: string;
 }

@@ -100,3 +100,13 @@ export const FRAMEWORK_PRESETS: Record<string, { install: string; build: string;
   streamlit: { install: 'pip install -r requirements.txt', build: '', run: 'streamlit run app.py', output: '.' },
   python: { install: 'pip install -r requirements.txt', build: '', run: 'python main.py', output: '.' },
 };
+
+export const PYTHON_FRAMEWORKS = new Set(['django', 'flask', 'fastapi', 'streamlit', 'python']);
+
+export const PYTHON_VERSIONS = [
+  { label: 'Auto (latest)', value: '' },
+  { label: '3.13', value: '3.13' },
+  { label: '3.12', value: '3.12' },
+  { label: '3.11', value: '3.11' },
+  { label: '3.10', value: '3.10' },
+];

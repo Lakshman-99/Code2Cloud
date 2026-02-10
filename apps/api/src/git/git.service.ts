@@ -179,37 +179,35 @@ export class GithubAppService {
       try {
         const packageJson = JSON.parse(packageJsonString);
         const dependencies = { ...packageJson.dependencies, ...packageJson.devDependencies };
-        const scripts = packageJson.scripts || {};
         const hasDependency = (dependencyName: string) => Boolean(dependencies[dependencyName]);
 
+        // Framework detection — only detect the framework and output directory.
+        // All build commands are left empty so Railpack can handle them natively.
         const nodeFrameworks = [
-          // SSR / server frameworks — have their own production servers, no host checking
-          { dependency:'next', framework:'nextjs', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'.next' },
-          { dependency:'@nestjs/core', framework:'nestjs', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'dist' },
-          { dependency:'nuxt', framework:'nuxt', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npm run start', outputDirectory:'.output/public' },
-          { dependency:'express', framework:'express', installCommand:'npm ci', buildCommand:'', runCommand:'npm start', outputDirectory:'.' },
-          { dependency:'fastify', framework:'fastify', installCommand:'npm ci', buildCommand:'', runCommand:'npm start', outputDirectory:'.' },
+          // SSR / server frameworks
+          { dependency:'next', framework:'nextjs', outputDirectory:'.next' },
+          { dependency:'@nestjs/core', framework:'nestjs', outputDirectory:'dist' },
+          { dependency:'nuxt', framework:'nuxt', outputDirectory:'.output/public' },
+          { dependency:'express', framework:'express', outputDirectory:'.' },
+          { dependency:'fastify', framework:'fastify', outputDirectory:'.' },
 
-          // Static site frameworks — use `serve` instead of preview servers to avoid
-          { dependency:'vite', framework:'vite', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', outputDirectory:'dist' },
-          { dependency:'@angular/core', framework:'angular', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', outputDirectory:'dist' },
-          { dependency:'react-scripts', framework:'create-react-app', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npx --yes serve -s build -l tcp://0.0.0.0:$PORT', outputDirectory:'build' },
-          { dependency:'vue', framework:'vue', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', outputDirectory:'dist' },
-          { dependency:'@sveltejs/kit', framework:'sveltekit', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npx --yes serve -s build -l tcp://0.0.0.0:$PORT', outputDirectory:'build' },
-          { dependency:'astro', framework:'astro', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npx --yes serve -s dist -l tcp://0.0.0.0:$PORT', outputDirectory:'dist' },
-          { dependency:'gatsby', framework:'gatsby', installCommand:'npm ci', buildCommand:'npm run build', runCommand:'npx --yes serve -s public -l tcp://0.0.0.0:$PORT', outputDirectory:'public' },
+          // Static site frameworks
+          { dependency:'vite', framework:'vite', outputDirectory:'dist' },
+          { dependency:'@angular/core', framework:'angular', outputDirectory:'dist' },
+          { dependency:'react-scripts', framework:'create-react-app', outputDirectory:'build' },
+          { dependency:'vue', framework:'vue', outputDirectory:'dist' },
+          { dependency:'@sveltejs/kit', framework:'sveltekit', outputDirectory:'build' },
+          { dependency:'astro', framework:'astro', outputDirectory:'dist' },
+          { dependency:'gatsby', framework:'gatsby', outputDirectory:'public' },
         ];
-
-        const staticFrameworks = new Set(['vite', 'vue', 'angular', 'create-react-app', 'sveltekit', 'astro', 'gatsby']);
 
         for (const frameworkEntry of nodeFrameworks) {
           if (hasDependency(frameworkEntry.dependency)) {
-            const useScriptsStart = !staticFrameworks.has(frameworkEntry.framework);
             return {
               framework: frameworkEntry.framework,
-              installCommand: frameworkEntry.installCommand || scripts.install,
-              buildCommand: frameworkEntry.buildCommand || scripts.build,
-              runCommand: frameworkEntry.runCommand || (useScriptsStart && scripts.start),
+              installCommand: '',
+              buildCommand: '',
+              runCommand: '',
               outputDirectory: frameworkEntry.outputDirectory
             };
           }
@@ -218,18 +216,18 @@ export class GithubAppService {
         if (hasDependency('express') || hasDependency('fastify') || hasDependency('koa')) {
           return {
             framework: 'node-server',
-            installCommand: 'npm ci',
+            installCommand: '',
             buildCommand: '',
-            runCommand: scripts.start || 'node index.js',
+            runCommand: '',
             outputDirectory: '.'
           };
         }
 
         return {
           framework: 'node',
-          installCommand: 'npm ci',
-          buildCommand: scripts.build ? 'npm run build' : '',
-          runCommand: scripts.start || 'npm run start',
+          installCommand: '',
+          buildCommand: '',
+          runCommand: '',
           outputDirectory: '.'
         };
       } catch {
@@ -241,12 +239,12 @@ export class GithubAppService {
       const content = requirementsTxtString.toLowerCase();
       const contains = (keyword: string) => content.includes(keyword);
 
-      if (contains('django')) return { framework: 'django', installCommand: '', buildCommand: 'python manage.py collectstatic --noinput', runCommand: 'gunicorn app.wsgi:application', outputDirectory: 'staticfiles' };
-      if (contains('fastapi')) return { framework: 'fastapi', installCommand: '', buildCommand: '', runCommand: 'uvicorn main:app --host 0.0.0.0 --port $PORT', outputDirectory: '.' };
-      if (contains('flask')) return { framework: 'flask', installCommand: '', buildCommand: '', runCommand: 'gunicorn app:app', outputDirectory: '.' };
-      if (contains('streamlit')) return { framework: 'streamlit', installCommand: '', buildCommand: '', runCommand: 'streamlit run app.py', outputDirectory: '.' };
+      if (contains('django')) return { framework: 'django', installCommand: '', buildCommand: '', runCommand: '', outputDirectory: 'staticfiles' };
+      if (contains('fastapi')) return { framework: 'fastapi', installCommand: '', buildCommand: '', runCommand: '', outputDirectory: '.' };
+      if (contains('flask')) return { framework: 'flask', installCommand: '', buildCommand: '', runCommand: '', outputDirectory: '.' };
+      if (contains('streamlit')) return { framework: 'streamlit', installCommand: '', buildCommand: '', runCommand: '', outputDirectory: '.' };
 
-      return { framework: 'python', installCommand: '', buildCommand: '', runCommand: 'python main.py', outputDirectory: '.' };
+      return { framework: 'python', installCommand: '', buildCommand: '', runCommand: '', outputDirectory: '.' };
     }
 
     return { framework: 'unknown', installCommand: '', buildCommand: '', runCommand: '', outputDirectory: '' };
