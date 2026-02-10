@@ -1,8 +1,16 @@
 # =============================================================================
-# Istio Tenant Isolation (deployments namespace)
+# Tenant Isolation (deployments namespace)
+# =============================================================================
+# Strategy:
+#   1. Istio PERMISSIVE mTLS   – encrypts pod-to-pod traffic when both sides
+#      have sidecars, but does NOT reject plaintext (so Traefik can reach pods).
+#   2. Kubernetes NetworkPolicy – L3/L4 isolation that reliably blocks cross-app
+#      traffic regardless of mTLS state. Per-app policies are created by worker.
 # =============================================================================
 
 ---
+# Istio: encrypt inter-pod traffic when possible, but allow plaintext from
+# non-mesh clients (Traefik ingress controller).
 apiVersion: security.istio.io/v1beta1
 kind: PeerAuthentication
 metadata:
@@ -10,12 +18,15 @@ metadata:
   namespace: deployments
 spec:
   mtls:
-    mode: STRICT
+    mode: PERMISSIVE
 
 ---
-apiVersion: security.istio.io/v1beta1
-kind: AuthorizationPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
 metadata:
-  name: default-deny
+  name: default-deny-ingress
   namespace: deployments
-spec: {}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress

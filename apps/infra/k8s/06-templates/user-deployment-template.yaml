@@ -118,7 +118,7 @@ spec:
 #    a. Clone git repo
 #    b. Build image using BuildKit
 #    c. Push to registry
-#    d. Create service account + Istio AuthorizationPolicy
+#    d. Create service account + NetworkPolicy (tenant isolation)
 #    e. Generate these manifests with user's config
 #    f. Apply to cluster: kubectl apply -f ...
 #    g. Update deployment status in DB

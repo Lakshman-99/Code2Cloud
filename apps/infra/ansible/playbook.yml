@@ -418,12 +418,6 @@
         KUBECONFIG: "{{ kubeconfig_remote }}"
       tags: [k8s, istio]
 
-    - name: Restart Traefik for Istio sidecar injection
-      ansible.builtin.shell: kubectl rollout restart deployment/traefik -n traefik
-      environment:
-        KUBECONFIG: "{{ kubeconfig_remote }}"
-      tags: [k8s, istio, traefik]
-
     - name: Apply Registry manifests
       ansible.builtin.shell: kubectl apply -f /tmp/k8s-manifests/03-registry/
       environment:

@@ -14,10 +14,6 @@ service:
   type: LoadBalancer
   # On Oracle Cloud, LoadBalancer gets the node's IP
 
-# Ensure Traefik always gets an Istio sidecar
-podAnnotations:
-  sidecar.istio.io/inject: "true"
-
 # Ports configuration
 ports:
   # HTTP entrypoint

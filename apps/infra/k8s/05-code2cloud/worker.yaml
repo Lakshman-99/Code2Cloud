@@ -33,13 +33,9 @@ rules:
   - apiGroups: [""]
     resources: ["services", "configmaps", "secrets", "serviceaccounts"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # Manage ingresses
+  # Manage ingresses and network policies
   - apiGroups: ["networking.k8s.io"]
-    resources: ["ingresses"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # Manage Istio authorization policies
-  - apiGroups: ["security.istio.io"]
-    resources: ["authorizationpolicies"]
+    resources: ["ingresses", "networkpolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # View pods and logs
   - apiGroups: [""]

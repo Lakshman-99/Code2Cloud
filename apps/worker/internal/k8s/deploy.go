@@ -35,13 +35,13 @@ func (c *Client) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	}
 
 	deployLog.Log("✓ Service account created")
-	deployLog.Log("Creating Istio authorization policy...")
+	deployLog.Log("Creating network policy...")
 
-	if err := c.CreateOrUpdateAuthorizationPolicy(ctx, opts); err != nil {
-		return nil, fmt.Errorf("failed to create authorization policy: %w", err)
+	if err := c.CreateOrUpdateNetworkPolicy(ctx, opts); err != nil {
+		return nil, fmt.Errorf("failed to create network policy: %w", err)
 	}
 
-	deployLog.Log("✓ Istio authorization policy created")
+	deployLog.Log("✓ Network policy created (tenant isolation)")
 	deployLog.Log("Creating deployment...")
 
 	if err := c.CreateOrUpdateDeployment(ctx, opts); err != nil {
@@ -125,8 +125,8 @@ func (c *Client) Cleanup(ctx context.Context, opts CleanupOptions) error {
 		errs = append(errs, fmt.Sprintf("deployment: %v", err))
 	}
 
-	if err := c.DeleteAuthorizationPolicy(ctx, name); err != nil {
-		errs = append(errs, fmt.Sprintf("authorization policy: %v", err))
+	if err := c.DeleteNetworkPolicy(ctx, name); err != nil {
+		errs = append(errs, fmt.Sprintf("network policy: %v", err))
 	}
 
 	if err := c.DeleteServiceAccount(ctx, name); err != nil {

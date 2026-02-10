@@ -46,7 +46,6 @@ metadata:
   labels:
     app.kubernetes.io/name: traefik
     app.kubernetes.io/part-of: code2cloud-platform
-    istio-injection: enabled
 
 ---
 apiVersion: v1

@@ -48,9 +48,10 @@ ansible-playbook -i inventory.ini playbook.yml --tags k3s
 ansible-playbook -i inventory.ini playbook.yml --tags k8s
 ```
 
-## Step 3.5: Install Istio (Tenant Isolation)
+## Step 3.5: Install Istio & Tenant Isolation
 
-Install Istio in its own namespace, enable sidecar injection for `deployments` and `traefik`, and apply the tenant isolation policies.
+Istio provides mTLS encryption between user pods. Kubernetes NetworkPolicy
+provides L3/L4 pod-to-pod isolation. Traefik stays **outside** the mesh.
 
 ```bash
 # From apps/infra
@@ -62,16 +63,17 @@ helm repo update
 helm install istio-base istio/base -n istio-system --create-namespace
 helm install istiod istio/istiod -n istio-system -f k8s/07-istio/values-istiod.yaml
 
-# Apply strict mTLS + default deny in deployments
+# Apply PERMISSIVE mTLS + default-deny NetworkPolicy in deployments
 kubectl apply -f k8s/07-istio/tenant-isolation.yaml
 
-# Restart Traefik so it gets the sidecar
-kubectl rollout restart deployment/traefik -n traefik
 ```
 
 Notes:
-- Existing user deployments in the `deployments` namespace should be restarted to get Istio sidecars.
-- The worker creates per-app Istio `AuthorizationPolicy` resources to allow only same-app traffic plus Traefik ingress.
+- Traefik does NOT get an Istio sidecar (it stays outside the mesh).
+- The worker creates per-app `NetworkPolicy` resources that whitelist only
+  same-app pods and the Traefik namespace for ingress.
+- Istio PERMISSIVE mTLS encrypts pod-to-pod traffic when both have sidecars,
+  but does not reject plaintext from Traefik.
 
 ## Step 4: Verify Installation
 
