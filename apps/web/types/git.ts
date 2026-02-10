@@ -109,4 +109,7 @@ export const PYTHON_VERSIONS = [
   { label: '3.12', value: '3.12' },
   { label: '3.11', value: '3.11' },
   { label: '3.10', value: '3.10' },
+  { label: '3.9', value: '3.9' },
+  { label: '3.8', value: '3.8' },
+  { label: '3.7', value: '3.7' },
 ];
