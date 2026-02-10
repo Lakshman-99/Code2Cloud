@@ -384,6 +384,46 @@
         KUBECONFIG: "{{ kubeconfig_remote }}"
       tags: [k8s, traefik]
 
+    - name: Add Istio Helm repo
+      ansible.builtin.shell: |
+        helm repo add istio https://istio-release.storage.googleapis.com/charts 2>/dev/null || true
+        helm repo update
+      environment:
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, istio]
+
+    - name: Install Istio base (CRDs)
+      ansible.builtin.shell: |
+        helm upgrade --install istio-base istio/base \
+          --namespace istio-system \
+          --create-namespace \
+          --wait --timeout 5m
+      environment:
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, istio]
+
+    - name: Install Istiod
+      ansible.builtin.shell: |
+        helm upgrade --install istiod istio/istiod \
+          --namespace istio-system \
+          --values /tmp/k8s-manifests/07-istio/values-istiod.yaml \
+          --wait --timeout 5m
+      environment:
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, istio]
+
+    - name: Apply tenant isolation policies
+      ansible.builtin.shell: kubectl apply -f /tmp/k8s-manifests/07-istio/tenant-isolation.yaml
+      environment:
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, istio]
+
+    - name: Restart Traefik for Istio sidecar injection
+      ansible.builtin.shell: kubectl rollout restart deployment/traefik -n traefik
+      environment:
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, istio, traefik]
+
     - name: Apply Registry manifests
       ansible.builtin.shell: kubectl apply -f /tmp/k8s-manifests/03-registry/
       environment:
@@ -457,11 +497,11 @@
           --frontend gateway.v0 \
           --opt source=ghcr.io/railwayapp/railpack-frontend:latest \
           --opt context=empty
-        
+
         # Wait for job with timeout (max 2 minutes)
         kubectl wait --for=condition=complete --timeout=120s \
           job/buildkit-prepull-{{ ansible_date_time.epoch }} -n default || true
-        
+
         # Cleanup job (ignore errors)
         kubectl delete job buildkit-prepull-{{ ansible_date_time.epoch }} -n default || true
       environment:
@@ -692,8 +732,8 @@
       become: false
       ansible.builtin.replace:
         path: "{{ kubeconfig_dir }}"
-        regexp: 'server: https://.*:6443'
-        replace: 'server: https://{{ ansible_host }}:6443'
+        regexp: "server: https://.*:6443"
+        replace: "server: https://{{ ansible_host }}:6443"
       tags: [kubeconfig]
 
     - name: Copy kubeconfig to Windows home for Powershell
@@ -744,22 +784,22 @@
           ══════════════════════════════════════════════════════════════
                     CODE2CLOUD INFRASTRUCTURE READY!
           ══════════════════════════════════════════════════════════════
-          
+
           🌐 Endpoints:
             Frontend:  https://{{ domain }}
             API:       https://{{ api_subdomain }}.{{ domain }}
             User Apps: https://*.{{ deploy_wildcard }}.{{ domain }}
-          
+
           🔑 Kubernetes API: https://{{ ansible_host }}:6443
           📁 Kubeconfig:     {{ kubeconfig_local }}
-          
+
           ══════════════════════════════════════════════════════════════
-          
+
           TEST COMMANDS:
             export KUBECONFIG={{ kubeconfig_local }}
             kubectl get nodes
             kubectl get pods -n code2cloud
             kubectl logs -f deployment/worker -n code2cloud
-          
+
           ══════════════════════════════════════════════════════════════
       tags: [always]

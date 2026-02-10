@@ -71,6 +71,7 @@ func (c *Client) CreateOrUpdateDeployment(ctx context.Context, opts DeployOption
 					Labels: labels,
 					Annotations: map[string]string{
 						"code2cloud/updated-at": time.Now().Format(time.RFC3339),
+						"sidecar.istio.io/inject": "true",
 					},
 				},
 				Spec: corev1.PodSpec{

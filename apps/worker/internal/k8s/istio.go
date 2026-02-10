@@ -111,8 +111,8 @@ func (c *Client) CreateOrUpdateAuthorizationPolicy(ctx context.Context, opts Dep
 						},
 						map[string]interface{}{
 							"source": map[string]interface{}{
-								"principals": []interface{}{
-									"cluster.local/ns/traefik/sa/traefik",
+								"namespaces": []interface{}{
+									"traefik",
 								},
 							},
 						},

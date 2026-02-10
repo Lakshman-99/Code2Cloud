@@ -54,7 +54,7 @@ const ProjectCard = ({ project, layout = false }: ProjectCardProps) => {
                   {project.name}
                 </h3>
                 <a 
-                  href={`https://${latestDeployment.deploymentUrl}`}
+                  href={`${latestDeployment.deploymentUrl}`}
                   target="_blank"
                   rel="noreferrer"
                   onClick={(e) => e.stopPropagation()} 

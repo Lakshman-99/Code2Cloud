@@ -31,11 +31,15 @@ rules:
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # Manage services
   - apiGroups: [""]
-    resources: ["services", "configmaps", "secrets"]
+    resources: ["services", "configmaps", "secrets", "serviceaccounts"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # Manage ingresses
   - apiGroups: ["networking.k8s.io"]
     resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Manage Istio authorization policies
+  - apiGroups: ["security.istio.io"]
+    resources: ["authorizationpolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # View pods and logs
   - apiGroups: [""]
