@@ -74,6 +74,8 @@ export const FRAMEWORK_ICONS: Record<string, string> = {
   typescript: "/icons/typescript.svg",
   golang: "/icons/golang_dark.svg",
   fastify: "/icons/fastify_dark.svg",
+  unknown: "/icons/dotted-circle.svg",
+  monorepo: "/icons/dotted-circle.svg",
 };
 
 export const FRAMEWORK_PRESETS: Record<string, { install: string; build: string; run: string; output: string }> = {

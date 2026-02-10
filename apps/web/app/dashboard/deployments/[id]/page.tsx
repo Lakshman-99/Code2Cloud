@@ -46,16 +46,6 @@ import { formatDistanceToNow } from "date-fns";
 import { DeploymentStatus, LogSource } from "@/types/project";
 import { DeploymentDetailsSkeleton } from "@/components/ui/skeleton";
 
-const FRONTEND_FRAMEWORKS = [
-  "next", "nextjs", "next.js", "react", "vue", "nuxt", "nuxtjs", "nuxt.js",
-  "svelte", "sveltekit", "angular", "gatsby", "astro", "remix", "vite",
-  "solid", "solidstart", "qwik",
-];
-
-function isFrontendFramework(fw: string): boolean {
-  return FRONTEND_FRAMEWORKS.includes(fw.toLowerCase().trim());
-}
-
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;

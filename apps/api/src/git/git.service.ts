@@ -119,15 +119,35 @@ export class GithubAppService {
                 defaultBranchRef { name }
                 primaryLanguage { name }
                 
-                # Try to fetch package.json
+                # Root manifest files
                 pkgJson: object(expression: "HEAD:package.json") {
                   ... on Blob { text }
                 }
-                
-                # Try to fetch requirements.txt
                 reqTxt: object(expression: "HEAD:requirements.txt") {
                   ... on Blob { text }
                 }
+                
+                # Subdirectory manifest files (monorepo support)
+                pkgJsonApi: object(expression: "HEAD:api/package.json") { ... on Blob { text } }
+                pkgJsonServer: object(expression: "HEAD:server/package.json") { ... on Blob { text } }
+                pkgJsonBackend: object(expression: "HEAD:backend/package.json") { ... on Blob { text } }
+                pkgJsonWeb: object(expression: "HEAD:web/package.json") { ... on Blob { text } }
+                pkgJsonClient: object(expression: "HEAD:client/package.json") { ... on Blob { text } }
+                pkgJsonFrontend: object(expression: "HEAD:frontend/package.json") { ... on Blob { text } }
+                pkgJsonApp: object(expression: "HEAD:app/package.json") { ... on Blob { text } }
+                
+                reqTxtApi: object(expression: "HEAD:api/requirements.txt") { ... on Blob { text } }
+                reqTxtServer: object(expression: "HEAD:server/requirements.txt") { ... on Blob { text } }
+                reqTxtBackend: object(expression: "HEAD:backend/requirements.txt") { ... on Blob { text } }
+                reqTxtWeb: object(expression: "HEAD:web/requirements.txt") { ... on Blob { text } }
+                reqTxtClient: object(expression: "HEAD:client/requirements.txt") { ... on Blob { text } }
+                reqTxtFrontend: object(expression: "HEAD:frontend/requirements.txt") { ... on Blob { text } }
+                reqTxtApp: object(expression: "HEAD:app/requirements.txt") { ... on Blob { text } }
+
+                # Monorepo indicators
+                lernaJson: object(expression: "HEAD:lerna.json") { ... on Blob { text } }
+                pnpmWorkspace: object(expression: "HEAD:pnpm-workspace.yaml") { ... on Blob { text } }
+                turboJson: object(expression: "HEAD:turbo.json") { ... on Blob { text } }
               }
             }
           }
@@ -137,16 +157,51 @@ export class GithubAppService {
       const response = await octokit.graphql<GraphQLResponse>(query);
       const nodes = response.viewer.repositories.nodes;
 
-      // 2. Map & Detect Frameworks
+      // 2. Map & Detect Frameworks (with monorepo support)
       const repos = nodes.map((node) => {
-        // Run detection logic on the file contents we just grabbed
-        const { framework, installCommand, buildCommand, runCommand, outputDirectory } = this.detectFrameworkFromContents(
+        // A. Try root-level detection first
+        let detected = this.detectFrameworkFromContents(
           node.pkgJson?.text, 
           node.reqTxt?.text
         );
 
+        // B. If root is unknown OR it's a plain 'node' project with monorepo indicators,
+        const isMonorepo = !!(node.lernaJson || node.pnpmWorkspace || node.turboJson);
+        if (detected.framework === 'unknown' || (detected.framework === 'node' && isMonorepo)) {
+          const subDirs = [
+            { name: 'api', pkg: node.pkgJsonApi?.text, req: node.reqTxtApi?.text },
+            { name: 'server', pkg: node.pkgJsonServer?.text, req: node.reqTxtServer?.text },
+            { name: 'backend', pkg: node.pkgJsonBackend?.text, req: node.reqTxtBackend?.text },
+            { name: 'web', pkg: node.pkgJsonWeb?.text, req: node.reqTxtWeb?.text },
+            { name: 'client', pkg: node.pkgJsonClient?.text, req: node.reqTxtClient?.text },
+            { name: 'frontend', pkg: node.pkgJsonFrontend?.text, req: node.reqTxtFrontend?.text },
+            { name: 'app', pkg: node.pkgJsonApp?.text, req: node.reqTxtApp?.text },
+          ];
+
+          const detectedServices = subDirs
+            .filter((s): s is { name: string; pkg: string | undefined; req: string | undefined } => !!(s.pkg || s.req))
+            .map(s => ({
+              name: s.name,
+              ...this.detectFrameworkFromContents(s.pkg, s.req),
+            }))
+            .filter(s => s.framework !== 'unknown');
+
+          if (detectedServices.length > 0) {
+            const primary = detectedServices[0];
+            detected = {
+              framework: `monorepo`,
+              installCommand: '',
+              buildCommand: '',
+              runCommand: '',
+              outputDirectory: primary.outputDirectory,
+            };
+          }
+        }
+
+        const { framework, installCommand, buildCommand, runCommand, outputDirectory } = detected;
+
         return {
-          id: node.databaseId, // Use the numeric ID for consistency
+          id: node.databaseId,
           name: node.name,
           fullName: node.nameWithOwner,
           private: node.isPrivate,
@@ -156,7 +211,6 @@ export class GithubAppService {
           language: node.primaryLanguage?.name || null,
           defaultBranch: node.defaultBranchRef?.name || 'main',
           updatedAt: node.updatedAt,
-          // --- NEW DETECTED METADATA ---
           framework,
           installCommand,
           buildCommand,
@@ -165,7 +219,7 @@ export class GithubAppService {
         };
       });
 
-      // 3. Filter: Only return supported runtimes (Node/Python)
+      // 3. Filter: Only return supported runtimes (Node/Python/Monorepo)
       return repos.filter(r => r.framework !== 'unknown');
 
     } catch (error) {
