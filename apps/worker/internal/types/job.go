@@ -16,6 +16,7 @@ type BuildJob struct {
 	InstallationID int    `json:"installationId"`
 	Branch         string `json:"branch"`
 	CommitHash     string `json:"commitHash"`
+	RootDirectory  string `json:"rootDirectory,omitempty"`
 
 	// Nested struct
 	BuildConfig BuildConfig `json:"buildConfig"`

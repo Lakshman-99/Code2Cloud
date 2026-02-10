@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
-import { getFrameworkIcon, getStatusConfig, STATUS_OPTIONS } from "@/components/project/utils";
+import { formatDuration, getFrameworkIcon, getStatusConfig, STATUS_OPTIONS } from "@/components/project/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useDeployments } from "@/hooks/use-deployments";
 import { useProjects } from "@/hooks/use-projects";
@@ -254,7 +254,7 @@ const Deployments = () => {
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                         <Timer className="w-3.5 h-3.5" />
                         {deployment.duration ? (
-                          <span className="text-foreground">{deployment.duration}s</span>
+                          <span className="text-foreground">{formatDuration(deployment.duration)}</span>
                         ) : deployment.status === "BUILDING" || deployment.status === "DEPLOYING" ? (
                           <span className="italic text-blue-400 animate-pulse">Calculating…</span>
                         ) : (

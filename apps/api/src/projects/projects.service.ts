@@ -122,6 +122,7 @@ export class ProjectsService {
         installationId: Number(matchingAccount.installationId),
         branch: project.gitBranch,
         commitHash: commitData.sha,
+        rootDirectory: project.rootDirectory || undefined,
         buildConfig: {
           framework: project.framework,
           installCommand: project.installCommand || undefined,

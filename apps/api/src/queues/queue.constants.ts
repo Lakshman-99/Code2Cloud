@@ -9,6 +9,7 @@ export interface BuildJobData {
   installationId: number;
   branch: string;
   commitHash: string;
+  rootDirectory?: string;
   // Build Config
   buildConfig: {
     installCommand?: string;

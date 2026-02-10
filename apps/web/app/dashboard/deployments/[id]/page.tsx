@@ -41,16 +41,11 @@ import { DeploymentNotFoundState } from "@/components/feedback/DeploymentNotFoun
 import { useDeployment, useDeployments } from "@/hooks/use-deployments";
 import { useDeploymentLogs } from "@/hooks/use-deployment-logs";
 import { useProjects } from "@/hooks/use-projects";
-import { getStatusConfig } from "@/components/project/utils";
+import { formatDuration, getStatusConfig } from "@/components/project/utils";
 import { formatDistanceToNow } from "date-fns";
 import { DeploymentStatus, LogSource } from "@/types/project";
 import { DeploymentDetailsSkeleton } from "@/components/ui/skeleton";
 
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
 
 // ─── Collapsible Section ─────────────────────────────────────
 

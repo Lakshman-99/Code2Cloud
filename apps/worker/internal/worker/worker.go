@@ -313,6 +313,13 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 		zap.Duration("duration", cloneResult.Duration),
 	)
 
+	// Resolve source path: if rootDirectory is set, cd into it
+	sourcePath := cloneResult.Path
+	if job.RootDirectory != "" {
+		sourcePath = fmt.Sprintf("%s/%s", cloneResult.Path, job.RootDirectory)
+		buildLog.Log(fmt.Sprintf("📂 Using root directory: %s", job.RootDirectory))
+	}
+
 	buildLog.Log("")
 
 	// ── Cancel check: before building ──
@@ -348,7 +355,7 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 	runCmd := builder.FrameworkStartCommand(job.BuildConfig.Framework, job.BuildConfig.RunCommand, port)
 
 	buildResult, err := w.builder.Build(ctx, builder.Options{
-		SourcePath:   cloneResult.Path,
+		SourcePath:   sourcePath,
 		ImageName:    imageName,
 		DeploymentID: job.DeploymentID,
 		ProjectName:  job.ProjectName,

@@ -112,3 +112,9 @@ export const STATUS_OPTIONS = Object.entries(STATUS_CONFIG).map(
     label, 
   }) 
 );
+
+export const formatDuration = (seconds: number): string => {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}

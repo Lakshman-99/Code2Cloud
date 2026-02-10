@@ -51,8 +51,13 @@ export class DeploymentsService {
       where: { projectId },
       orderBy: { startedAt: "desc" },
     });
-    if (latestDeployment && ["QUEUED", "BUILDING", "DEPLOYING"].includes(latestDeployment.status)) {
-      throw new BadRequestException("A deployment is already in progress for this project.");
+    if (
+      latestDeployment &&
+      ["QUEUED", "BUILDING", "DEPLOYING"].includes(latestDeployment.status)
+    ) {
+      throw new BadRequestException(
+        "A deployment is already in progress for this project.",
+      );
     }
 
     // Try to match owner, otherwise pick the first (likely correct for single-user scenarios)
@@ -138,6 +143,7 @@ export class DeploymentsService {
       installationId: Number(matchingAccount.installationId),
       branch: project.gitBranch,
       commitHash: commitData.sha,
+      rootDirectory: project.rootDirectory || undefined,
       buildConfig: {
         framework: project.framework,
         installCommand: project.installCommand || undefined,
@@ -148,7 +154,9 @@ export class DeploymentsService {
       domains,
       envVars: {
         ...envVars,
-        ...(project.pythonVersion ? { RAILPACK_PYTHON_VERSION: String(project.pythonVersion) } : {}),
+        ...(project.pythonVersion
+          ? { RAILPACK_PYTHON_VERSION: String(project.pythonVersion) }
+          : {}),
       },
     });
 
