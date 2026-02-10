@@ -38,7 +38,7 @@ export function useDeployments(projectId?: string) {
     const toastId = toast.loading("Queuing deployment...");
 
     try {
-      await api.post("/deployments", { projectId: targetProjectId });
+      const deployment = await api.post<Deployment>("/deployments", { projectId: targetProjectId });
       
       toast.success("Deployment queued", { id: toastId });
       
@@ -47,6 +47,7 @@ export function useDeployments(projectId?: string) {
       // Also refresh the project card to show status update
       mutate((key) => typeof key === 'string' && key.startsWith('/projects'));
 
+      return deployment;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error(err);

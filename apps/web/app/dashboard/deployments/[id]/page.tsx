@@ -144,9 +144,11 @@ export default function DeploymentDetails() {
   const commitUrl = `https://github.com/${project.gitRepoOwner}/${project.gitRepoName}/commit/${deployment.commitHash}`;
   const branchUrl = `${project.gitRepoUrl}/tree/${project.gitBranch}`;
 
-  const handleRedeploy = () => {
-    redeploy(project.id);
-    router.push(`/dashboard/deployments/${project.deployments?.[0].id}`);
+  const handleRedeploy = async () => {
+    const newDeployment = await redeploy(project.id);
+    if (newDeployment) {
+      router.push(`/dashboard/deployments/${newDeployment.id}`);
+    }
   };
 
   const handleCopy = (text: string, key: string) => {

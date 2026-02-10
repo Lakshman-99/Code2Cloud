@@ -14,6 +14,10 @@ service:
   type: LoadBalancer
   # On Oracle Cloud, LoadBalancer gets the node's IP
 
+# Ensure Traefik always gets an Istio sidecar
+podAnnotations:
+  sidecar.istio.io/inject: "true"
+
 # Ports configuration
 ports:
   # HTTP entrypoint
@@ -23,7 +27,7 @@ ports:
     expose:
       default: true
     protocol: TCP
-  
+
   # HTTPS entrypoint
   websecure:
     port: 8443
@@ -48,7 +52,7 @@ providers:
 # Traefik dashboard (optional - access via port-forward)
 ingressRoute:
   dashboard:
-    enabled: false  # Disable public dashboard for security
+    enabled: false # Disable public dashboard for security
 
 # Resource limits (adjust based on traffic)
 resources:

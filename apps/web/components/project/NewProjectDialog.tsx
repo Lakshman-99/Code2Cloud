@@ -27,6 +27,7 @@ import { RootDirectorySelector } from './root-directory-selector';
 import { getFrameworkIcon } from './utils';
 import { urlConfig } from '@/lib/url-config';
 import { useProjects } from '@/hooks/use-projects';
+import { useRouter } from 'next/navigation';
 
 interface NewProjectDialogProps {
   open: boolean;
@@ -36,6 +37,7 @@ interface NewProjectDialogProps {
 export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) => {
   const { isConnected, accounts, repos, isLoading, selectedAccount, setSelectedAccount, refreshStatus, detectFramework } = useGit();
   const { createProject } = useProjects();
+  const router = useRouter();
   
   // Local UI State
   const [searchQuery, setSearchQuery] = useState("");
@@ -245,6 +247,8 @@ export const NewProjectDialog = ({ open, onOpenChange }: NewProjectDialogProps) 
       toast.success("Project created and deployment queued!", { id: toastId, description: `Deployment ID: ${newProject.deployments[0].id}` });
       handleClose(false);
 
+      router.push(`/dashboard/deployments/${newProject.deployments[0].id}`);
+      
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       toast.error(error?.message || "Failed to create project", { id: toastId });
