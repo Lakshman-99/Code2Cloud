@@ -156,7 +156,6 @@ export default function DeploymentDetails() {
   
   const canCancel = isActive ||
     deployment.status === DeploymentStatus.QUEUED;
-  const isFrontend = isFrontendFramework(project.framework);
   const commitUrl = `https://github.com/${project.gitRepoOwner}/${project.gitRepoName}/commit/${deployment.commitHash}`;
   const branchUrl = `${project.gitRepoUrl}/tree/${project.gitBranch}`;
 
@@ -292,7 +291,7 @@ export default function DeploymentDetails() {
         <div className="flex flex-col lg:flex-row">
           {/* Preview (frontend only) or Placeholder */}
           <div className="lg:w-[400px] shrink-0 border-b lg:border-b-0 lg:border-r border-white/[0.06] bg-[#050505] relative overflow-hidden flex flex-col justify-center">
-            {isFrontend && isReady ? (
+            {isReady ? (
               <div
                 className="aspect-[16/10] relative group cursor-pointer overflow-hidden"
                 onClick={() =>
@@ -309,13 +308,6 @@ export default function DeploymentDetails() {
                     <>
                       <Loader2 className="w-6 h-6 mx-auto animate-spin text-muted-foreground" />
                       <p className="text-xs text-muted-foreground">Building…</p>
-                    </>
-                  ) : !isFrontend ? (
-                    <>
-                      <Server className="w-6 h-6 mx-auto text-muted-foreground/50" />
-                      <p className="text-xs text-muted-foreground/50">
-                        Preview not available for server applications
-                      </p>
                     </>
                   ) : (
                     <>
@@ -674,7 +666,7 @@ function SitePreview({ url }: { url: string }) {
       {status === "error" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#050505] z-10 gap-2">
           <ImageOff className="w-5 h-5 text-muted-foreground/50" />
-          <p className="text-[11px] text-muted-foreground/50">Failed to load preview</p>
+          <p className="text-[11px] text-muted-foreground/50">Preview unavailable</p>
         </div>
       )}
       <Image

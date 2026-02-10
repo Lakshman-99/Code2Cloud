@@ -93,6 +93,14 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	args = append(args, "--secret", "id=PORT,env=PORT")
 	cmd.Args = append(cmd.Args[:1], args...)
 
+	for key, val := range opts.EnvVars {
+		if strings.HasPrefix(key, "RAILPACK_") && val != "" {
+			cmd.Env = append(cmd.Env, key+"="+val)
+			args = append(args, "--secret", "id="+key+",env="+key)
+			cmd.Args = append(cmd.Args[:1], args...)
+		}
+	}
+
 	// ─────────────────────────────────────────────────────────
 	// Step 4: Attach logging
 	// ─────────────────────────────────────────────────────────
