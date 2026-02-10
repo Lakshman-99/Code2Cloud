@@ -250,12 +250,8 @@ func isPythonFramework(framework string) bool {
 func resolveInstallCommand(userCmd string, framework string) string {
 	userCmd = strings.TrimSpace(userCmd)
 
-	if isPythonFramework(framework) {
-		pipInstall := "pip install -r requirements.txt"
-		if userCmd != "" {
-			pipInstall = userCmd
-		}
-		return "python -m venv /app/.venv && export PATH=/app/.venv/bin:$PATH && pip install setuptools==44.1.1 wheel && " + pipInstall
+	if isPythonFramework(framework) && userCmd != "" {
+		return "python -m venv /app/.venv && export PATH=/app/.venv/bin:$PATH && " + userCmd
 	}
 
 	if userCmd == "" {
