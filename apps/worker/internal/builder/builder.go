@@ -255,7 +255,7 @@ func resolveInstallCommand(userCmd string, framework string) string {
 		if userCmd != "" {
 			pipInstall = userCmd
 		}
-		return "python -m venv /app/.venv && export PATH=/app/.venv/bin:$PATH && pip install 'setuptools<70' wheel && " + pipInstall
+		return "python -m venv /app/.venv && export PATH=/app/.venv/bin:$PATH && pip install setuptools==69.5.1 wheel && " + pipInstall
 	}
 
 	if userCmd == "" {
