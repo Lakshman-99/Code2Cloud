@@ -77,8 +77,8 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	cmd.Dir = opts.SourcePath
 	cmd.Env = os.Environ()
 
-	if opts.BuildConfig.InstallCommand != "" {
-		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand, opts.BuildConfig.Framework)
+	installCmd := resolveInstallCommand(opts.BuildConfig.InstallCommand, opts.BuildConfig.Framework)
+	if installCmd != "" {
 		cmd.Env = append(cmd.Env, "RAILPACK_INSTALL_CMD="+installCmd)
 		args = append(args, "--secret", "id=RAILPACK_INSTALL_CMD,env=RAILPACK_INSTALL_CMD")
 		cmd.Args = append(cmd.Args[:1], args...)
@@ -122,9 +122,9 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	if opts.BuildConfig.RunCommand != "" {
 		prepareArgs = append(prepareArgs, "--start-cmd", opts.BuildConfig.RunCommand)
 	}
-	if opts.BuildConfig.InstallCommand != "" {
-		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand, opts.BuildConfig.Framework)
-		prepareArgs = append(prepareArgs, "--env", "RAILPACK_INSTALL_CMD="+installCmd)
+	installCmdForPrepare := resolveInstallCommand(opts.BuildConfig.InstallCommand, opts.BuildConfig.Framework)
+	if installCmdForPrepare != "" {
+		prepareArgs = append(prepareArgs, "--env", "RAILPACK_INSTALL_CMD="+installCmdForPrepare)
 	}
 
 	// Always tell Railpack which port the app will listen on
@@ -247,23 +247,27 @@ func isPythonFramework(framework string) bool {
 	return false
 }
 
-func normalizeInstallCommand(cmd string, framework string) string {
-	cmd = strings.TrimSpace(cmd)
-	if cmd == "" {
-		return cmd
-	}
+func resolveInstallCommand(userCmd string, framework string) string {
+	userCmd = strings.TrimSpace(userCmd)
 
 	if isPythonFramework(framework) {
-		return "python -m venv /app/.venv && export PATH=/app/.venv/bin:$PATH && " + cmd
+		pipInstall := "pip install -r requirements.txt"
+		if userCmd != "" {
+			pipInstall = userCmd
+		}
+		return "python -m venv /app/.venv && export PATH=/app/.venv/bin:$PATH && pip install 'setuptools<70' wheel && " + pipInstall
 	}
 
-	if cmd == "npm ci" {
+	if userCmd == "" {
+		return ""
+	}
+	if userCmd == "npm ci" {
 		return "npm ci || npm install"
 	}
-	if strings.HasPrefix(cmd, "--") {
-		return "npm install " + cmd
+	if strings.HasPrefix(userCmd, "--") {
+		return "npm install " + userCmd
 	}
-	return cmd
+	return userCmd
 }
 
 func sanitizeArgs(args []string) []string {
