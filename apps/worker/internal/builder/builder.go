@@ -84,6 +84,15 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 		cmd.Args = append(cmd.Args[:1], args...)
 	}
 
+
+	port := "3000"
+	if p, ok := opts.EnvVars["PORT"]; ok && p != "" {
+		port = p
+	}
+	cmd.Env = append(cmd.Env, "PORT="+port)
+	args = append(args, "--secret", "id=PORT,env=PORT")
+	cmd.Args = append(cmd.Args[:1], args...)
+
 	// ─────────────────────────────────────────────────────────
 	// Step 4: Attach logging
 	// ─────────────────────────────────────────────────────────
