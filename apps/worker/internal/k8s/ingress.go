@@ -74,7 +74,6 @@ func (c *Client) CreateOrUpdateIngress(ctx context.Context, opts DeployOptions) 
 			Annotations: map[string]string{
 				"traefik.ingress.kubernetes.io/router.entrypoints": "websecure",
 				"traefik.ingress.kubernetes.io/router.tls":         "true",
-
 				"cert-manager.io/cluster-issuer": "letsencrypt-prod",
 			},
 		},

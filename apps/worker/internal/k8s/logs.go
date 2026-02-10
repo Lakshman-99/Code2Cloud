@@ -101,7 +101,7 @@ func (ls *LogStreamer) streamPodLogs(ctx context.Context, deploymentID, appName,
 			// Continue streaming
 		}
 
-		err := ls.streamOnce(ctx, deploymentID, podName, logWriter)
+		err := ls.streamOnce(ctx, deploymentID, appName, podName, logWriter)
 
 		if ctx.Err() != nil {
 			return
@@ -126,11 +126,12 @@ func (ls *LogStreamer) streamPodLogs(ctx context.Context, deploymentID, appName,
 
 func (ls *LogStreamer) streamOnce(
 	ctx context.Context,
-	deploymentID, podName string,
+	deploymentID, appName, podName string,
 	logWriter *logging.StreamLogger,
 ) error {
 
 	req := ls.client.clientset.CoreV1().Pods(ls.client.namespace).GetLogs(podName, &corev1.PodLogOptions{
+		Container:  appName,
 		Follow:     true,
 		Timestamps: true,
 		TailLines:  int64Ptr(100),
