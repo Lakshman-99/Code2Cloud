@@ -78,7 +78,7 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 	cmd.Env = os.Environ()
 
 	if opts.BuildConfig.InstallCommand != "" {
-		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand)
+		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand, opts.BuildConfig.Framework)
 		cmd.Env = append(cmd.Env, "RAILPACK_INSTALL_CMD="+installCmd)
 		args = append(args, "--secret", "id=RAILPACK_INSTALL_CMD,env=RAILPACK_INSTALL_CMD")
 		cmd.Args = append(cmd.Args[:1], args...)
@@ -123,7 +123,7 @@ func (b *Builder) Build(ctx context.Context, opts Options) (*Result, error) {
 		prepareArgs = append(prepareArgs, "--start-cmd", opts.BuildConfig.RunCommand)
 	}
 	if opts.BuildConfig.InstallCommand != "" {
-		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand)
+		installCmd := normalizeInstallCommand(opts.BuildConfig.InstallCommand, opts.BuildConfig.Framework)
 		prepareArgs = append(prepareArgs, "--env", "RAILPACK_INSTALL_CMD="+installCmd)
 	}
 
@@ -239,11 +239,24 @@ func (b *Builder) writeDockerIgnore(sourcePath string) {
 	os.WriteFile(ignorePath, []byte(".git\n"), 0644)
 }
 
-func normalizeInstallCommand(cmd string) string {
+func isPythonFramework(framework string) bool {
+	switch strings.ToLower(framework) {
+	case "flask", "django", "fastapi", "streamlit", "python":
+		return true
+	}
+	return false
+}
+
+func normalizeInstallCommand(cmd string, framework string) string {
 	cmd = strings.TrimSpace(cmd)
 	if cmd == "" {
 		return cmd
 	}
+
+	if isPythonFramework(framework) {
+		return "python -m venv /app/.venv && export PATH=/app/.venv/bin:$PATH && " + cmd
+	}
+
 	if cmd == "npm ci" {
 		return "npm ci || npm install"
 	}
