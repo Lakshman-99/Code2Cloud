@@ -18,8 +18,8 @@ metadata:
   namespace: deployments
   labels:
     app: my-nextjs-app
-    code2cloud.io/project-id: "abc123"      # Track which project
-    code2cloud.io/deployment-id: "def456"   # Track which deployment
+    code2cloud/project-id: "abc123"      # Track which project
+    code2cloud/deployment-id: "def456"   # Track which deployment
 spec:
   replicas: 1
   selector:
@@ -30,6 +30,7 @@ spec:
       labels:
         app: my-nextjs-app
     spec:
+      serviceAccountName: my-nextjs-app-sa
       containers:
         - name: app
           # Image built by worker and pushed to registry
@@ -117,9 +118,10 @@ spec:
 #    a. Clone git repo
 #    b. Build image using BuildKit
 #    c. Push to registry
-#    d. Generate these manifests with user's config
-#    e. Apply to cluster: kubectl apply -f ...
-#    f. Update deployment status in DB
+#    d. Create service account + Istio AuthorizationPolicy
+#    e. Generate these manifests with user's config
+#    f. Apply to cluster: kubectl apply -f ...
+#    g. Update deployment status in DB
 # 4. cert-manager automatically provisions TLS cert
 # 5. User's app is live at https://my-nextjs-app.deploy.lakshman.me
 # =============================================================================

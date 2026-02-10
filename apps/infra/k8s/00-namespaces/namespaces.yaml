@@ -26,8 +26,8 @@ metadata:
   labels:
     app.kubernetes.io/name: deployments
     app.kubernetes.io/part-of: code2cloud-platform
-    # This label helps identify user workloads
     code2cloud.io/type: user-deployments
+    istio-injection: enabled
 
 ---
 apiVersion: v1
@@ -45,6 +45,16 @@ metadata:
   name: traefik
   labels:
     app.kubernetes.io/name: traefik
+    app.kubernetes.io/part-of: code2cloud-platform
+    istio-injection: enabled
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: istio-system
+  labels:
+    app.kubernetes.io/name: istio
     app.kubernetes.io/part-of: code2cloud-platform
 
 ---

@@ -17,6 +17,7 @@ import (
 
 func (c *Client) CreateOrUpdateDeployment(ctx context.Context, opts DeployOptions) error {
 	name := sanitizeK8sName(opts.ProjectName)
+	serviceAccountName := buildServiceAccountName(name)
 
 	c.logger.Info("Creating/updating deployment",
 		zap.String("name", name),
@@ -74,6 +75,7 @@ func (c *Client) CreateOrUpdateDeployment(ctx context.Context, opts DeployOption
 				},
 				Spec: corev1.PodSpec{
 					TerminationGracePeriodSeconds: int64Ptr(30),
+					ServiceAccountName:            serviceAccountName,
 
 					Containers: []corev1.Container{{
 						Name:            name,

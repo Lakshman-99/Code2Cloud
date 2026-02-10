@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"go.uber.org/zap"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -14,11 +15,12 @@ import (
 )
 
 type Client struct {
-	clientset  *kubernetes.Clientset
-	namespace  string
-	baseDomain string
-	logFactory *logging.Factory
-	logger     *zap.Logger
+	clientset     *kubernetes.Clientset
+	dynamicClient dynamic.Interface
+	namespace     string
+	baseDomain    string
+	logFactory    *logging.Factory
+	logger        *zap.Logger
 }
 
 type Config struct {
@@ -37,17 +39,23 @@ func NewClient(config Config, logFactory *logging.Factory, logger *zap.Logger) (
 		return nil, fmt.Errorf("failed to create kubernetes client: %w", err)
 	}
 
+	dynamicClient, err := dynamic.NewForConfig(k8sConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes dynamic client: %w", err)
+	}
+
 	logger.Info("Kubernetes client initialized",
 		zap.String("namespace", config.Namespace),
 		zap.String("baseDomain", config.BaseDomain),
 	)
 
 	return &Client{
-		clientset:  clientset,
-		namespace:  config.Namespace,
-		baseDomain: config.BaseDomain,
-		logFactory: logFactory,
-		logger:     logger,
+		clientset:     clientset,
+		dynamicClient: dynamicClient,
+		namespace:     config.Namespace,
+		baseDomain:    config.BaseDomain,
+		logFactory:    logFactory,
+		logger:        logger,
 	}, nil
 }
 

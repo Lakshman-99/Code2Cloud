@@ -28,6 +28,20 @@ func (c *Client) Deploy(ctx context.Context, opts DeployOptions) (*DeployResult,
 	)
 
 	deployLog.Log(fmt.Sprintf("Deploying %s to Kubernetes...", name))
+	deployLog.Log("Creating service account...")
+
+	if err := c.CreateOrUpdateServiceAccount(ctx, opts); err != nil {
+		return nil, fmt.Errorf("failed to create service account: %w", err)
+	}
+
+	deployLog.Log("✓ Service account created")
+	deployLog.Log("Creating Istio authorization policy...")
+
+	if err := c.CreateOrUpdateAuthorizationPolicy(ctx, opts); err != nil {
+		return nil, fmt.Errorf("failed to create authorization policy: %w", err)
+	}
+
+	deployLog.Log("✓ Istio authorization policy created")
 	deployLog.Log("Creating deployment...")
 
 	if err := c.CreateOrUpdateDeployment(ctx, opts); err != nil {
@@ -109,6 +123,14 @@ func (c *Client) Cleanup(ctx context.Context, opts CleanupOptions) error {
 
 	if err := c.DeleteDeployment(ctx, name); err != nil {
 		errs = append(errs, fmt.Sprintf("deployment: %v", err))
+	}
+
+	if err := c.DeleteAuthorizationPolicy(ctx, name); err != nil {
+		errs = append(errs, fmt.Sprintf("authorization policy: %v", err))
+	}
+
+	if err := c.DeleteServiceAccount(ctx, name); err != nil {
+		errs = append(errs, fmt.Sprintf("service account: %v", err))
 	}
 
 	if len(errs) > 0 {

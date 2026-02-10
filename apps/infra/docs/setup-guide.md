@@ -48,6 +48,31 @@ ansible-playbook -i inventory.ini playbook.yml --tags k3s
 ansible-playbook -i inventory.ini playbook.yml --tags k8s
 ```
 
+## Step 3.5: Install Istio (Tenant Isolation)
+
+Install Istio in its own namespace, enable sidecar injection for `deployments` and `traefik`, and apply the tenant isolation policies.
+
+```bash
+# From apps/infra
+kubectl apply -f k8s/00-namespaces/namespaces.yaml
+
+helm repo add istio https://istio-release.storage.googleapis.com/charts
+helm repo update
+
+helm install istio-base istio/base -n istio-system --create-namespace
+helm install istiod istio/istiod -n istio-system -f k8s/07-istio/values-istiod.yaml
+
+# Apply strict mTLS + default deny in deployments
+kubectl apply -f k8s/07-istio/tenant-isolation.yaml
+
+# Restart Traefik so it gets the sidecar
+kubectl rollout restart deployment/traefik -n traefik
+```
+
+Notes:
+- Existing user deployments in the `deployments` namespace should be restarted to get Istio sidecars.
+- The worker creates per-app Istio `AuthorizationPolicy` resources to allow only same-app traffic plus Traefik ingress.
+
 ## Step 4: Verify Installation
 
 ```bash

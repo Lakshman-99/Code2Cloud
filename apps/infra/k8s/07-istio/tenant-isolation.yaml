@@ -1,0 +1,21 @@
+# =============================================================================
+# Istio Tenant Isolation (deployments namespace)
+# =============================================================================
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: deployments-mtls
+  namespace: deployments
+spec:
+  mtls:
+    mode: STRICT
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: default-deny
+  namespace: deployments
+spec: {}

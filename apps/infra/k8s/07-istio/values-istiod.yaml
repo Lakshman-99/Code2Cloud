@@ -1,0 +1,11 @@
+# =============================================================================
+# Istiod Helm Values
+# =============================================================================
+
+meshConfig:
+  enableAutoMtls: true
+  accessLogFile: /dev/stdout
+
+global:
+  proxy:
+    holdApplicationUntilProxyStarts: true
