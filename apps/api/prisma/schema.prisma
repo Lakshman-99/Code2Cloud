@@ -84,6 +84,7 @@ model Project {
   gitBranch        String
   gitCloneUrl      String
   gitRepoUrl       String
+  gitRepoFullName  String?
 
   // ─── Deployment Config ─────────────────────────
   configChanged    Boolean  @default(false)
@@ -132,6 +133,7 @@ enum DeploymentStatus {
   FAILED
   CANCELED
   EXPIRED
+  SUPERSEDED
 }
 
 enum EnvironmentType {
@@ -147,6 +149,12 @@ enum DomainDnsStatus {
   VERIFYING
   ERROR
 }
+
+enum DeploymentTrigger {
+  MANUAL
+  WEBHOOK
+  ROLLBACK
+} 
 
 model Deployment {
   id                String           @id @default(uuid())
@@ -183,6 +191,7 @@ model Deployment {
 
   initiatorId       String?
   initiator         User?            @relation("UserDeployments", fields: [initiatorId], references: [id])
+  trigger           DeploymentTrigger           @default(MANUAL)
 
   @@index([projectId])
   @@index([status])

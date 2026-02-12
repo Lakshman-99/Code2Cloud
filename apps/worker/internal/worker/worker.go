@@ -32,10 +32,11 @@ type Worker struct {
 	k8s        *k8s.Client
 	logFactory *logging.Factory 
 	logger     *zap.Logger
-	logStreamer *k8s.LogStreamer
-	domainWorker *k8s.DomainWorker
-	cleanupWorker *k8s.CleanupWorker
-	logCleanupWorker *k8s.LogCleanupWorker
+	logStreamer       *k8s.LogStreamer
+	domainWorker      *k8s.DomainWorker
+	cleanupWorker     *k8s.CleanupWorker
+	logCleanupWorker  *k8s.LogCleanupWorker
+	projectCleanupWorker *k8s.ProjectCleanupWorker
 }
 
 func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, error) {
@@ -122,20 +123,29 @@ func New(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*Worker, 
 		logger,
 	)
 
+	projectCleanupWorker := k8s.NewProjectCleanupWorker(k8s.ProjectCleanupWorkerConfig{
+		Client:           k8sClient,
+		LogStreamer:       logStreamer,
+		Logger:           logger,
+		FetchCleanupJobs: q.PopProjectCleanup,
+		CheckInterval:    5 * time.Second,
+	})
+
 	// Create worker instance
 	w := &Worker{
-		cfg:         cfg,
-		queue:       q,
-		api:         apiClient,
-		git:         gitCloner,
-		builder:     bldr,
-		k8s:         k8sClient,
-		logFactory:  logFactory,
-		logger:      logger,
-		logStreamer:      logStreamer,
-		domainWorker:     domainWorker,
-		cleanupWorker:    cleanupWorker,
-		logCleanupWorker: logCleanupWorker,
+		cfg:                  cfg,
+		queue:                q,
+		api:                  apiClient,
+		git:                  gitCloner,
+		builder:              bldr,
+		k8s:                  k8sClient,
+		logFactory:           logFactory,
+		logger:               logger,
+		logStreamer:           logStreamer,
+		domainWorker:         domainWorker,
+		cleanupWorker:        cleanupWorker,
+		logCleanupWorker:     logCleanupWorker,
+		projectCleanupWorker: projectCleanupWorker,
 	}
 
 	return w, nil
@@ -156,6 +166,7 @@ func (w *Worker) Start(ctx context.Context) error {
 	w.domainWorker.Start(ctx)
 	w.cleanupWorker.Start(ctx)
 	w.logCleanupWorker.Start(ctx)
+	w.projectCleanupWorker.Start(ctx)
 
 	for {
 		select {
@@ -340,18 +351,14 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 		cloneResult.CommitHash[:8],
 	)
 
-	// Merge environment variables
 	envVars := builder.MergeEnvVars(
 		builder.DefaultBuildEnv(),
 		builder.FrameworkEnv(job.BuildConfig.Framework),
 		job.EnvVars,
 	)
 
-	// Resolve the port early so it can inform the start command
 	port := resolvePort(job.EnvVars)
 
-	// Override the run command for frameworks that ignore the PORT env var
-	// (e.g. vite preview uses 4173 by default and ignores PORT)
 	runCmd := builder.FrameworkStartCommand(job.BuildConfig.Framework, job.BuildConfig.RunCommand, port)
 
 	buildResult, err := w.builder.Build(ctx, builder.Options{
@@ -436,9 +443,9 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 	buildLog.Log("")
 
 	// ─────────────────────────────────────────────────────────
-	// Step 8: Mark as READY
+	// Step 8: Mark as READY + retire previous deployment
 	// ─────────────────────────────────────────────────────────
-	deploymentURL := deployResult.URLs[0] // Primary URL
+	deploymentURL := deployResult.URLs[0]
 
 	if err := w.api.UpdateDeploymentWithURL(ctx, job.DeploymentID, types.StatusReady, deploymentURL); err != nil {
 		return fmt.Errorf("failed to complete deployment: %w", err)
@@ -446,7 +453,11 @@ func (w *Worker) processJob(ctx context.Context, job *types.BuildJob, jobID stri
 
 	w.api.UpdateProjectStatus(ctx, job.ProjectID, "ACTIVE")
 
-	// Update domain statuses
+	if job.PreviousDeploymentID != "" {
+		w.logStreamer.StopStreaming(job.PreviousDeploymentID)
+		w.api.UpdateDeploymentStatus(ctx, job.PreviousDeploymentID, types.StatusSuperseded)
+	}
+
 	for _, domain := range job.Domains {
 		w.logger.Debug("Domain configured", zap.String("domain", domain))
 	}
@@ -512,7 +523,6 @@ func (w *Worker) shutdown() error {
 }
 
 // checkCancelled polls Redis to see if the deployment has been cancelled by the user.
-// Returns errCancelled if a cancel signal is found, nil otherwise.
 func (w *Worker) checkCancelled(ctx context.Context, deploymentID string, buildLog interface{ Log(string) }) error {
 	if w.queue.IsCancelled(ctx, deploymentID) {
 		w.logger.Info("Deployment cancelled by user",
@@ -555,9 +565,6 @@ func (w *Worker) cancelCleanup(ctx context.Context, job *types.BuildJob) {
 	w.api.UpdateProjectStatus(ctx, job.ProjectID, "INACTIVE")
 }
 
-// resolvePort determines the container port from user environment variables.
-// If the user specified a PORT env var, that value is used.
-// Otherwise, defaults to 3000 to ensure the app is accessible.
 func resolvePort(envVars map[string]string) int32 {
 	if portStr, ok := envVars["PORT"]; ok {
 		if port, err := strconv.ParseInt(portStr, 10, 32); err == nil && port > 0 && port <= 65535 {

@@ -445,6 +445,7 @@ export class InternalService {
       FAILED: "❌",
       CANCELED: "🚫",
       EXPIRED: "🧹",
+      SUPERSEDED: "♻️"
     };
     return emojis[status] || "📋";
   }
@@ -458,6 +459,7 @@ export class InternalService {
       FAILED: "#FF0000",
       CANCELED: "#808080",
       EXPIRED:  "#A52A2A",
+      SUPERSEDED: "#ff7b00",
     };
     return colors[status] || "#808080";
   }

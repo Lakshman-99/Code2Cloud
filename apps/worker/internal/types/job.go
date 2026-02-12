@@ -26,6 +26,7 @@ type BuildJob struct {
 
 	// map[string]string = { [key: string]: string }
 	EnvVars map[string]string `json:"envVars"`
+	PreviousDeploymentID string `json:"previousDeploymentId,omitempty"`
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -41,6 +42,7 @@ const (
 	StatusFailed    DeploymentStatus = "FAILED"
 	StatusCanceled  DeploymentStatus = "CANCELED"
 	StatusExpired   DeploymentStatus = "EXPIRED"
+	StatusSuperseded DeploymentStatus = "SUPERSEDED"
 )
 
 // ─────────────────────────────────────────────────────────────
@@ -68,4 +70,10 @@ type ExpiredDeployment struct {
 	ContainerImage string `json:"containerImage"`
 	TTLMinutes     int    `json:"ttlMinutes"`
 	ExpiredAt      string `json:"expiredAt"`
+}
+
+type ProjectCleanupJob struct {
+	ProjectID           string   `json:"projectId"`
+	ProjectName         string   `json:"projectName"`
+	ActiveDeploymentIDs []string `json:"activeDeploymentIds"`
 }

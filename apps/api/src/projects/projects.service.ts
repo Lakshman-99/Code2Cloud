@@ -214,10 +214,38 @@ export class ProjectsService {
   }
 
   async remove(id: string, userId: string) {
-    // Check ownership
-    await this.findOne(id, userId);
+    const project = await this.prisma.project.findFirst({
+      where: { id, userId },
+      include: {
+        deployments: {
+          where: {
+            status: { in: ['QUEUED', 'BUILDING', 'DEPLOYING', 'READY'] },
+          },
+          select: { id: true, status: true },
+        },
+      },
+    });
 
-    // Cascading delete in Schema handles deployments/env-vars automatically
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const activeDeployments = project.deployments;
+
+    for (const deployment of activeDeployments) {
+      if (['QUEUED', 'BUILDING', 'DEPLOYING'].includes(deployment.status)) {
+        await this.queuesService.publishCancelSignal(deployment.id);
+      }
+    }
+
+    if (activeDeployments.length > 0) {
+      await this.queuesService.addProjectCleanupJob({
+        projectId: project.id,
+        projectName: project.name,
+        activeDeploymentIds: activeDeployments.map((d) => d.id),
+      });
+    }
+
     return this.prisma.project.delete({
       where: { id }
     });

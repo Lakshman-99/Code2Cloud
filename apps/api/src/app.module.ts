@@ -13,6 +13,7 @@ import { HealthModule } from "./health/health.module";
 import { InternalModule } from "./internal/internal.module";
 import { MailModule } from "./mail/mail.module";
 import { AnalyticsModule } from "./analytics/analytics.module";
+import { WebhooksModule } from "./webhooks/webhooks.module";
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { AnalyticsModule } from "./analytics/analytics.module";
     InternalModule,
     MailModule,
     AnalyticsModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,4 +1,6 @@
 export const BUILD_QUEUE_NAME = 'build-queue';
+export const PROJECT_CLEANUP_QUEUE = 'project-cleanup-queue';
+export const CANCEL_KEY_PREFIX = 'cancel:';
 
 // This is the payload your Go worker will expect
 export interface BuildJobData {
@@ -20,4 +22,11 @@ export interface BuildJobData {
   };
   domains: string[];
   envVars: Record<string, string>;
+  previousDeploymentId?: string;
+}
+
+export interface ProjectCleanupJobData {
+  projectId: string;
+  projectName: string;
+  activeDeploymentIds: string[];
 }

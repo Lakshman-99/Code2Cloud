@@ -10,7 +10,6 @@ import { EncryptionService } from "src/common/utils/encryption.service";
 import { CreateDeploymentDto } from "./dto/create-deployment.dto";
 import { DeploymentStatus, EnvironmentType } from "generated/prisma/enums";
 import { GithubAppService } from "src/git/git.service";
-import { UrlUtils } from "src/common/utils/url.utils";
 
 @Injectable()
 export class DeploymentsService {
@@ -32,7 +31,11 @@ export class DeploymentsService {
       where: { id: projectId, userId },
       include: {
         envVars: true,
-        domains: true,
+        domains: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
       },
     });
 
@@ -83,7 +86,7 @@ export class DeploymentsService {
       const systemConfig = await tx.systemConfig.findUnique({
         where: { userId },
       });
-      const deploymentUrl = UrlUtils.generateDeploymentUrl(project.name);
+      const deploymentUrl = project.domains[0]?.name;
 
       const deployment = await tx.deployment.create({
         data: {

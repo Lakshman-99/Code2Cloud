@@ -12,6 +12,10 @@ import (
 	"code2cloud/worker/internal/types"
 )
 
+const (
+	ProjectCleanupQueue = "project-cleanup-queue"
+)
+
 type Queue struct {
 	client    *redis.Client
 	queueName string        
@@ -19,7 +23,6 @@ type Queue struct {
 }
 
 func New(url, queueName string, logger *zap.Logger) (*Queue, error) {
-	// Create Redis client
 	opts, err := redis.ParseURL(url)
 	if err != nil {
 			return nil, fmt.Errorf("invalid redis url: %w", err)
@@ -47,6 +50,7 @@ func New(url, queueName string, logger *zap.Logger) (*Queue, error) {
 // ─────────────────────────────────────────────────────────────
 // Job Processing
 // ─────────────────────────────────────────────────────────────
+
 func (q *Queue) WaitForJob(ctx context.Context) (*types.BuildJob, string, error) {
 	q.logger.Debug("Waiting for job...", zap.String("key", q.queueName))
 
@@ -81,7 +85,6 @@ func (q *Queue) WaitForJob(ctx context.Context) (*types.BuildJob, string, error)
 			continue
 		}
 
-		// Use deploymentID as the job identifier for logging/tracking
 		jobID := job.DeploymentID
 
 		q.logger.Info("Got job",
@@ -95,8 +98,41 @@ func (q *Queue) WaitForJob(ctx context.Context) (*types.BuildJob, string, error)
 }
 
 // ─────────────────────────────────────────────────────────────
+// Project Cleanup Queue
+// ─────────────────────────────────────────────────────────────
+
+func (q *Queue) PopProjectCleanup(ctx context.Context) (*types.ProjectCleanupJob, error) {
+	result, err := q.client.RPop(ctx, ProjectCleanupQueue).Result()
+	if err == redis.Nil {
+		return nil, nil
+	}
+	if err != nil {
+		q.logger.Warn("Failed to pop project cleanup job", zap.Error(err))
+		return nil, err
+	}
+
+	var job types.ProjectCleanupJob
+	if err := json.Unmarshal([]byte(result), &job); err != nil {
+		q.logger.Error("Failed to parse project cleanup job",
+			zap.String("raw", result),
+			zap.Error(err),
+		)
+		return nil, fmt.Errorf("failed to parse cleanup job: %w", err)
+	}
+
+	q.logger.Info("Got project cleanup job",
+		zap.String("project_id", job.ProjectID),
+		zap.String("project_name", job.ProjectName),
+		zap.Int("deployments", len(job.ActiveDeploymentIDs)),
+	)
+
+	return &job, nil
+}
+
+// ─────────────────────────────────────────────────────────────
 // Job Completion
 // ─────────────────────────────────────────────────────────────
+
 func (q *Queue) CompleteJob(ctx context.Context, jobID string) error {
 	q.logger.Info("Job completed", zap.String("jobId", jobID))
 	return nil
@@ -110,8 +146,10 @@ func (q *Queue) FailJob(ctx context.Context, jobID, reason string) error {
 	return nil
 }
 
-// IsCancelled checks if a cancel signal exists for the given deployment.
-// The NestJS API sets a Redis key "cancel:<deploymentId>" when the user cancels.
+// ─────────────────────────────────────────────────────────────
+// Cancellation Signals
+// ─────────────────────────────────────────────────────────────
+
 func (q *Queue) IsCancelled(ctx context.Context, deploymentID string) bool {
 	key := "cancel:" + deploymentID
 	val, err := q.client.Get(ctx, key).Result()
@@ -121,7 +159,6 @@ func (q *Queue) IsCancelled(ctx context.Context, deploymentID string) bool {
 	return val == "1"
 }
 
-// ClearCancelSignal removes the cancel key after it has been consumed.
 func (q *Queue) ClearCancelSignal(ctx context.Context, deploymentID string) {
 	key := "cancel:" + deploymentID
 	q.client.Del(ctx, key)
