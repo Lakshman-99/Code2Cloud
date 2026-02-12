@@ -252,7 +252,7 @@ export const ProjectOverview = ({ project }: ProjectOverviewProps) => {
                 icon: Zap, 
                 color: "text-amber-400", 
                 bg: "group-hover:bg-amber-500/10",
-                href: "#"
+                href: `?tab=analytics`
               }
             ].map((action) => (
               <motion.a

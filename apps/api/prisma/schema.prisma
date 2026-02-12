@@ -152,6 +152,7 @@ model Deployment {
   id                String           @id @default(uuid())
   status            DeploymentStatus @default(QUEUED)
   environment       EnvironmentType  @default(PRODUCTION)
+  isSuccess         Boolean @default(false)
 
   // ─── Git Metadata ───────────────────────────────
   commitHash        String

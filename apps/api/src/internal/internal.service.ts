@@ -50,6 +50,10 @@ export class InternalService {
       );
     }
 
+    if (dto.status === "READY") {
+      updateData.isSuccess = true;
+    }
+
     const updated = await this.prisma.deployment.update({
       where: { id },
       data: updateData,

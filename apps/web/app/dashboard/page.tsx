@@ -1,21 +1,32 @@
 "use client";
 
 import { AnimatePresence, motion } from 'framer-motion';
-import SystemHealthChart from '@/components/dashboard/SystemHealthChart';
+import DeploymentActivityChart from '@/components/dashboard/DeploymentActivityChart';
 import ActiveDeployments from '@/components/dashboard/ActiveDeployments';
 import ProjectCard from '@/components/dashboard/ProjectCard';
 import { ChartSkeleton, ListSkeleton, CardSkeleton, NameSkeleton } from '@/components/ui/skeleton';
 import { useUser } from '@/hooks/use-user';
 import { useRouter } from 'next/navigation';
 import { useProjects } from '@/hooks/use-projects';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Clock, Rocket } from 'lucide-react';
 import { useDeployments } from '@/hooks/use-deployments';
+import { useAnalytics } from '@/hooks/use-analytics';
+
+const formatDuration = (seconds: number): string => {
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+};
 
 const Dashboard = () => {
   const router = useRouter();
   const { user, isUserLoading } = useUser();
   const { projects, isLoading: isProjectsLoading } = useProjects();
   const { deployments, isLoading: isDeploymentsLoading } = useDeployments();
+  const { analytics, isLoading: isAnalyticsLoading } = useAnalytics();
+
+  const isStatsLoading = isProjectsLoading || isAnalyticsLoading;
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -54,13 +65,16 @@ const Dashboard = () => {
 
       {/* Bento Grid */}
       <div className="grid grid-cols-4 gap-4">
-        {/* System Health - Large Card */}
-        {isProjectsLoading ? (
+        {/* Deployment Activity Chart - Real Data */}
+        {isStatsLoading ? (
           <div className="col-span-2 row-span-2">
             <ChartSkeleton />
           </div>
         ) : (
-          <SystemHealthChart />
+          <DeploymentActivityChart
+            data={analytics?.deploymentsOverTime || []}
+            deploymentsThisWeek={analytics?.deploymentsThisWeek || 0}
+          />
         )}
 
         {/* Active Deployments */}
@@ -72,8 +86,8 @@ const Dashboard = () => {
           <ActiveDeployments deployments={deployments} projects={projects || []} />
         )}
 
-        {/* Quick Stats */}
-        {isProjectsLoading ? (
+        {/* Quick Stats - Real Analytics */}
+        {isStatsLoading ? (
           <>
             <div className="col-span-1">
               <CardSkeleton />
@@ -91,9 +105,16 @@ const Dashboard = () => {
               className="col-span-1"
             >
               <div className="glass rounded-xl p-5 h-full">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Total Deployments</p>
-                <p className="text-3xl font-bold text-foreground">1,247</p>
-                <p className="text-xs text-success mt-2">+23 this week</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <Rocket className="w-4 h-4 text-primary" />
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Deployments</p>
+                </div>
+                <p className="text-3xl font-bold text-foreground">
+                  {analytics?.totalDeployments.toLocaleString() || '0'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  +{analytics?.deploymentsThisWeek || 0} this week
+                </p>
               </div>
             </motion.div>
             <motion.div
@@ -103,9 +124,16 @@ const Dashboard = () => {
               className="col-span-1"
             >
               <div className="glass rounded-xl p-5 h-full">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Avg Build Time</p>
-                <p className="text-3xl font-bold text-foreground">47s</p>
-                <p className="text-xs text-success mt-2">-12% faster</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="w-4 h-4 text-accent" />
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Avg Build Time</p>
+                </div>
+                <p className="text-3xl font-bold text-foreground">
+                  {analytics?.avgBuildTime ? formatDuration(analytics.avgBuildTime) : '—'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  last 30 days
+                </p>
               </div>
             </motion.div>
           </>

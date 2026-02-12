@@ -18,8 +18,9 @@ import { useDeploymentLogs } from "@/hooks/use-deployment-logs";
 import { ProjectDetailSkeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { LogSource } from "@/types/project";
+import AnalyticsPanel from "@/components/project/AnalyticsPanel";
 
-const tabs = ["Overview", "Deployments", "Logs", "Storage", "Settings"];
+const tabs = ["Overview", "Deployments", "Logs", "Analytics", "Storage", "Settings"];
 
 const ProjectDetail = () => {
   const router = useRouter();
@@ -102,6 +103,8 @@ const ProjectDetail = () => {
             isLoading={isLogsLoading}
           />
         );
+      case "Analytics":
+        return <AnalyticsPanel project={project} />;
       case "Storage":
         return <StoragePanel />;
       case "Settings":

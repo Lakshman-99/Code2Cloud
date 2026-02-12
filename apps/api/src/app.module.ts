@@ -12,6 +12,7 @@ import { SettingsModule } from "./settings/settings.module";
 import { HealthModule } from "./health/health.module";
 import { InternalModule } from "./internal/internal.module";
 import { MailModule } from "./mail/mail.module";
+import { AnalyticsModule } from "./analytics/analytics.module";
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { MailModule } from "./mail/mail.module";
     HealthModule,
     InternalModule,
     MailModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
