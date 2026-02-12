@@ -286,6 +286,7 @@
       ansible.builtin.shell: |
         find /tmp/k8s-manifests -name "*.yaml" -exec sed -i \
           -e 's|\${DOMAIN}|{{ domain }}|g' \
+          -e 's|\${MY_DOMAIN}|{{ my_domain }}|g' \
           -e 's|\${API_SUBDOMAIN}|{{ api_subdomain }}|g' \
           -e 's|\${DEPLOY_WILDCARD}|{{ deploy_wildcard }}|g' \
           -e 's|\${LETSENCRYPT_EMAIL}|{{ letsencrypt_email }}|g' \
@@ -346,6 +347,17 @@
           -n cert-manager --timeout=120s
       environment:
         KUBECONFIG: "{{ kubeconfig_remote }}"
+      tags: [k8s, cert-manager]
+
+    - name: Create Cloudflare API token secret for cert-manager
+      ansible.builtin.shell: |
+        kubectl create secret generic cloudflare-api-token \
+          --namespace cert-manager \
+          --from-literal=api-token={{ cloudflare_api_token }} \
+          --dry-run=client -o yaml | kubectl apply -f -
+      environment:
+        KUBECONFIG: "{{ kubeconfig_remote }}"
+      no_log: true
       tags: [k8s, cert-manager]
 
     - name: Apply ClusterIssuers
