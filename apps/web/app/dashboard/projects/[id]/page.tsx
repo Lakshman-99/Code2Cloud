@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { LogSource } from "@/types/project";
 import AnalyticsPanel from "@/components/project/AnalyticsPanel";
 
-const tabs = ["Overview", "Deployments", "Logs", "Analytics", "Storage", "Settings"];
+const tabs = ["Overview", "Deployments", "Logs", "Analytics", "Settings"];
 
 const ProjectDetail = () => {
   const router = useRouter();

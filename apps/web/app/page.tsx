@@ -636,7 +636,7 @@ export default function Home() {
               </a>
             ))}
           </div>
-          <Link href="/auth" className="group px-4 py-2 text-sm font-medium rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/30 transition-all">
+          <Link href="/dashboard" className="group px-4 py-2 text-sm font-medium rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/30 transition-all">
             Get Started <ArrowRight className="w-3.5 h-3.5 inline ml-1 group-hover:translate-x-0.5 transition-transform" />
           </Link>
         </div>
@@ -702,7 +702,7 @@ export default function Home() {
               className="flex flex-wrap gap-4"
             >
               <Link
-                href="/auth"
+                href="/dashboard"
                 className="group inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-medium text-sm text-white bg-emerald-600 hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-600/20 hover:shadow-emerald-500/30"
               >
                 <Rocket className="w-4 h-4" />
@@ -1453,8 +1453,8 @@ export default function Home() {
       </Section>
 
       {/* ══════════════════════════════════════════════════════
-           CTA
-           ══════════════════════════════════════════════════════ */}
+        CTA
+        ══════════════════════════════════════════════════════ */}
       <Section>
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center max-w-2xl mx-auto">
           <motion.div initial={{ scale: 0 }} whileInView={{ scale: 1 }} viewport={{ once: true }} className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-8">
@@ -1463,7 +1463,7 @@ export default function Home() {
           <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Ready to deploy?</h2>
           <p className="text-zinc-400 text-lg mb-10 leading-relaxed">Connect GitHub. Push code. The Go worker handles the rest.</p>
           <div className="flex flex-wrap justify-center gap-4">
-            <Link href="/auth" className="group inline-flex items-center gap-2 px-8 py-4 rounded-xl font-medium text-white bg-emerald-600 hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-600/20 hover:shadow-emerald-500/30 text-base">
+            <Link href="/dashboard" className="group inline-flex items-center gap-2 px-8 py-4 rounded-xl font-medium text-white bg-emerald-600 hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-600/20 hover:shadow-emerald-500/30 text-base">
               Get Started Free
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>

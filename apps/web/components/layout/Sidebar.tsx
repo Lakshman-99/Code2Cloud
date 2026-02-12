@@ -49,7 +49,7 @@ export const Sidebar = () => {
     } finally {
       tokenManager.clearTokens();
       toast.success("Logged out successfully", { id: toastId });
-      router.push('/auth');
+      router.push('/');
     }
   };
 
