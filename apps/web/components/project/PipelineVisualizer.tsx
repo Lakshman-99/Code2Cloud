@@ -75,6 +75,13 @@ function getStepsFromStatus(deploymentStatus?: DeploymentStatus): PipelineStep[]
       { icon: Rocket, label: "Deploy", sublabel: "Expired", status: "completed" },
       { icon: Globe, label: "Ready", status: "pending" },
     ],
+    [DeploymentStatus.SUPERSEDED]: [
+      { icon: Clock, label: "Queued", sublabel: "Done", status: "completed" },
+      { icon: GitCommit, label: "Source", sublabel: "Cloned", status: "completed" },
+      { icon: Hammer, label: "Build", sublabel: "Done", status: "completed" },
+      { icon: Rocket, label: "Deploy", sublabel: "Superseded", status: "completed" },
+      { icon: Globe, label: "Ready", status: "completed" },
+    ],
   };
 
   return map[s];

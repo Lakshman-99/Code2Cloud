@@ -60,6 +60,10 @@ const DeploymentActivityChart = ({ data, deploymentsThisWeek }: DeploymentActivi
                     <stop offset="5%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0.3} />
                     <stop offset="95%" stopColor="hsl(0, 84%, 60%)" stopOpacity={0} />
                   </linearGradient>
+                  <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(240, 5%, 35%)" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="hsl(240, 5%, 35%)" stopOpacity={0} />
+                  </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(240, 10%, 12%)" />
                 <XAxis
@@ -87,22 +91,22 @@ const DeploymentActivityChart = ({ data, deploymentsThisWeek }: DeploymentActivi
                 />
                 <Area
                   type="monotone"
-                  dataKey="success"
-                  name="Successful"
-                  stroke="hsl(142, 71%, 45%)"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorSuccess)"
-                  stackId="1"
-                />
-                <Area
-                  type="monotone"
                   dataKey="failed"
                   name="Failed"
                   stroke="hsl(0, 84%, 60%)"
                   strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#colorFailed)"
+                  stackId="1"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="success"
+                  name="Successful"
+                  stroke="hsl(142, 71%, 45%)"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#colorSuccess)"
                   stackId="1"
                 />
               </AreaChart>

@@ -42,10 +42,8 @@ type DeployResult struct {
 	ServiceName    string
 	IngressName    string
 
-	// Access URLs
 	URLs []string
 
-	// Status
 	Ready bool
 }
 
