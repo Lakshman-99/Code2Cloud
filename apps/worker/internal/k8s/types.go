@@ -28,10 +28,10 @@ type DeployOptions struct {
 func DefaultDeployOptions() DeployOptions {
 	return DeployOptions{
 		Port:          3000,
-		CPURequest:    "100m",
-		CPULimit:      "500m",
-		MemoryRequest: "128Mi",
-		MemoryLimit:   "512Mi",
+		CPURequest:    "50m",
+		CPULimit:      "250m",
+		MemoryRequest: "64Mi",
+		MemoryLimit:   "256Mi",
 		Replicas:      1,
 		HealthPath:    "/health",
 	}
