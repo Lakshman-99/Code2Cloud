@@ -4,7 +4,6 @@ import * as crypto from "crypto";
 import { PrismaService } from "prisma/prisma.service";
 import { QueuesService } from "src/queues/queues.service";
 import { EncryptionService } from "src/common/utils/encryption.service";
-import { UrlUtils } from "src/common/utils/url.utils";
 import { Prisma } from "generated/prisma/client";
 
 // ─────────────────────────────────────────────────────────────
@@ -147,8 +146,8 @@ export class WebhooksService {
           select: { key: true, value: true },
         },
         domains: {
-          where: { status: "ACTIVE" },
           select: { name: true },
+          orderBy: { createdAt: "asc" },
         },
         deployments: {
           where: {
@@ -245,11 +244,6 @@ export class WebhooksService {
     // ── Build domain list from existing project domains ──
     const domains: string[] = project.domains.map((d) => d.name);
 
-    // Safety: ensure at least the default subdomain exists
-    if (domains.length === 0) {
-      domains.push(UrlUtils.generateDeploymentUrl(project.name));
-    }
-
     // ── Decrypt env vars (stored encrypted in DB) ────────
     const envVars: Record<string, string> = {};
     for (const env of project.envVars) {
@@ -267,7 +261,7 @@ export class WebhooksService {
     });
 
     // ── Create deployment record ─────────────────────────
-    const deploymentUrl = UrlUtils.generateDeploymentUrl(project.name);
+    const deploymentUrl = domains[0];
 
     const deployment = await this.prisma.deployment.create({
       data: {
