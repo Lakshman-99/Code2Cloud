@@ -67,11 +67,11 @@ metadata:
 spec:
   hard:
     requests.cpu: "2"           # Total CPU requests allowed
-    requests.memory: 8Gi        # Total memory requests allowed
-    limits.cpu: "3"             # Total CPU limits allowed
-    limits.memory: 12Gi         # Total memory limits allowed
+    requests.memory: 12Gi        # Total memory requests allowed
+    limits.cpu: "8"             # Total CPU limits allowed
+    limits.memory: 16Gi         # Total memory limits allowed
     pods: "20"                  # Max pods in namespace
-    services: "10"              # Max services
+    services: "15"              # Max services
     persistentvolumeclaims: "5" # Max PVCs
 
 ---
@@ -85,9 +85,9 @@ metadata:
 spec:
   limits:
     - default:
-        cpu: "500m"
-        memory: "512Mi"
+        cpu: "250m"
+        memory: "256Mi"
       defaultRequest:
-        cpu: "100m"
-        memory: "128Mi"
+        cpu: "50m"
+        memory: "64Mi"
       type: Container

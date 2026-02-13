@@ -1,6 +1,14 @@
 # =============================================================================
 # Istiod Helm Values
 # =============================================================================
+pilot:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
 
 meshConfig:
   enableAutoMtls: true
@@ -9,3 +17,11 @@ meshConfig:
 global:
   proxy:
     holdApplicationUntilProxyStarts: true
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
