@@ -34,7 +34,7 @@ const AuthPage = () => {
     formState: { errors },
   } = useForm<any>({
     resolver: zodResolver(isLogin ? signInSchema : signUpSchema),
-    defaultValues: { email: "siva.l@northeastern.edu", password: "Code@2024", name: "" },
+    defaultValues: { email: "", password: "", name: "" },
   });
 
   const onSubmit = async (data: any) => {
