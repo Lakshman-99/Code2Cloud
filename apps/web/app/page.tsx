@@ -739,11 +739,16 @@ export default function Home() {
                 transition={{ delay: 0.6 + i * 0.1 }}
                 className="flex flex-col items-center justify-center py-8 px-4 text-center bg-[#030712]/80 group hover:bg-emerald-500/[0.03] transition-colors"
               >
-                <stat.icon className="w-4 h-4 text-emerald-500/40 mb-3 group-hover:text-emerald-400 transition-colors" />
-                <div className="text-2xl md:text-3xl font-bold text-white mb-1">
-                  <AnimatedNumber value={stat.value} suffix={stat.suffix} />
+                {/* Icon + Number Group */}
+                <div className="flex items-center gap-2 mb-2"> {/* Added small mb-2 here to space away from label */}
+                  <stat.icon className="w-5 h-5 md:w-6 md:h-6 text-emerald-500/40 group-hover:text-emerald-400 transition-colors" />
+                  <div className="text-2xl md:text-3xl font-bold text-white leading-none">
+                    <AnimatedNumber value={stat.value} suffix={stat.suffix} />
+                  </div>
                 </div>
-                <p className="text-zinc-600 text-xs">{stat.label}</p>
+                
+                {/* Label */}
+                <p className="text-zinc-600 text-xs uppercase tracking-wider">{stat.label}</p>
               </motion.div>
             ))}
           </motion.div>
